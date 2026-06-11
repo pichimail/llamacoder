@@ -102,7 +102,7 @@ function PreviewModeSwitcher({
 }) {
   return (
     <div
-      className="inline-flex items-center rounded-lg border border-border bg-background p-1 shadow-sm"
+      className="inline-flex items-center rounded-md border border-border bg-background p-0.5 shadow-sm"
       role="toolbar"
       aria-label="Preview device toggle"
     >
@@ -117,10 +117,10 @@ function PreviewModeSwitcher({
             aria-label={`Show ${label.toLowerCase()} preview`}
             onClick={() => onChange(value)}
             data-active={isActive ? true : undefined}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring data-[active]:bg-primary data-[active]:text-primary-foreground"
+            className="inline-flex h-7 items-center justify-center gap-1 rounded-sm px-2 text-[11px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring data-[active]:bg-primary data-[active]:text-primary-foreground sm:px-2.5"
           >
             <Icon className="size-3.5" aria-hidden="true" />
-            {label}
+            <span className="hidden sm:inline">{label}</span>
           </button>
         );
       })}
