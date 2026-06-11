@@ -153,17 +153,17 @@ export default function Home() {
         <div className="absolute inset-0 z-0 overflow-hidden">
           <LiquidEther
             colors={["#5227FF", "#FF9FFC", "#B497CF"]}
-            mouseForce={24}
-            cursorSize={130}
+            mouseForce={4}
+            cursorSize={190}
             isViscous={false}
-            viscous={30}
-            iterationsViscous={32}
-            iterationsPoisson={18}
-            resolution={0.5}
-            isBounce={true}
+            viscous={1}
+            iterationsViscous={1}
+            iterationsPoisson={1}
+            resolution={0.2}
+            isBounce={false}
             autoDemo={true}
-            autoSpeed={0.5}
-            autoIntensity={2.2}
+            autoSpeed={0.85}
+            autoIntensity={0.5}
             takeoverDuration={0.25}
             autoResumeDelay={3000}
             autoRampDuration={0.6}
