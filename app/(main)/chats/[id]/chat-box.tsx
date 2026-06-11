@@ -176,7 +176,7 @@ export default function ChatBox({
                     <option value="plan">Plan</option>
                     <option value="agent">Agent (Full Stack)</option>
                   </select>
-                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-500">
                     ▼
                   </div>
                 </div>
@@ -231,7 +231,7 @@ export default function ChatBox({
                     <button
                       type="button"
                       onClick={() => removeFile(index)}
-                      className="ml-1 text-gray-400 hover:text-red-500"
+                      className="ml-1 text-gray-400 hover:text-red-500 dark:text-gray-500"
                     >
                       ×
                     </button>
@@ -274,7 +274,7 @@ export default function ChatBox({
             <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-gray-200 px-3 py-2 dark:border-gray-800">
               <div className="flex items-center gap-2 pl-1 text-[10px] text-gray-500 dark:text-gray-400">
                 <span>{modelLabel}</span>
-                <span className="text-gray-300 dark:text-gray-700">•</span>
+                <span className="text-gray-400 dark:text-gray-500">•</span>
                 <span className="font-mono">{mode.toUpperCase()} MODE</span>
               </div>
 

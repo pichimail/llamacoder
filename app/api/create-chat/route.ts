@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
             data: [
               {
                 role: "system",
-                content: getMainCodingPrompt('agent', !!fullScreenshotDescription, false),
+                content: getMainCodingPrompt('agent', !!fullScreenshotDescription),
                 position: 0,
               },
               { role: "user", content: userMessage, position: 1 },
