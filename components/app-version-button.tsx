@@ -24,13 +24,13 @@ export function AppVersionButton({
     <div className="my-4">
       <button
         disabled={disabled}
-        className={`inline-flex w-full items-center gap-2 rounded-lg border-4 border-gray-300 p-1.5 dark:border-gray-700 ${
+        className={`inline-flex w-full items-center gap-2 rounded-lg border-4 border-gray-400 p-1.5 dark:border-gray-600 ${
           generating
             ? "animate-pulse"
             : isActive !== undefined
               ? isActive
                 ? "bg-white dark:bg-zinc-950"
-                : "bg-gray-300 hover:border-gray-400 hover:bg-gray-400 dark:bg-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
+                : "bg-gray-200 hover:border-gray-400 hover:bg-gray-300 dark:bg-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
               : "bg-white dark:bg-zinc-950"
         }`}
         onClick={onClick}
@@ -39,10 +39,10 @@ export function AppVersionButton({
           className={`flex size-8 items-center justify-center rounded font-bold ${
             isActive !== undefined
               ? isActive
-                ? "bg-gray-300 dark:bg-zinc-800 dark:text-gray-100"
-                : "bg-gray-200 dark:bg-zinc-700 dark:text-gray-300"
-              : "bg-gray-300 dark:bg-zinc-700"
-          }`}
+                ? "bg-gray-200 dark:bg-zinc-700 dark:text-gray-100"
+                : "bg-gray-300 dark:bg-zinc-800 dark:text-gray-200"
+              : "bg-gray-200 dark:bg-zinc-700"
+          }`} aria-hidden="true"
         >
           V{version}
         </div>

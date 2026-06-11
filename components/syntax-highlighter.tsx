@@ -65,7 +65,7 @@ export default function SyntaxHighlighter({
   }, [file?.content, activeFile, isStreaming]);
 
   if (files.length === 0) {
-    return <div className="p-4 text-gray-500 dark:text-gray-400">No files to display</div>;
+    return <div className="p-4 text-gray-600 dark:text-gray-400" role="status">No files to display</div>;
   }
 
   // Group files by directory structure
@@ -76,8 +76,8 @@ export default function SyntaxHighlighter({
       {files.length > 1 && (
         <>
           {/* Mobile: File tree above code editor */}
-          <div className="block border-b border-gray-200 bg-gray-50 md:hidden dark:border-gray-800 dark:bg-zinc-950">
-            <div className="border-b border-gray-200 p-2 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300">
+          <div className="block border-b border-gray-300 bg-gray-100 md:hidden dark:border-gray-700 dark:bg-zinc-900" role="region" aria-label="File list">
+            <div className="border-b border-gray-300 p-2 text-sm font-medium text-gray-800 dark:border-gray-700 dark:text-gray-200">
               Files ({files.length})
             </div>
             <div className="max-h-32 overflow-y-auto">
@@ -95,9 +95,11 @@ export default function SyntaxHighlighter({
 
           {/* Desktop: File tree as sidebar */}
           <div
-            className={`hidden w-fit max-w-48 border-r border-gray-200 bg-gray-50 md:block md:w-64 dark:border-gray-800 dark:bg-zinc-950 ${isStreaming ? "pointer-events-none opacity-60" : ""}`}
+            className={`hidden w-fit max-w-48 border-r border-gray-300 bg-gray-100 md:block md:w-64 dark:border-gray-700 dark:bg-zinc-900 ${isStreaming ? "pointer-events-none opacity-60" : ""}`}
+            role="tree"
+            aria-label="File explorer"
           >
-            <div className="border-b border-gray-200 p-2 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300">
+            <div className="border-b border-gray-300 p-2 text-sm font-medium text-gray-800 dark:border-gray-700 dark:text-gray-200">
               Files ({files.length})
             </div>
             <div className="overflow-y-auto">
@@ -115,7 +117,7 @@ export default function SyntaxHighlighter({
         </>
       )}
       <div className="flex flex-1 flex-col">
-        <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:bg-zinc-950 dark:text-gray-400">
+        <div className="border-b border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-zinc-900 dark:text-gray-300" aria-live="polite">
           {file?.path}
         </div>
         <div className="flex-1">
@@ -199,7 +201,7 @@ export default function SyntaxHighlighter({
                 />
                 <div className="absolute bottom-4 left-0 right-0 z-20 pb-4 pt-8">
                   <div className="flex items-center justify-center">
-                    <div className="flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm dark:bg-blue-950 dark:text-blue-300">
+                    <div className="flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800 shadow-sm dark:bg-blue-900/70 dark:text-blue-200" role="status" aria-live="polite">
                       <div className="flex space-x-1">
                         <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]"></div>
                         <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></div>
@@ -263,9 +265,12 @@ function FileTree({
           return (
             <div
               key={name}
-              className={`cursor-pointer px-2 py-1 text-sm hover:bg-gray-200 dark:hover:bg-zinc-800 ${
-                isActive ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"
+              className={`cursor-pointer px-2 py-1 text-sm hover:bg-gray-200 focus:bg-gray-200 focus:outline-none dark:hover:bg-zinc-800 dark:focus:bg-zinc-800 ${
+                isActive ? "bg-blue-100 text-blue-800 dark:bg-blue-900/70 dark:text-blue-200 font-medium" : "text-gray-800 dark:text-gray-200"
               }`}
+              role="treeitem"
+              aria-selected={isActive}
+              tabIndex={0}
               onClick={() => onFileSelect(fullPath)}
             >
               📄 {name}
@@ -274,7 +279,7 @@ function FileTree({
         } else {
           return (
             <div key={name}>
-              <div className="px-2 py-1 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <div className="px-2 py-1 text-sm font-medium text-gray-700 dark:text-gray-300" aria-hidden="true">
                 📁 {name}
               </div>
               <div className="ml-4">

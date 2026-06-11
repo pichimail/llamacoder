@@ -96,7 +96,7 @@ export default function ChatLog({
 function UserMessage({ content }: { content: string }) {
   return (
     <div className="relative inline-flex max-w-[80%] items-end gap-3 self-end">
-      <div className="whitespace-pre-wrap break-words rounded bg-white px-4 py-2 text-gray-600 shadow dark:bg-zinc-900 dark:text-gray-300">
+      <div className="whitespace-pre-wrap break-words rounded bg-white px-4 py-2 text-gray-800 shadow dark:bg-zinc-900 dark:text-gray-100" role="log">
         {content}
       </div>
     </div>
@@ -185,7 +185,7 @@ function AssistantMessage({
           return (
             <div
               key={i}
-              className="m-0.5 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-800 dark:bg-zinc-950"
+              className="m-0.5 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-zinc-900" role="status"
             >
               <svg
                 width="14"
@@ -193,14 +193,14 @@ function AssistantMessage({
                 viewBox="0 0 14 14"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="text-gray-600 dark:text-gray-400"
+                className="text-gray-700 dark:text-gray-300" aria-hidden="true"
               >
                 <path
                   d="M10.5 3.5L11.5 2.5L12.5 3.5L11.5 4.5L10.5 3.5ZM2.5 9.5V11.5H4.5L9.5 6.5L7.5 4.5L2.5 9.5ZM0.5 12.5H13.5V14.5H0.5V12.5Z"
                   fill="currentColor"
                 />
               </svg>
-              <span className="font-medium text-gray-700 dark:text-gray-300">{seg.path}</span>
+              <span className="font-medium text-gray-800 dark:text-gray-100">{seg.path}</span>
             </div>
           );
         })}

@@ -111,7 +111,7 @@ export default function Home() {
         <Header />
 
         <div className="mt-10 flex grow flex-col items-center px-4 lg:mt-16">
-          <h1 className="mt-4 text-balance text-center text-4xl leading-none text-gray-700 dark:text-gray-300 md:text-[64px] lg:mt-8">
+          <h1 className="mt-4 text-balance text-center text-4xl leading-none text-gray-900 dark:text-gray-100 md:text-[64px] lg:mt-8">
             Turn your <span className="text-blue-500">idea</span>
             <br className="hidden md:block" /> into an{" "}
             <span className="text-blue-500">app</span>
@@ -177,12 +177,12 @@ export default function Home() {
             }}
           >
             <Fieldset>
-              <div className="relative flex w-full max-w-2xl rounded-xl border border-gray-300 bg-white pb-10 dark:border-gray-800 dark:bg-zinc-950">
+              <div className="relative flex w-full max-w-2xl rounded-xl border border-gray-400 bg-white pb-10 dark:border-gray-700 dark:bg-zinc-950" role="form" aria-label="Create new app from prompt">
                 <div className="w-full">
                   {screenshotLoading && (
                     <div className="relative mx-3 mt-3">
                       <div className="rounded-xl">
-                        <div className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-gray-200 dark:bg-gray-800">
+                        <div className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-gray-300 dark:bg-zinc-700">
                           <Spinner />
                         </div>
                       </div>
@@ -202,7 +202,7 @@ export default function Home() {
                       <button
                         type="button"
                         id="x-circle-icon"
-                        className="absolute -right-3 -top-4 left-14 z-10 size-5 rounded-full bg-white text-gray-900 hover:text-gray-500 dark:bg-zinc-900 dark:text-gray-100 dark:hover:text-gray-400"
+                        className="absolute -right-3 -top-4 left-14 z-10 size-5 rounded-full bg-white text-gray-900 hover:text-gray-600 dark:bg-zinc-800 dark:text-gray-100 dark:hover:text-gray-300" aria-label="Remove attached screenshot"
                         onClick={() => {
                           setScreenshotUrl(undefined);
                           if (fileInputRef.current) {
@@ -239,7 +239,7 @@ export default function Home() {
                       required
                       name="prompt"
                       rows={2}
-                      className="peer absolute inset-0 w-full resize-none bg-transparent px-4 py-3 placeholder-gray-500 focus-visible:outline-none disabled:opacity-50 dark:placeholder-gray-400"
+                      className="peer absolute inset-0 w-full resize-none bg-transparent px-4 py-3 placeholder-gray-600 focus-visible:outline-none disabled:opacity-50 dark:placeholder-gray-400" aria-label="App description prompt"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       onPaste={(e) => {
@@ -293,7 +293,7 @@ export default function Home() {
                       value={model}
                       onValueChange={setModel}
                     >
-                      <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 dark:hover:bg-gray-800 dark:hover:text-gray-200">
+                      <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-zinc-800 dark:hover:text-gray-100" aria-label="Select AI model">
                         <Select.Value aria-label={model}>
                           <span>{selectedModel?.label}</span>
                         </Select.Value>
@@ -302,15 +302,15 @@ export default function Home() {
                         </Select.Icon>
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
+                        <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/10 dark:bg-zinc-900 dark:ring-white/10" role="listbox">
                           <Select.Viewport className="space-y-1 p-2">
                             {MODELS.filter((m) => !m.hidden).map((m) => (
                               <Select.Item
                                 key={m.value}
                                 value={m.value}
-                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-100 data-[highlighted]:outline-none dark:data-[highlighted]:bg-gray-800"
+                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-200 data-[highlighted]:outline-none dark:data-[highlighted]:bg-zinc-800" role="option"
                               >
-                                <Select.ItemText className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                <Select.ItemText className="inline-flex items-center gap-2 text-gray-700 dark:text-gray-300">
                                   {m.label}
                                 </Select.ItemText>
                                 <Select.ItemIndicator>
@@ -325,14 +325,14 @@ export default function Home() {
                       </Select.Portal>
                     </Select.Root>
 
-                    <div className="h-4 w-px bg-gray-200 dark:bg-gray-800 max-sm:hidden" />
+                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-700 max-sm:hidden" aria-hidden="true" />
 
                     <Select.Root
                       name="quality"
                       value={quality}
                       onValueChange={setQuality}
                     >
-                      <Select.Trigger className="inline-flex items-center gap-1 rounded p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 dark:hover:bg-gray-800 dark:hover:text-gray-200">
+                      <Select.Trigger className="inline-flex items-center gap-1 rounded p-1 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-zinc-800 dark:hover:text-gray-100" aria-label="Select quality">
                         <Select.Value aria-label={quality}>
                           <span className="max-sm:hidden">
                             {quality === "low"
@@ -348,15 +348,15 @@ export default function Home() {
                         </Select.Icon>
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
+                        <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/10 dark:bg-zinc-900 dark:ring-white/10" role="listbox">
                           <Select.Viewport className="space-y-1 p-2">
                             {qualityOptions.map((q) => (
                               <Select.Item
                                 key={q.value}
                                 value={q.value}
-                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-100 data-[highlighted]:outline-none dark:data-[highlighted]:bg-gray-800"
+                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-200 data-[highlighted]:outline-none dark:data-[highlighted]:bg-zinc-800" role="option"
                               >
-                                <Select.ItemText className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                <Select.ItemText className="inline-flex items-center gap-2 text-gray-700 dark:text-gray-300">
                                   {q.label}
                                 </Select.ItemText>
                                 <Select.ItemIndicator>
@@ -370,13 +370,13 @@ export default function Home() {
                         </Select.Content>
                       </Select.Portal>
                     </Select.Root>
-                    <div className="h-4 w-px bg-gray-200 dark:bg-gray-800 max-sm:hidden" />
+                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-700 max-sm:hidden" aria-hidden="true" />
                     <div>
                       <label
                         htmlFor="screenshot"
-                        className="flex cursor-pointer gap-2 text-sm text-gray-400 hover:underline dark:hover:text-gray-300"
+                        className="flex cursor-pointer gap-2 text-sm text-gray-600 hover:underline dark:hover:text-gray-300" aria-label="Attach screenshot or design image"
                       >
-                        <div className="flex size-6 items-center justify-center rounded bg-black hover:bg-gray-700 dark:bg-white dark:text-black dark:hover:bg-gray-200">
+                        <div className="flex size-6 items-center justify-center rounded bg-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100" aria-hidden="true">
                           <UploadIcon className="size-4" />
                         </div>
                         <div className="flex items-center justify-center transition hover:text-gray-700 dark:hover:text-gray-300">
@@ -434,7 +434,7 @@ export default function Home() {
                         }
                       }, 0);
                     }}
-                    className="rounded bg-[#E5E9EF] px-2.5 py-1.5 text-xs tracking-[0%] transition-colors hover:bg-[#cccfd5] dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                    className="rounded bg-gray-200 px-2.5 py-1.5 text-xs tracking-[0%] transition-colors hover:bg-gray-300 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700" role="button"
                   >
                     {v.title}
                   </button>
@@ -453,8 +453,8 @@ export default function Home() {
 const Footer = memo(() => {
   return (
     <footer className="flex w-full flex-col items-center justify-between space-y-3 px-5 pb-3 pt-5 text-center sm:flex-row sm:pt-2">
-      <div className="font-medium text-gray-700 dark:text-gray-300">Chinna-Coder</div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">Build apps from a single prompt.</div>
+      <div className="font-medium text-gray-800 dark:text-gray-200">Chinna-Coder</div>
+      <div className="text-sm text-gray-600 dark:text-gray-400">Build apps from a single prompt.</div>
     </footer>
   );
 });
@@ -467,8 +467,8 @@ function LoadingMessage({
   screenshotUrl: string | undefined;
 }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white px-1 py-3 md:px-3 dark:bg-zinc-950">
-      <div className="flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white px-1 py-3 md:px-3 dark:bg-zinc-950" role="status" aria-live="polite">
+      <div className="flex flex-col items-center justify-center gap-2 text-gray-600 dark:text-gray-400">
         <span className="animate-pulse text-balance text-center text-sm md:text-base">
           {isHighQuality
             ? `Coming up with project plan, may take 15 seconds...`

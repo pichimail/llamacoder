@@ -159,18 +159,19 @@ export default function ChatBox({
         onSubmit={handleSubmit}
       >
         <fieldset className="w-full" disabled={disabled}>
-          <div className="relative flex flex-col rounded-2xl border border-gray-300 bg-white shadow-sm dark:border-gray-800 dark:bg-zinc-950">
+          <div className="relative flex flex-col rounded-2xl border border-gray-400 bg-white shadow-sm dark:border-gray-700 dark:bg-zinc-950" role="form" aria-label="Chat input form">
             
             {/* Mode Selector + Upload Bar - Lovable.dev style */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+            <div className="flex items-center justify-between border-b border-gray-300 px-3 py-2 dark:border-gray-700">
               <div className="flex items-center gap-2">
                 {/* Mode Dropdown */}
                 <div className="relative">
                   <select
                     value={mode}
                     onChange={(e) => setMode(e.target.value as 'ask' | 'plan' | 'agent')}
-                    className="appearance-none rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-zinc-900 dark:text-gray-300"
+                    className="appearance-none rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-zinc-900 dark:text-gray-200"
                     disabled={disabled}
+                    aria-label="Generation mode"
                   >
                     <option value="ask">Ask</option>
                     <option value="plan">Plan</option>
@@ -181,7 +182,7 @@ export default function ChatBox({
                   </div>
                 </div>
 
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                <div id="mode-description" className="text-[10px] text-gray-600 dark:text-gray-400" aria-live="polite">
                   {mode === 'agent' && 'Full backend + SaaS admin'}
                   {mode === 'plan' && 'Architecture first'}
                   {mode === 'ask' && 'Quick answers'}
@@ -193,9 +194,10 @@ export default function ChatBox({
                 type="button"
                 onClick={triggerFileUpload}
                 disabled={disabled}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-zinc-900"
+                className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-200 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-zinc-800"
+                aria-label="Upload screenshot, HTML or TSX file for analysis"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Upload (img / .html / .tsx)
@@ -212,7 +214,7 @@ export default function ChatBox({
 
             {/* Attached Files Preview */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+              <div className="flex flex-wrap gap-2 border-b border-gray-300 px-3 py-2 dark:border-gray-700" role="list" aria-label="Attached files">
                 {attachedFiles.map((file, index) => (
                   <div
                     key={index}
@@ -225,13 +227,14 @@ export default function ChatBox({
                         {file.name.split('.').pop()?.toUpperCase()}
                       </div>
                     )}
-                    <span className="max-w-[120px] truncate font-medium text-gray-700 dark:text-gray-300" title={file.name}>
+                    <span className="max-w-[120px] truncate font-medium text-gray-800 dark:text-gray-200" title={file.name}>
                       {file.name}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeFile(index)}
-                      className="ml-1 text-gray-400 hover:text-red-500 dark:text-gray-500"
+                      className="ml-1 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                      aria-label={`Remove attached file ${file.name}`}
                     >
                       ×
                     </button>
@@ -260,7 +263,7 @@ export default function ChatBox({
                 onChange={(e) => setPrompt(e.target.value)}
                 required={attachedFiles.length === 0}
                 name="prompt"
-                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder-gray-500 focus:outline-none disabled:opacity-50 dark:placeholder-gray-400"
+                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder-gray-600 focus:outline-none disabled:opacity-50 dark:placeholder-gray-400" aria-describedby="mode-description"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -271,22 +274,23 @@ export default function ChatBox({
             </div>
 
             {/* Bottom Bar */}
-            <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-gray-200 px-3 py-2 dark:border-gray-800">
-              <div className="flex items-center gap-2 pl-1 text-[10px] text-gray-500 dark:text-gray-400">
+            <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-gray-300 px-3 py-2 dark:border-gray-700">
+              <div className="flex items-center gap-2 pl-1 text-[10px] text-gray-600 dark:text-gray-400" aria-live="polite">
                 <span>{modelLabel}</span>
-                <span className="text-gray-400 dark:text-gray-500">•</span>
+                <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">•</span>
                 <span className="font-mono">{mode.toUpperCase()} MODE</span>
               </div>
 
               <button
                 type="submit"
                 disabled={disabled || (!prompt.trim() && attachedFiles.length === 0)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={mode === 'agent' ? 'Build full stack app' : 'Send message'}
               >
                 <Spinner loading={disabled}>
                   {mode === 'agent' ? 'Build Full Stack' : 'Send'}
                 </Spinner>
-                <ArrowRightIcon className="h-3.5 w-3.5" />
+                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>
