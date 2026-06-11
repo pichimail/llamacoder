@@ -4,11 +4,10 @@
 import Fieldset from "@/components/fieldset";
 import ArrowRightIcon from "@/components/icons/arrow-right";
 import LoadingButton from "@/components/loading-button";
-import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useState, useRef, useTransition, useLayoutEffect, useEffect, useMemo, memo } from "react";
+import { use, useState, useRef, useTransition, useLayoutEffect, useEffect, memo } from "react";
 import { Context } from "./providers";
 import Header from "@/components/header";
 import HyperspeedBackground from "@/components/hyperspeed-background";
@@ -119,30 +118,38 @@ export default function Home() {
                   </div>
                 )}
 
-                <textarea ref={textareaRef} placeholder="Describe what to build" required rows={4}
+                <textarea
+                  ref={textareaRef}
+                  placeholder="Describe what to build"
+                  required
+                  rows={4}
                   className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[120px]"
-                  value={prompt} onChange={e => setPrompt(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} />
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+                />
 
-                <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                {/* Sleek minimal toolbar - no separator, no extra backgrounds */}
+                <div className="mt-4 flex items-center justify-between pt-3">
                   <div className="flex items-center gap-2">
-                    <label htmlFor="file" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent hover:text-foreground">
+                    <label htmlFor="file" className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-zinc-800 hover:text-foreground transition-colors">
                       <Plus className="h-4 w-4" />
                     </label>
                     <input id="file" type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.tsx,.jsx,.html" disabled={!isUploadAvailable} />
 
+                    {/* Mode - sleek */}
                     <Select.Root value={mode} onValueChange={v => setMode(v as Mode)}>
-                      <Select.Trigger className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
-                        <span className="font-medium">{currentMode.icon} {currentMode.label}</span>
-                        <ChevronDownIcon className="h-3.5 w-3.5 opacity-50" />
+                      <Select.Trigger className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
+                        <span>{currentMode.icon} {currentMode.label}</span>
+                        <ChevronDownIcon className="h-3 w-3 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="z-[999] overflow-hidden rounded-xl border border-border bg-popover shadow-xl text-sm" sideOffset={6}>
+                        <Select.Content className="z-[999] overflow-hidden rounded-lg border border-border bg-popover shadow-xl text-sm" sideOffset={4}>
                           <Select.Viewport className="p-1">
                             {modes.map(m => (
-                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-[7px] hover:bg-accent data-[highlighted]:bg-accent">
+                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent">
                                 <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
-                                {mode === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
+                                {mode === m.value && <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />}
                               </Select.Item>
                             ))}
                           </Select.Viewport>
@@ -150,18 +157,19 @@ export default function Home() {
                       </Select.Portal>
                     </Select.Root>
 
+                    {/* Model - sleek */}
                     <Select.Root value={model} onValueChange={setModel}>
-                      <Select.Trigger className="flex h-9 min-w-[200px] items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
+                      <Select.Trigger className="flex h-8 min-w-[180px] items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
                         <Select.Value>{getModelLabel(model)}</Select.Value>
-                        <ChevronDownIcon className="h-3.5 w-3.5 opacity-50" />
+                        <ChevronDownIcon className="h-3 w-3 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="z-[999] max-h-[340px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl text-sm" sideOffset={6}>
+                        <Select.Content className="z-[999] max-h-[320px] overflow-hidden rounded-lg border border-border bg-popover shadow-xl text-sm" sideOffset={4}>
                           <Select.Viewport className="p-1">
                             {MODELS.filter(m => !m.hidden).map(m => (
-                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-[7px] hover:bg-accent data-[highlighted]:bg-accent">
+                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent">
                                 <Select.ItemText>{m.label}</Select.ItemText>
-                                {model === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
+                                {model === m.value && <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />}
                               </Select.Item>
                             ))}
                           </Select.Viewport>
@@ -170,7 +178,7 @@ export default function Home() {
                     </Select.Root>
                   </div>
 
-                  <LoadingButton type="submit" disabled={screenshotLoading || !prompt.trim()} className="flex h-9 items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+                  <LoadingButton type="submit" disabled={screenshotLoading || !prompt.trim()} className="flex h-8 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 transition-colors">
                     <ArrowRightIcon className="h-4 w-4" />
                   </LoadingButton>
                 </div>
@@ -178,7 +186,7 @@ export default function Home() {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {SUGGESTED_PROMPTS.map(v => (
-                  <button key={v.title} type="button" onClick={() => { setPrompt(v.description); setTimeout(() => textareaRef.current?.focus(), 0); }} className="rounded-lg bg-muted px-3 py-1 text-xs text-foreground hover:bg-accent">
+                  <button key={v.title} type="button" onClick={() => { setPrompt(v.description); setTimeout(() => textareaRef.current?.focus(), 0); }} className="rounded-md bg-muted px-3 py-1 text-xs text-foreground hover:bg-zinc-800 transition-colors">
                     {v.title}
                   </button>
                 ))}
