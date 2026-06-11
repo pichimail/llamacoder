@@ -45,6 +45,7 @@ function applyTheme(theme: Theme) {
 
   root.classList.remove("light", "dark");
   root.classList.add(resolved);
+  root.style.colorScheme = resolved;
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -72,6 +73,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(newResolved);
+    root.style.colorScheme = newResolved;
   }, [systemIsDark, theme]);
 
   const setTheme = (newTheme: Theme) => {

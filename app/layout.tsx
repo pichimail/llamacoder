@@ -39,7 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full" suppressHydrationWarning>
+    <html
+      lang="en"
+      className="h-full bg-background text-foreground"
+      suppressHydrationWarning
+    >
       <head>
         <PlausibleProvider domain="llamacoder.io" />
         {/* Prevent FOUC by setting theme class before hydration */}
@@ -57,6 +61,7 @@ export default function RootLayout({
     var root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(resolved);
+    root.style.colorScheme = resolved;
   } catch (e) {}
 })();
             `,

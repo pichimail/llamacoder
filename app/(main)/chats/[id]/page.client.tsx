@@ -135,7 +135,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
   }, [chat.id, router, streamPromise, context]);
 
   return (
-    <div className="h-dvh">
+    <div className="h-dvh bg-background text-foreground">
       <div className="flex h-full">
         <div
           className={`flex w-full shrink-0 flex-col overflow-hidden ${isShowingCodeViewer ? "lg:w-[30%]" : "lg:w-full"}`}
