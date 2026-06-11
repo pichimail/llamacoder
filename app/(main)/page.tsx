@@ -42,6 +42,9 @@ export default function Home() {
     undefined,
   );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [s3UploadConfigured, setS3UploadConfigured] = useState<boolean | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -53,7 +56,32 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUploadConfig() {
+      try {
+        const response = await fetch("/api/s3-upload/config", {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Upload config unavailable");
+        const data = (await response.json()) as {
+          configured?: boolean;
+        };
+        if (!cancelled) setS3UploadConfigured(!!data.configured);
+      } catch {
+        if (!cancelled) setS3UploadConfigured(false);
+      }
+    }
+
+    loadUploadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const { uploadToS3 } = useS3Upload();
+  const isScreenshotUploadAvailable = s3UploadConfigured === true;
 
   const selectedModel = useMemo(
     () => MODELS.find((m) => m.value === model),
@@ -68,6 +96,20 @@ export default function Home() {
     [],
   );
   const handleScreenshotUpload = async (event: any) => {
+    if (!isScreenshotUploadAvailable) {
+      setScreenshotUrl(undefined);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      toast({
+        title: "Screenshot upload unavailable",
+        description:
+          "S3 upload is not configured in this environment, so attachments are disabled.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (prompt.length === 0) setPrompt("Build this");
     setQuality("low");
     setScreenshotLoading(true);
@@ -374,13 +416,13 @@ export default function Home() {
                     <div>
                       <label
                         htmlFor="screenshot"
-                        className="flex cursor-pointer gap-2 text-sm text-muted-foreground hover:text-foreground hover:underline" aria-label="Attach screenshot or design image"
+                        className={`flex gap-2 text-sm text-muted-foreground hover:text-foreground hover:underline ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50 hover:no-underline" : "cursor-pointer"}`} aria-label="Attach screenshot or design image"
                       >
                         <div className="flex size-6 items-center justify-center rounded bg-foreground text-background hover:opacity-90" aria-hidden="true">
                           <UploadIcon className="size-4" />
                         </div>
                         <div className="flex items-center justify-center transition">
-                          Attach
+                          {isScreenshotUploadAvailable ? "Attach" : "Attach disabled"}
                         </div>
                       </label>
                       <input
@@ -391,6 +433,7 @@ export default function Home() {
                         onChange={handleScreenshotUpload}
                         className="hidden"
                         ref={fileInputRef}
+                        disabled={!isScreenshotUploadAvailable}
                       />
                     </div>
                   </div>
