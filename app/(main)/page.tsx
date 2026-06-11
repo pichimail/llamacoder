@@ -8,7 +8,7 @@ import LoadingButton from "@/components/loading-button";
 import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
 import assert from "assert";
-import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   use,
@@ -23,7 +23,6 @@ import {
 
 import { Context } from "./providers";
 import Header from "@/components/header";
-import UploadIcon from "@/components/icons/upload-icon";
 import HyperspeedBackground from "@/components/hyperspeed-background";
 import BallpitBackground from "@/components/ballpit-background";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
@@ -353,7 +352,16 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="absolute bottom-2 left-3 right-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="screenshot"
+                    className={`absolute left-0 bottom-0 inline-flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50 hover:bg-background hover:text-muted-foreground" : "cursor-pointer"}`}
+                    aria-label="Attach files"
+                    title={isScreenshotUploadAvailable ? "Attach files" : "Attach disabled"}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                  </label>
+
+                  <div className="flex items-center gap-3 pl-10">
                     <Select.Root
                       name="model"
                       value={model}
@@ -436,30 +444,6 @@ export default function Home() {
                         </Select.Content>
                       </Select.Portal>
                     </Select.Root>
-                    <div className="h-4 w-px bg-border max-sm:hidden" aria-hidden="true" />
-                    <div>
-                      <label
-                        htmlFor="screenshot"
-                        className={`flex gap-2 text-sm text-muted-foreground hover:text-foreground hover:underline ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50 hover:no-underline" : "cursor-pointer"}`} aria-label="Attach screenshot or design image"
-                      >
-                        <div className="flex size-6 items-center justify-center rounded bg-foreground text-background hover:opacity-90" aria-hidden="true">
-                          <UploadIcon className="size-4" />
-                        </div>
-                        <div className="flex items-center justify-center transition">
-                          {isScreenshotUploadAvailable ? "Attach" : "Attach disabled"}
-                        </div>
-                      </label>
-                      <input
-                        // name="screenshot"
-                        id="screenshot"
-                        type="file"
-                        accept="image/png, image/jpeg, image/webp"
-                        onChange={handleScreenshotUpload}
-                        className="hidden"
-                        ref={fileInputRef}
-                        disabled={!isScreenshotUploadAvailable}
-                      />
-                    </div>
                   </div>
 
                   <div className="relative flex shrink-0 has-[:disabled]:opacity-50">
@@ -474,6 +458,16 @@ export default function Home() {
                     </LoadingButton>
                   </div>
                 </div>
+                <input
+                  // name="screenshot"
+                  id="screenshot"
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  onChange={handleScreenshotUpload}
+                  className="hidden"
+                  ref={fileInputRef}
+                  disabled={!isScreenshotUploadAvailable}
+                />
 
                 {isPending && (
                   <LoadingMessage
