@@ -24,7 +24,6 @@ import {
 
 import { Context } from "./providers";
 import Header from "@/components/header";
-import { useS3Upload } from "next-s3-upload";
 import UploadIcon from "@/components/icons/upload-icon";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
@@ -42,7 +41,7 @@ export default function Home() {
     undefined,
   );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [s3UploadConfigured, setS3UploadConfigured] = useState<boolean | null>(
+  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(
     null,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,16 +60,16 @@ export default function Home() {
 
     async function loadUploadConfig() {
       try {
-        const response = await fetch("/api/s3-upload/config", {
+        const response = await fetch("/api/blob-upload/config", {
           cache: "no-store",
         });
         if (!response.ok) throw new Error("Upload config unavailable");
         const data = (await response.json()) as {
           configured?: boolean;
         };
-        if (!cancelled) setS3UploadConfigured(!!data.configured);
+        if (!cancelled) setBlobUploadConfigured(!!data.configured);
       } catch {
-        if (!cancelled) setS3UploadConfigured(false);
+        if (!cancelled) setBlobUploadConfigured(false);
       }
     }
 
@@ -80,8 +79,7 @@ export default function Home() {
     };
   }, []);
 
-  const { uploadToS3 } = useS3Upload();
-  const isScreenshotUploadAvailable = s3UploadConfigured === true;
+  const isScreenshotUploadAvailable = blobUploadConfigured === true;
 
   const selectedModel = useMemo(
     () => MODELS.find((m) => m.value === model),
@@ -104,7 +102,7 @@ export default function Home() {
       toast({
         title: "Screenshot upload unavailable",
         description:
-          "S3 upload is not configured in this environment, so attachments are disabled.",
+          "Blob upload is not configured in this environment, so attachments are disabled.",
         variant: "destructive",
       });
       return;
@@ -116,8 +114,26 @@ export default function Home() {
 
     try {
       const file = event.target.files[0];
-      const { url } = await uploadToS3(file);
-      setScreenshotUrl(url);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/blob-upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let message = "Blob upload failed";
+        try {
+          const error = await response.json();
+          if (error?.error) message = error.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const blob = (await response.json()) as { url?: string };
+      if (!blob.url) throw new Error("Blob upload did not return a URL.");
+      setScreenshotUrl(blob.url);
     } catch (error) {
       console.error("Screenshot upload failed:", error);
       setScreenshotUrl(undefined);
