@@ -2,6 +2,7 @@
 
 import { createMessage } from "@/app/(main)/actions";
 import LogoSmall from "@/components/icons/logo-small";
+import LightRays from "@/components/LightRays";
 import {
   parseReplySegments,
   extractFirstCodeBlock,
@@ -528,8 +529,25 @@ ${error.trimStart()}`;
   }, [chat.id, router, streamPromise, context, autoFixEnabled]);
 
   return (
-    <div className="h-dvh bg-background text-foreground">
-      <div className="flex h-full">
+    <div className="h-dvh bg-background text-foreground relative overflow-hidden">
+      {/* Light rays background */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <LightRays
+          raysOrigin="top-center"
+          raysColor="#67e8f9"
+          raysSpeed={1.1}
+          lightSpread={0.8}
+          rayLength={1.6}
+          fadeDistance={1.4}
+          saturation={0.9}
+          followMouse={true}
+          mouseInfluence={0.18}
+          noiseAmount={0.1}
+          distortion={0.06}
+        />
+      </div>
+
+      <div className="relative z-10 flex h-full">
         <div
           className={`flex w-full shrink-0 flex-col overflow-hidden ${isFullScreenPreview ? "hidden" : isShowingCodeViewer ? "lg:w-[30%]" : "lg:w-full"}`}
         >

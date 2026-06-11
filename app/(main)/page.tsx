@@ -6,6 +6,7 @@ import ArrowRightIcon from "@/components/icons/arrow-right";
 import Hyperspeed from "@/components/Hyperspeed";
 import { hyperspeedPresets } from "@/components/HyperSpeedPresets";
 import LoadingButton from "@/components/loading-button";
+import SpotlightCard from "@/components/SpotlightCard";
 import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -118,7 +119,7 @@ export default function Home() {
             });
           }}>
             <Fieldset>
-              <div className="relative w-full rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <SpotlightCard className="w-full shadow-sm" spotlightColor="rgba(0, 229, 255, 0.2)">
                 {screenshotUrl && (
                   <div className="mb-3 flex items-center gap-2 text-sm">
                     <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1">
@@ -190,7 +191,7 @@ export default function Home() {
                     <ArrowRightIcon className="h-4 w-4" />
                   </LoadingButton>
                 </div>
-              </div>
+              </SpotlightCard>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {SUGGESTED_PROMPTS.map(v => (
