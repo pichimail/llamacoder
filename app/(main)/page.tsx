@@ -10,8 +10,7 @@ import { useRouter } from "next/navigation";
 import { use, useState, useRef, useTransition, useLayoutEffect, useEffect, memo } from "react";
 import { Context } from "./providers";
 import Header from "@/components/header";
-import HyperspeedBackground from "@/components/hyperspeed-background";
-import BallpitBackground from "@/components/ballpit-background";
+import Hyperspeed from "@/components/Hyperspeed";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
@@ -78,11 +77,48 @@ export default function Home() {
     finally { setScreenshotLoading(false); }
   };
 
+  // Four preset options for Hyperspeed (React Bits style)
+  const hyperspeedOptions = {
+    distortion: "LongRaceDistortion",
+    length: 400,
+    roadWidth: 10,
+    islandWidth: 5,
+    lanesPerRoad: 2,
+    fov: 90,
+    fovSpeedUp: 150,
+    speedUp: 2,
+    carLightsFade: 0.4,
+    totalSideLightSticks: 50,
+    lightPairsPerRoadWay: 70,
+    shoulderLinesWidthPercentage: 0.05,
+    brokenLinesWidthPercentage: 0.1,
+    brokenLinesLengthPercentage: 0.5,
+    lightStickWidth: [0.12, 0.5] as [number, number],
+    lightStickHeight: [1.3, 1.7] as [number, number],
+    movingAwaySpeed: [60, 80] as [number, number],
+    movingCloserSpeed: [-120, -160] as [number, number],
+    carLightsLength: [20, 60] as [number, number],
+    carLightsRadius: [0.05, 0.14] as [number, number],
+    carWidthPercentage: [0.3, 0.5] as [number, number],
+    carShiftX: [-0.2, 0.2] as [number, number],
+    carFloorSeparation: [0.05, 1] as [number, number],
+    colors: {
+      roadColor: 0x080808,
+      islandColor: 0x0a0a0a,
+      background: 0x000000,
+      shoulderLines: 0x131318,
+      brokenLines: 0x131318,
+      leftCars: [0xff5f73, 0xe74d60, 0xff102a],
+      rightCars: [0xa4e3e6, 0x80d1d4, 0x53c2c6],
+      sticks: 0xa4e3e6,
+    },
+  };
+
   return (
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
+      {/* New React Bits Hyperspeed as full background */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <div className={`${theme === "dark" && mounted ? "block" : "hidden"}`}><HyperspeedBackground /></div>
-        <div className={`${theme === "dark" && mounted ? "hidden" : "block"}`}><BallpitBackground /></div>
+        <Hyperspeed effectOptions={hyperspeedOptions} interactive={true} />
       </div>
 
       <div className="relative z-10 isolate flex h-full grow flex-col">
@@ -129,7 +165,6 @@ export default function Home() {
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
                 />
 
-                {/* Sleek minimal toolbar - no separator, no extra backgrounds */}
                 <div className="mt-4 flex items-center justify-between pt-3">
                   <div className="flex items-center gap-2">
                     <label htmlFor="file" className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-zinc-800 hover:text-foreground transition-colors">
@@ -137,7 +172,6 @@ export default function Home() {
                     </label>
                     <input id="file" type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.tsx,.jsx,.html" disabled={!isUploadAvailable} />
 
-                    {/* Mode - sleek */}
                     <Select.Root value={mode} onValueChange={v => setMode(v as Mode)}>
                       <Select.Trigger className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
                         <span>{currentMode.icon} {currentMode.label}</span>
@@ -157,7 +191,6 @@ export default function Home() {
                       </Select.Portal>
                     </Select.Root>
 
-                    {/* Model - sleek */}
                     <Select.Root value={model} onValueChange={setModel}>
                       <Select.Trigger className="flex h-8 min-w-[180px] items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
                         <Select.Value>{getModelLabel(model)}</Select.Value>
