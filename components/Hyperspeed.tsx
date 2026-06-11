@@ -1378,13 +1378,25 @@ const Hyperspeed: FC<HyperspeedProps> = ({
       options.distortion = distortions[options.distortion];
     }
 
+    let disposed = false;
     const myApp = new App(container, options, interactive, interactiveScope);
     appRef.current = myApp;
-    myApp.loadAssets().then(myApp.init);
+    myApp.loadAssets().then(() => {
+      if (disposed || appRef.current !== myApp || myApp.disposed) return;
+      myApp.init();
+    }).catch((error) => {
+      if (!disposed && process.env.NODE_ENV !== "production") {
+        console.debug("Hyperspeed failed to initialize", error);
+      }
+    });
 
     return () => {
-      if (appRef.current) {
-        appRef.current.dispose();
+      disposed = true;
+      if (appRef.current === myApp) {
+        appRef.current = null;
+      }
+      if (!myApp.disposed) {
+        myApp.dispose();
       }
     };
   }, [effectOptions, interactive, interactiveScope]);

@@ -27,6 +27,7 @@ import CodeViewerLayout from "./code-viewer-layout";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
+import { toast } from "@/hooks/use-toast";
 
 const HeaderChat = memo(({ chat }: { chat: Chat }) => (
   <div className="flex items-center justify-between gap-4 px-4 py-4">
@@ -314,7 +315,10 @@ ${error.trimStart()}`;
           signal: controller.signal,
         },
       )
-        .then((res) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            throw new Error((await res.text()) || "Failed to start generation");
+          }
           if (!res.body) {
             throw new Error("No body on response");
           }
@@ -326,6 +330,7 @@ ${error.trimStart()}`;
             return null as any;
           }
           abortControllerRef.current = null;
+          toast({ title: "Generation failed", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
           throw err;
         });
 

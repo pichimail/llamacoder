@@ -134,11 +134,17 @@ export default function LiquidEther({
         this.container = container;
         this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         this.resize();
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, depth: false, stencil: false });
         this.renderer.autoClear = false;
         this.renderer.setClearColor(new THREE.Color(0x000000), 0);
         this.renderer.setPixelRatio(this.pixelRatio);
         this.renderer.setSize(this.width, this.height);
+        // Permanent fix: disable depth and stencil entirely for this context to prevent glBlitFramebuffer errors
+        // about read/write depth stencil attachments being the same image.
+        this.renderer.state.buffers.depth.setTest(false);
+        this.renderer.state.buffers.depth.setMask(false);
+        this.renderer.state.buffers.stencil.setTest(false);
+        this.renderer.state.buffers.stencil.setMask(0);
         const el = this.renderer.domElement;
         el.style.width = '100%';
         el.style.height = '100%';
@@ -394,6 +400,11 @@ export default function LiquidEther({
       }
       update(..._args: any[]) {
         if (!Common.renderer || !this.scene || !this.camera) return;
+        // Permanently disable depth/stencil to avoid glBlitFramebuffer errors with depth stencil attachments
+        Common.renderer.state.buffers.depth.setTest(false);
+        Common.renderer.state.buffers.depth.setMask(false);
+        Common.renderer.state.buffers.stencil.setTest(false);
+        Common.renderer.state.buffers.stencil.setMask(0);
         Common.renderer.setRenderTarget(this.props.output || null);
         Common.renderer.render(this.scene, this.camera);
         Common.renderer.setRenderTarget(null);
@@ -431,7 +442,7 @@ export default function LiquidEther({
       init(simProps: any) {
         super.init();
         const mouseG = new THREE.PlaneGeometry(1, 1);
-        const mouseM = new THREE.RawShaderMaterial({ vertexShader: mouse_vert, fragmentShader: externalForce_frag, blending: THREE.AdditiveBlending, depthWrite: false, uniforms: { px: { value: simProps.cellScale }, force: { value: new THREE.Vector2(0, 0) }, center: { value: new THREE.Vector2(0, 0) }, scale: { value: new THREE.Vector2(simProps.cursor_size, simProps.cursor_size) } } });
+        const mouseM = new THREE.RawShaderMaterial({ vertexShader: mouse_vert, fragmentShader: externalForce_frag, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, uniforms: { px: { value: simProps.cellScale }, force: { value: new THREE.Vector2(0, 0) }, center: { value: new THREE.Vector2(0, 0) }, scale: { value: new THREE.Vector2(simProps.cursor_size, simProps.cursor_size) } } });
         this.mouse = new THREE.Mesh(mouseG, mouseM);
         this.scene!.add(this.mouse);
       }
@@ -575,13 +586,21 @@ export default function LiquidEther({
         this.scene = new THREE.Scene();
         this.camera = new THREE.Camera();
         this.output = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.RawShaderMaterial({
-          vertexShader: face_vert, fragmentShader: color_frag, transparent: true, depthWrite: false,
+          vertexShader: face_vert, fragmentShader: color_frag, transparent: true, depthWrite: false, depthTest: false,
           uniforms: { velocity: { value: this.simulation.fbos.vel_0!.texture }, boundarySpace: { value: new THREE.Vector2() }, palette: { value: paletteTex }, bgColor: { value: bgVec4 } }
         }));
         this.scene.add(this.output);
       }
       resize() { this.simulation.resize(); }
-      render() { if (!Common.renderer) return; Common.renderer.setRenderTarget(null); Common.renderer.render(this.scene, this.camera); }
+      render() { 
+        if (!Common.renderer) return; 
+        Common.renderer.state.buffers.depth.setTest(false);
+        Common.renderer.state.buffers.depth.setMask(false);
+        Common.renderer.state.buffers.stencil.setTest(false);
+        Common.renderer.state.buffers.stencil.setMask(0);
+        Common.renderer.setRenderTarget(null); 
+        Common.renderer.render(this.scene, this.camera); 
+      }
       update() { this.simulation.update(); this.render(); }
     }
 

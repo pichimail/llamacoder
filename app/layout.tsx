@@ -42,25 +42,6 @@ export default function RootLayout({
     <html lang="en" className="h-full bg-background text-foreground" suppressHydrationWarning>
       <head>
         <PlausibleProvider domain="llamacoder.io" />
-        {/* Prevent FOUC by setting theme class before hydration */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-(function() {
-  try {
-    var stored = localStorage.getItem('theme');
-    var theme = (stored === 'light' || stored === 'dark')
-      ? stored
-      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    var root = document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-    root.style.colorScheme = theme;
-  } catch (e) {}
-})();
-            `,
-          }}
-        />
       </head>
 
       {children}

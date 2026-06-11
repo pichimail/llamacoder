@@ -98,6 +98,20 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!process.env.DATABASE_URL) {
+    console.error("Missing DATABASE_URL environment variable");
+    return new Response("Server misconfiguration: missing database URL", {
+      status: 500,
+    });
+  }
+
+  if (!process.env.TOGETHER_API_KEY) {
+    console.error("Missing TOGETHER_API_KEY environment variable");
+    return new Response("Server misconfiguration: missing Together AI API key", {
+      status: 500,
+    });
+  }
+
   const neon = new Pool({ connectionString: process.env.DATABASE_URL });
   const adapter = new PrismaNeon(neon);
   const prisma = new PrismaClient({ adapter });
@@ -188,16 +202,25 @@ export async function POST(req: Request) {
     metadata: { type: "followup", messageId },
   });
 
-  const res = await together.chat.completions.create({
-    model: resolveModel(model),
-    reasoning: { enabled: false },
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    stream: true,
-    temperature: 0.4,
-    max_tokens: 9000,
-  });
+  try {
+    const res = await together.chat.completions.create({
+      model: resolveModel(model),
+      reasoning: { enabled: false },
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+      temperature: 0.4,
+      max_tokens: 9000,
+    });
 
-  return new Response(res.toReadableStream());
+    return new Response(res.toReadableStream());
+  } catch (error) {
+    console.error("Error starting completion stream:", error);
+    const message =
+      error instanceof Error
+        ? `Failed to start generation: ${error.message}`
+        : "Failed to start generation";
+    return new Response(message, { status: 500 });
+  }
 }
 
 export const runtime = "edge";

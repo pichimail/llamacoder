@@ -11,7 +11,14 @@ import { logGeneration } from "@/lib/braintrust";
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, model, quality, screenshotUrl } = await request.json();
+    const body = await request.json();
+    const {
+      prompt,
+      model,
+      quality = "low",
+      screenshotUrl,
+      mode = "agent",
+    } = body;
     const resolvedModel = resolveModel(model);
 
     // Fail fast with clear messages if required secrets are missing
@@ -162,7 +169,7 @@ export async function POST(request: NextRequest) {
             data: [
               {
                 role: "system",
-                content: getMainCodingPrompt('agent', !!fullScreenshotDescription), // 2 args to match current getMainCodingPrompt(mode, hasScreenshot) signature
+                content: getMainCodingPrompt(mode, !!fullScreenshotDescription),
                 position: 0,
               },
               { role: "user", content: userMessage, position: 1 },
@@ -184,7 +191,7 @@ export async function POST(request: NextRequest) {
     logGeneration({
       chatId: chat.id,
       model: resolvedModel,
-      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode: "initial" },
+      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode },
       output: userMessage, // the enriched prompt that was used
       metadata: { type: "initial_generation", title },
     });

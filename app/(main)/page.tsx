@@ -101,15 +101,8 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
   }, []);
-  const showHyperspeed =
-    mounted
-      ? resolvedTheme === "dark"
-      : typeof window !== "undefined" && document.documentElement.classList.contains("dark");
-
-  const showLiquidEther =
-    mounted
-      ? resolvedTheme === "light"
-      : typeof window !== "undefined" && !document.documentElement.classList.contains("dark");
+  const showHyperspeed = mounted && resolvedTheme === "dark";
+  const showLiquidEther = mounted && resolvedTheme === "light";
 
   const isUploadAvailable = blobUploadConfigured === true;
 
@@ -205,7 +198,7 @@ export default function Home() {
             />
           </h1>
 
-          <form id="prompt-composer" className="relative mt-8 w-full max-w-[860px]" onSubmit={async (e) => {
+          <form id="prompt-composer" className="relative mt-8 w-full max-w-[820px]" onSubmit={async (e) => {
             e.preventDefault();
             if (!prompt.trim()) return;
             startTransition(async () => {
@@ -251,7 +244,7 @@ export default function Home() {
                     placeholder="Describe what to build"
                     required
                     rows={4}
-                    className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[102px]"
+                    className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[92px]"
                     value={prompt}
                     onChange={e => setPrompt(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
