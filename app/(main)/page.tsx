@@ -3,12 +3,11 @@
 
 import Fieldset from "@/components/fieldset";
 import ArrowRightIcon from "@/components/icons/arrow-right";
-import LightningBoltIcon from "@/components/icons/lightning-bolt";
 import LoadingButton from "@/components/loading-button";
 import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
 import assert from "assert";
-import { CheckIcon, ChevronDownIcon, Plus, Settings } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   use,
@@ -41,14 +40,9 @@ export default function Home() {
     MODELS.find((m) => !m.hidden)?.value || MODELS[0].value,
   );
   const [mode, setMode] = useState<Mode>("agent");
-  const [quality, setQuality] = useState("low");
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
-    undefined,
-  );
+  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(undefined);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(
-    null,
-  );
+  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,133 +50,64 @@ export default function Home() {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    if (textareaRef.current) textareaRef.current.focus();
   }, []);
 
-  useLayoutEffect(() => {
-    setMounted(true);
-  }, []);
+  useLayoutEffect(() => setMounted(true), []);
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadUploadConfig() {
       try {
-        const response = await fetch("/api/blob-upload/config", {
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error("Upload config unavailable");
-        const data = (await response.json()) as {
-          configured?: boolean;
-        };
+        const res = await fetch("/api/blob-upload/config", { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
         if (!cancelled) setBlobUploadConfigured(!!data.configured);
       } catch {
         if (!cancelled) setBlobUploadConfigured(false);
       }
     }
-
     loadUploadConfig();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const isScreenshotUploadAvailable = blobUploadConfigured === true;
 
-  const selectedModel = useMemo(
-    () => MODELS.find((m) => m.value === model),
-    [model],
-  );
-
-  // Full display label for Cursor-style
   const getModelDisplayLabel = (modelValue: string) => {
-    const modelInfo = MODELS.find((m) => m.value === modelValue);
-    if (!modelInfo) return modelValue;
-
-    if (modelInfo.label.includes("GLM")) return "GLM 5 • AGENT MODE";
-    if (modelInfo.label.includes("MiniMax")) return "MiniMax M2.7 (free)";
-    if (modelInfo.label.includes("Qwen")) return "Qwen 3 Coder (free)";
-    return modelInfo.label;
+    const m = MODELS.find((x) => x.value === modelValue);
+    if (!m) return modelValue;
+    if (m.label.includes("GLM")) return "GLM 5 • AGENT MODE";
+    if (m.label.includes("MiniMax")) return "MiniMax M2.7 (free)";
+    if (m.label.includes("Qwen")) return "Qwen 3 Coder (free)";
+    return m.label;
   };
 
-  const qualityOptions = useMemo(
-    () => [
-      { value: "low", label: "Low quality [faster]" },
-      { value: "high", label: "High quality [slower]" },
-    ],
-    [],
-  );
-
-  const modes: { value: Mode; label: string; icon: string }[] = [
-    { value: "ask", label: "Ask", icon: "?" },
-    { value: "plan", label: "Plan", icon: "≡" },
-    { value: "agent", label: "Agent (Full Stack)", icon: "◇" },
+  const modes = [
+    { value: "ask" as const, label: "Ask", icon: "?" },
+    { value: "plan" as const, label: "Plan", icon: "≡" },
+    { value: "agent" as const, label: "Agent (Full Stack)", icon: "◇" },
   ];
+  const currentMode = modes.find((m) => m.value === mode)!;
 
-  const currentMode = modes.find((m) => m.value === mode) || modes[2];
+  const handleAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isScreenshotUploadAvailable) return;
 
-  const handleScreenshotUpload = async (event: any) => {
-    if (!isScreenshotUploadAvailable) {
-      setScreenshotUrl(undefined);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      toast({
-        title: "Screenshot upload unavailable",
-        description:
-          "Blob upload is not configured in this environment, so attachments are disabled.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (prompt.length === 0) setPrompt("Build this");
-    setQuality("low");
     setScreenshotLoading(true);
-
     try {
-      const file = event.target.files[0];
       const formData = new FormData();
       formData.append("file", file);
-
-      const response = await fetch("/api/blob-upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        let message = "Blob upload failed";
-        try {
-          const error = await response.json();
-          if (error?.error) message = error.error;
-        } catch {}
-        throw new Error(message);
-      }
-
-      const blob = (await response.json()) as { url?: string };
-      if (!blob.url) throw new Error("Blob upload did not return a URL.");
-      setScreenshotUrl(blob.url);
-    } catch (error) {
-      console.error("Screenshot upload failed:", error);
-      setScreenshotUrl(undefined);
-      alert(
-        "Screenshot upload is not available right now. You can still generate the app without an attachment.",
-      );
+      const res = await fetch("/api/blob-upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setScreenshotUrl(data.url);
+      if (!prompt) setPrompt("Build this");
+    } catch (err) {
+      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
     } finally {
       setScreenshotLoading(false);
     }
   };
-
-  const textareaResizePrompt = useMemo(
-    () =>
-      prompt
-        .split("\n")
-        .map((text) => (text === "" ? "a" : text))
-        .join("\n"),
-    [prompt],
-  );
 
   return (
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
@@ -200,86 +125,54 @@ export default function Home() {
 
         <div className="mt-10 flex grow flex-col items-center px-4 lg:mt-16">
           <h1 className="mt-4 text-balance text-center text-4xl leading-none text-foreground md:text-[64px] lg:mt-8">
-            Turn your <span className="text-blue-500">idea</span>
-            <br className="hidden md:block" /> into an{" "}
-            <span className="text-blue-500">app</span>
+            Turn your <span className="text-blue-500">idea</span><br className="hidden md:block" /> into an <span className="text-blue-500">app</span>
           </h1>
 
           <form
-            className="relative w-full max-w-2xl pt-6 lg:pt-12"
-            action={async (formData) => {
+            className="relative w-full max-w-[820px] pt-6 lg:pt-12"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!prompt.trim()) return;
+
               startTransition(async () => {
-                const { prompt, model, quality } = Object.fromEntries(formData);
-
-                assert.ok(typeof prompt === "string");
-                assert.ok(typeof model === "string");
-                assert.ok(quality === "high" || quality === "low");
-
-                const response = await fetch("/api/create-chat", {
+                const res = await fetch("/api/create-chat", {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    prompt,
-                    model,
-                    quality,
-                    mode,
-                    screenshotUrl,
-                  }),
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ prompt, model, mode, screenshotUrl }),
                 });
 
-                if (!response.ok) {
-                  let message = "Failed to create chat";
-                  try {
-                    const err = await response.json();
-                    if (err?.error) message = err.error;
-                  } catch {}
-                  toast({
-                    title: "Failed to create chat",
-                    description: message,
-                    variant: "destructive",
-                  });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({}));
+                  toast({ title: "Failed to create chat", description: err.error || "Unknown error", variant: "destructive" });
                   return;
                 }
 
-                const { chatId, lastMessageId } = await response.json();
+                const { chatId, lastMessageId } = await res.json();
+                const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+                  method: "POST",
+                  body: JSON.stringify({ messageId: lastMessageId, model }),
+                }).then((r) => r.body!);
 
-                const streamPromise = fetch(
-                  "/api/get-next-completion-stream-promise",
-                  {
-                    method: "POST",
-                    body: JSON.stringify({ messageId: lastMessageId, model }),
-                  },
-                ).then((res) => {
-                  if (!res.body) {
-                    throw new Error("No body on response");
-                  }
-                  return res.body;
-                });
-
-                startTransition(() => {
-                  setStreamPromise(streamPromise);
-                  router.push(`/chats/${chatId}`);
-                });
+                setStreamPromise(streamPromise);
+                router.push(`/chats/${chatId}`);
               });
             }}
           >
             <Fieldset>
-              <div className="relative flex w-full max-w-2xl flex-col rounded-xl border border-border bg-card pb-14 shadow-sm" role="form" aria-label="Create new app from prompt">
-                {/* Top: Attached file badge (sonner.tsx style) */}
+              <div className="relative w-full rounded-2xl border border-border bg-card p-5 shadow-sm">
+                {/* Attached file badge */}
                 {screenshotUrl && (
-                  <div className="mx-4 mt-4 flex items-center gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1 text-sm">
-                      <span className="text-blue-400">📄</span>
-                      <span>sonner.tsx</span>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1 text-sm">
+                      <span>📎</span>
+                      <span className="font-mono text-xs">{screenshotUrl.split("/").pop()?.slice(0, 20)}...</span>
                       <button
                         type="button"
                         onClick={() => {
                           setScreenshotUrl(undefined);
                           if (fileInputRef.current) fileInputRef.current.value = "";
                         }}
-                        className="ml-1 text-muted-foreground hover:text-foreground"
+                        className="ml-1 text-muted-foreground hover:text-red-500"
                       >
                         ×
                       </button>
@@ -287,61 +180,68 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Textarea */}
-                <div className="relative px-4 pt-4">
-                  <textarea
-                    ref={textareaRef}
-                    placeholder="Describe what to build"
-                    required
-                    name="prompt"
-                    rows={3}
-                    className="w-full resize-y min-h-[80px] bg-transparent px-1 py-2 text-lg placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        const target = event.target;
-                        if (!(target instanceof HTMLTextAreaElement)) return;
-                        target.closest("form")?.requestSubmit();
-                      }
-                    }}
-                  />
-                </div>
+                {/* Textarea - wider */}
+                <textarea
+                  ref={textareaRef}
+                  placeholder="Describe what to build"
+                  required
+                  rows={4}
+                  className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[110px]"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                />
 
-                {/* Bottom Toolbar - Single unified row */}
-                <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between gap-2">
+                {/* Clean single-row toolbar - no extra backgrounds on icons */}
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                   <div className="flex items-center gap-2">
-                    {/* + Attachment Button */}
+                    {/* + Attach */}
                     <label
-                      htmlFor="screenshot"
-                      className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50" : ""}`}
-                      title={isScreenshotUploadAvailable ? "Attach screenshot" : "Attach disabled"}
+                      htmlFor="file-upload"
+                      className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground"
                     >
-                      <Plus className="size-4" />
+                      <Plus className="h-4 w-4" />
                     </label>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleAttachment}
+                      accept="image/*,.tsx,.jsx,.html,.json"
+                      disabled={!isScreenshotUploadAvailable}
+                    />
 
-                    {/* Mode Selector using existing Radix Select */}
-                    <Select.Root value={mode} onValueChange={(val) => setMode(val as Mode)}>
-                      <Select.Trigger className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent">
+                    {/* Mode Selector */}
+                    <Select.Root value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                      <Select.Trigger className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
                         <span>{currentMode.icon} {currentMode.label}</span>
-                        <ChevronDownIcon className="size-3 opacity-60" />
+                        <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md z-50">
+                        <Select.Content
+                          className="z-[100] overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+                          position="popper"
+                          sideOffset={8}
+                        >
                           <Select.Viewport className="p-1">
                             {modes.map((m) => (
                               <Select.Item
                                 key={m.value}
                                 value={m.value}
-                                className="flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent data-[highlighted]:bg-accent"
+                                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-accent data-[highlighted]:bg-accent"
                               >
                                 <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
-                                {mode === m.value && <CheckIcon className="ml-auto size-3 text-blue-500" />}
+                                {mode === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
                               </Select.Item>
                             ))}
                             <div className="my-1 h-px bg-border" />
-                            <div className="px-3 py-1.5 text-xs text-muted-foreground cursor-pointer hover:bg-accent rounded">
+                            <div className="px-3 py-2 text-xs text-muted-foreground hover:bg-accent rounded-lg cursor-pointer">
                               Configure Custom Agents...
                             </div>
                           </Select.Viewport>
@@ -349,90 +249,53 @@ export default function Home() {
                       </Select.Portal>
                     </Select.Root>
 
-                    {/* Model Selector - shows full name like NVIDIA example */}
-                    <Select.Root name="model" value={model} onValueChange={setModel}>
-                      <Select.Trigger className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent min-w-[220px]">
-                        <Select.Value>
-                          {getModelDisplayLabel(model)}
-                        </Select.Value>
-                        <ChevronDownIcon className="size-3 opacity-60" />
+                    {/* Model Selector */}
+                    <Select.Root value={model} onValueChange={setModel}>
+                      <Select.Trigger className="flex h-9 min-w-[210px] items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
+                        <Select.Value>{getModelDisplayLabel(model)}</Select.Value>
+                        <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md z-50 max-h-[300px]">
+                        <Select.Content className="z-[100] max-h-[320px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl" position="popper" sideOffset={8}>
                           <Select.Viewport className="p-1">
                             {MODELS.filter((m) => !m.hidden).map((m) => (
                               <Select.Item
                                 key={m.value}
                                 value={m.value}
-                                className="flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent data-[highlighted]:bg-accent"
+                                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-accent data-[highlighted]:bg-accent"
                               >
                                 <Select.ItemText>{m.label}</Select.ItemText>
-                                {model === m.value && <CheckIcon className="ml-auto size-3 text-blue-500" />}
+                                {model === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
                               </Select.Item>
                             ))}
                           </Select.Viewport>
                         </Select.Content>
                       </Select.Portal>
                     </Select.Root>
-
-                    {/* Medium label */}
-                    <div className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md bg-background">
-                      Medium
-                    </div>
-
-                    {/* Settings Gear */}
-                    <button type="button" className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground">
-                      <Settings className="size-4" />
-                    </button>
                   </div>
 
-                  {/* Send Button */}
-                  <div className="relative flex shrink-0 has-[:disabled]:opacity-50">
-                    <div className="pointer-events-none absolute inset-0 -bottom-[1px] rounded bg-blue-500" />
-                    <LoadingButton
-                      className="relative inline-flex size-9 items-center justify-center rounded bg-blue-500 font-medium text-white shadow-lg hover:bg-blue-500/90 disabled:cursor-not-allowed disabled:opacity-90"
-                      type="submit"
-                      disabled={screenshotLoading || prompt.length === 0}
-                    >
-                      <ArrowRightIcon className="size-4" />
-                    </LoadingButton>
-                  </div>
+                  {/* Send Button - clean */}
+                  <LoadingButton
+                    type="submit"
+                    disabled={screenshotLoading || !prompt.trim()}
+                    className="flex h-9 items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </LoadingButton>
                 </div>
-
-                <input
-                  id="screenshot"
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp"
-                  onChange={handleScreenshotUpload}
-                  className="hidden"
-                  ref={fileInputRef}
-                  disabled={!isScreenshotUploadAvailable}
-                />
-
-                {isPending && (
-                  <LoadingMessage
-                    isHighQuality={quality === "high"}
-                    screenshotUrl={screenshotUrl}
-                  />
-                )}
               </div>
 
-              <div className="mt-4 flex w-full flex-wrap justify-between gap-2.5">
+              {/* Suggested Prompts */}
+              <div className="mt-4 flex flex-wrap gap-2">
                 {SUGGESTED_PROMPTS.map((v) => (
                   <button
                     key={v.title}
                     type="button"
                     onClick={() => {
                       setPrompt(v.description);
-                      setTimeout(() => {
-                        textareaRef.current?.focus();
-                        if (textareaRef.current) {
-                          textareaRef.current.selectionStart = textareaRef.current.value.length;
-                          textareaRef.current.selectionEnd = textareaRef.current.value.length;
-                        }
-                      }, 0);
+                      setTimeout(() => textareaRef.current?.focus(), 0);
                     }}
-                    className="rounded bg-muted px-2.5 py-1.5 text-xs tracking-[0%] text-foreground transition-colors hover:bg-accent"
+                    className="rounded-lg bg-muted px-3 py-1.5 text-xs text-foreground transition hover:bg-accent"
                   >
                     {v.title}
                   </button>
@@ -448,33 +311,21 @@ export default function Home() {
   );
 }
 
-const Footer = memo(() => {
-  return (
-    <footer className="flex w-full flex-col items-center justify-between space-y-3 px-5 pb-3 pt-5 text-center sm:flex-row sm:pt-2">
-      <div className="font-medium text-foreground">Chinna-Coder</div>
-      <div className="text-sm text-muted-foreground">Build apps from a single prompt.</div>
-    </footer>
-  );
-});
+const Footer = memo(() => (
+  <footer className="flex w-full flex-col items-center justify-between gap-y-2 px-5 pb-4 pt-6 text-center text-sm text-muted-foreground sm:flex-row">
+    <div>Chinna-Coder</div>
+    <div>Build production-ready apps from a single prompt.</div>
+  </footer>
+));
 
-function LoadingMessage({
-  isHighQuality,
-  screenshotUrl,
-}: {
-  isHighQuality: boolean;
-  screenshotUrl: string | undefined;
-}) {
+function LoadingMessage({ isHighQuality, screenshotUrl }: { isHighQuality: boolean; screenshotUrl?: string }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background px-1 py-3 md:px-3" role="status" aria-live="polite">
-      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-        <span className="animate-pulse text-balance text-center text-sm md:text-base">
-          {isHighQuality
-            ? `Coming up with project plan, may take 15 seconds...`
-            : screenshotUrl
-              ? "Analyzing your screenshot..."
-              : `Creating your app...`}
-        </span>
+    <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/80">
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
         <Spinner />
+        <span className="text-sm">
+          {isHighQuality ? "Planning your app..." : screenshotUrl ? "Analyzing screenshot..." : "Generating your app..."}
+        </span>
       </div>
     </div>
   );
