@@ -8,7 +8,7 @@ import LoadingButton from "@/components/loading-button";
 import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
 import assert from "assert";
-import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, Plus, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   use,
@@ -29,6 +29,8 @@ import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 
+type Mode = "ask" | "plan" | "agent";
+
 export default function Home() {
   const { setStreamPromise } = use(Context);
   const { theme } = useTheme();
@@ -38,6 +40,7 @@ export default function Home() {
   const [model, setModel] = useState(
     MODELS.find((m) => !m.hidden)?.value || MODELS[0].value,
   );
+  const [mode, setMode] = useState<Mode>("agent");
   const [quality, setQuality] = useState("low");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
     undefined,
@@ -93,6 +96,17 @@ export default function Home() {
     [model],
   );
 
+  // Full display label for Cursor-style
+  const getModelDisplayLabel = (modelValue: string) => {
+    const modelInfo = MODELS.find((m) => m.value === modelValue);
+    if (!modelInfo) return modelValue;
+
+    if (modelInfo.label.includes("GLM")) return "GLM 5 • AGENT MODE";
+    if (modelInfo.label.includes("MiniMax")) return "MiniMax M2.7 (free)";
+    if (modelInfo.label.includes("Qwen")) return "Qwen 3 Coder (free)";
+    return modelInfo.label;
+  };
+
   const qualityOptions = useMemo(
     () => [
       { value: "low", label: "Low quality [faster]" },
@@ -100,6 +114,15 @@ export default function Home() {
     ],
     [],
   );
+
+  const modes: { value: Mode; label: string; icon: string }[] = [
+    { value: "ask", label: "Ask", icon: "?" },
+    { value: "plan", label: "Plan", icon: "≡" },
+    { value: "agent", label: "Agent (Full Stack)", icon: "◇" },
+  ];
+
+  const currentMode = modes.find((m) => m.value === mode) || modes[2];
+
   const handleScreenshotUpload = async (event: any) => {
     if (!isScreenshotUploadAvailable) {
       setScreenshotUrl(undefined);
@@ -201,6 +224,7 @@ export default function Home() {
                     prompt,
                     model,
                     quality,
+                    mode,
                     screenshotUrl,
                   }),
                 });
@@ -216,7 +240,7 @@ export default function Home() {
                     description: message,
                     variant: "destructive",
                   });
-                  return; // Graceful exit instead of throwing (prevents uncaught error + stuck loading state)
+                  return;
                 }
 
                 const { chatId, lastMessageId } = await response.json();
@@ -242,224 +266,140 @@ export default function Home() {
             }}
           >
             <Fieldset>
-              <div className="relative flex w-full max-w-2xl rounded-xl border border-border bg-card pb-10 shadow-sm" role="form" aria-label="Create new app from prompt">
-                <div className="w-full">
-                  {screenshotLoading && (
-                    <div className="relative mx-3 mt-3">
-                      <div className="rounded-xl">
-                        <div className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-muted">
-                          <Spinner />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {screenshotUrl && (
-                    <div
-                      className={`${isPending ? "invisible" : ""} relative mx-3 mt-3`}
-                    >
-                      <div className="rounded-xl">
-                        <img
-                          alt="screenshot"
-                          src={screenshotUrl}
-                          className="group relative mb-2 h-16 w-[68px] rounded object-cover"
-                        />
-                      </div>
+              <div className="relative flex w-full max-w-2xl flex-col rounded-xl border border-border bg-card pb-14 shadow-sm" role="form" aria-label="Create new app from prompt">
+                {/* Top: Attached file badge (sonner.tsx style) */}
+                {screenshotUrl && (
+                  <div className="mx-4 mt-4 flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1 text-sm">
+                      <span className="text-blue-400">📄</span>
+                      <span>sonner.tsx</span>
                       <button
                         type="button"
-                        id="x-circle-icon"
-                        className="absolute -right-3 -top-4 left-14 z-10 size-5 rounded-full bg-background text-foreground shadow hover:text-muted-foreground" aria-label="Remove attached screenshot"
                         onClick={() => {
                           setScreenshotUrl(undefined);
-                          if (fileInputRef.current) {
-                            fileInputRef.current.value = "";
-                          }
+                          if (fileInputRef.current) fileInputRef.current.value = "";
                         }}
+                        className="ml-1 text-muted-foreground hover:text-foreground"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth={1.5}
-                          stroke="currentColor"
-                          className="size-6"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                          />
-                        </svg>
+                        ×
                       </button>
                     </div>
-                  )}
-                  <div className="relative">
-                    <div className="p-3">
-                      <p className="invisible w-full whitespace-pre-wrap">
-                        {textareaResizePrompt}
-                      </p>
-                    </div>
-                    <textarea
-                      ref={textareaRef}
-                      placeholder="Build me a budgeting app..."
-                      required
-                      name="prompt"
-                      rows={2}
-                      className="peer absolute inset-0 w-full resize-none bg-transparent px-4 py-3 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50" aria-label="App description prompt"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onPaste={(e) => {
-                        // Clean up pasted text
-                        e.preventDefault();
-                        const pastedText = e.clipboardData.getData("text");
-
-                        // Normalize line endings and clean up whitespace
-                        const cleanedText = pastedText
-                          .replace(/\r\n/g, "\n") // Convert Windows line endings
-                          .replace(/\r/g, "\n") // Convert old Mac line endings
-                          .replace(/\n{3,}/g, "\n\n") // Max 2 consecutive newlines
-                          .trim(); // Remove leading/trailing whitespace
-
-                        // Insert the cleaned text at cursor position
-                        const textarea = e.target as HTMLTextAreaElement;
-                        const start = textarea.selectionStart;
-                        const end = textarea.selectionEnd;
-                        const newValue =
-                          prompt.slice(0, start) +
-                          cleanedText +
-                          prompt.slice(end);
-
-                        setPrompt(newValue);
-
-                        // Set cursor position after the pasted text
-                        setTimeout(() => {
-                          if (textareaRef.current) {
-                            textareaRef.current.selectionStart =
-                              start + cleanedText.length;
-                            textareaRef.current.selectionEnd =
-                              start + cleanedText.length;
-                          }
-                        }, 0);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          const target = event.target;
-                          if (!(target instanceof HTMLTextAreaElement)) return;
-                          target.closest("form")?.requestSubmit();
-                        }
-                      }}
-                    />
                   </div>
-                </div>
-                <div className="absolute bottom-2 left-3 right-2.5 flex items-center justify-between">
-                  <label
-                    htmlFor="screenshot"
-                    className={`absolute left-0 bottom-0 inline-flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50 hover:bg-background hover:text-muted-foreground" : "cursor-pointer"}`}
-                    aria-label="Attach files"
-                    title={isScreenshotUploadAvailable ? "Attach files" : "Attach disabled"}
-                  >
-                    <Plus className="size-4" aria-hidden="true" />
-                  </label>
+                )}
 
-                  <div className="flex items-center gap-3 pl-10">
-                    <Select.Root
-                      name="model"
-                      value={model}
-                      onValueChange={setModel}
+                {/* Textarea */}
+                <div className="relative px-4 pt-4">
+                  <textarea
+                    ref={textareaRef}
+                    placeholder="Describe what to build"
+                    required
+                    name="prompt"
+                    rows={3}
+                    className="w-full resize-y min-h-[80px] bg-transparent px-1 py-2 text-lg placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        const target = event.target;
+                        if (!(target instanceof HTMLTextAreaElement)) return;
+                        target.closest("form")?.requestSubmit();
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Bottom Toolbar - Single unified row */}
+                <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {/* + Attachment Button */}
+                    <label
+                      htmlFor="screenshot"
+                      className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50" : ""}`}
+                      title={isScreenshotUploadAvailable ? "Attach screenshot" : "Attach disabled"}
                     >
-                      <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Select AI model">
-                        <Select.Value aria-label={model}>
-                          <span>{selectedModel?.label}</span>
-                        </Select.Value>
-                        <Select.Icon>
-                          <ChevronDownIcon className="size-3" />
-                        </Select.Icon>
+                      <Plus className="size-4" />
+                    </label>
+
+                    {/* Mode Selector using existing Radix Select */}
+                    <Select.Root value={mode} onValueChange={(val) => setMode(val as Mode)}>
+                      <Select.Trigger className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent">
+                        <span>{currentMode.icon} {currentMode.label}</span>
+                        <ChevronDownIcon className="size-3 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md" role="listbox">
-                          <Select.Viewport className="space-y-1 p-2">
+                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md z-50">
+                          <Select.Viewport className="p-1">
+                            {modes.map((m) => (
+                              <Select.Item
+                                key={m.value}
+                                value={m.value}
+                                className="flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent data-[highlighted]:bg-accent"
+                              >
+                                <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
+                                {mode === m.value && <CheckIcon className="ml-auto size-3 text-blue-500" />}
+                              </Select.Item>
+                            ))}
+                            <div className="my-1 h-px bg-border" />
+                            <div className="px-3 py-1.5 text-xs text-muted-foreground cursor-pointer hover:bg-accent rounded">
+                              Configure Custom Agents...
+                            </div>
+                          </Select.Viewport>
+                        </Select.Content>
+                      </Select.Portal>
+                    </Select.Root>
+
+                    {/* Model Selector - shows full name like NVIDIA example */}
+                    <Select.Root name="model" value={model} onValueChange={setModel}>
+                      <Select.Trigger className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent min-w-[220px]">
+                        <Select.Value>
+                          {getModelDisplayLabel(model)}
+                        </Select.Value>
+                        <ChevronDownIcon className="size-3 opacity-60" />
+                      </Select.Trigger>
+                      <Select.Portal>
+                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md z-50 max-h-[300px]">
+                          <Select.Viewport className="p-1">
                             {MODELS.filter((m) => !m.hidden).map((m) => (
                               <Select.Item
                                 key={m.value}
                                 value={m.value}
-                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm text-foreground data-[highlighted]:bg-accent data-[highlighted]:outline-none" role="option"
+                                className="flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent data-[highlighted]:bg-accent"
                               >
-                                <Select.ItemText className="inline-flex items-center gap-2 text-foreground">
-                                  {m.label}
-                                </Select.ItemText>
-                                <Select.ItemIndicator>
-                                  <CheckIcon className="size-3 text-blue-600" />
-                                </Select.ItemIndicator>
+                                <Select.ItemText>{m.label}</Select.ItemText>
+                                {model === m.value && <CheckIcon className="ml-auto size-3 text-blue-500" />}
                               </Select.Item>
                             ))}
                           </Select.Viewport>
-                          <Select.ScrollDownButton />
-                          <Select.Arrow />
                         </Select.Content>
                       </Select.Portal>
                     </Select.Root>
 
-                    <div className="h-4 w-px bg-border max-sm:hidden" aria-hidden="true" />
+                    {/* Medium label */}
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md bg-background">
+                      Medium
+                    </div>
 
-                    <Select.Root
-                      name="quality"
-                      value={quality}
-                      onValueChange={setQuality}
-                    >
-                      <Select.Trigger className="inline-flex items-center gap-1 rounded p-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Select quality">
-                        <Select.Value aria-label={quality}>
-                          <span className="max-sm:hidden">
-                            {quality === "low"
-                              ? "Low quality [faster]"
-                              : "High quality [slower]"}
-                          </span>
-                          <span className="sm:hidden">
-                            <LightningBoltIcon className="size-3" />
-                          </span>
-                        </Select.Value>
-                        <Select.Icon>
-                          <ChevronDownIcon className="size-3" />
-                        </Select.Icon>
-                      </Select.Trigger>
-                      <Select.Portal>
-                        <Select.Content className="overflow-hidden rounded-md border border-border bg-popover shadow-md" role="listbox">
-                          <Select.Viewport className="space-y-1 p-2">
-                            {qualityOptions.map((q) => (
-                              <Select.Item
-                                key={q.value}
-                                value={q.value}
-                                className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm text-foreground data-[highlighted]:bg-accent data-[highlighted]:outline-none" role="option"
-                              >
-                                <Select.ItemText className="inline-flex items-center gap-2 text-foreground">
-                                  {q.label}
-                                </Select.ItemText>
-                                <Select.ItemIndicator>
-                                  <CheckIcon className="size-3 text-blue-600" />
-                                </Select.ItemIndicator>
-                              </Select.Item>
-                            ))}
-                          </Select.Viewport>
-                          <Select.ScrollDownButton />
-                          <Select.Arrow />
-                        </Select.Content>
-                      </Select.Portal>
-                    </Select.Root>
+                    {/* Settings Gear */}
+                    <button type="button" className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground">
+                      <Settings className="size-4" />
+                    </button>
                   </div>
 
+                  {/* Send Button */}
                   <div className="relative flex shrink-0 has-[:disabled]:opacity-50">
                     <div className="pointer-events-none absolute inset-0 -bottom-[1px] rounded bg-blue-500" />
-
                     <LoadingButton
-                      className="relative inline-flex size-6 items-center justify-center rounded bg-blue-500 font-medium text-white shadow-lg outline-blue-300 hover:bg-blue-500/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-90"
+                      className="relative inline-flex size-9 items-center justify-center rounded bg-blue-500 font-medium text-white shadow-lg hover:bg-blue-500/90 disabled:cursor-not-allowed disabled:opacity-90"
                       type="submit"
                       disabled={screenshotLoading || prompt.length === 0}
                     >
-                      <ArrowRightIcon />
+                      <ArrowRightIcon className="size-4" />
                     </LoadingButton>
                   </div>
                 </div>
+
                 <input
-                  // name="screenshot"
                   id="screenshot"
                   type="file"
                   accept="image/png, image/jpeg, image/webp"
@@ -476,6 +416,7 @@ export default function Home() {
                   />
                 )}
               </div>
+
               <div className="mt-4 flex w-full flex-wrap justify-between gap-2.5">
                 {SUGGESTED_PROMPTS.map((v) => (
                   <button
@@ -483,19 +424,15 @@ export default function Home() {
                     type="button"
                     onClick={() => {
                       setPrompt(v.description);
-                      // Refocus the textarea after setting the prompt
                       setTimeout(() => {
                         textareaRef.current?.focus();
-                        // Position cursor at the end
                         if (textareaRef.current) {
-                          textareaRef.current.selectionStart =
-                            textareaRef.current.value.length;
-                          textareaRef.current.selectionEnd =
-                            textareaRef.current.value.length;
+                          textareaRef.current.selectionStart = textareaRef.current.value.length;
+                          textareaRef.current.selectionEnd = textareaRef.current.value.length;
                         }
                       }, 0);
                     }}
-                    className="rounded bg-muted px-2.5 py-1.5 text-xs tracking-[0%] text-foreground transition-colors hover:bg-accent" role="button"
+                    className="rounded bg-muted px-2.5 py-1.5 text-xs tracking-[0%] text-foreground transition-colors hover:bg-accent"
                   >
                     {v.title}
                   </button>
@@ -537,7 +474,6 @@ function LoadingMessage({
               ? "Analyzing your screenshot..."
               : `Creating your app...`}
         </span>
-
         <Spinner />
       </div>
     </div>
