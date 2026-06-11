@@ -39,11 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className="h-full bg-background text-foreground"
-      suppressHydrationWarning
-    >
+    <html lang="en" className="h-full bg-background text-foreground" suppressHydrationWarning>
       <head>
         <PlausibleProvider domain="llamacoder.io" />
         {/* Prevent FOUC by setting theme class before hydration */}
@@ -53,15 +49,13 @@ export default function RootLayout({
 (function() {
   try {
     var stored = localStorage.getItem('theme');
-    var theme = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system';
-    var resolved = theme;
-    if (theme === 'system') {
-      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    var theme = (stored === 'light' || stored === 'dark')
+      ? stored
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     var root = document.documentElement;
     root.classList.remove('light', 'dark');
-    root.classList.add(resolved);
-    root.style.colorScheme = resolved;
+    root.classList.add(theme);
+    root.style.colorScheme = theme;
   } catch (e) {}
 })();
             `,

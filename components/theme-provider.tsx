@@ -1,80 +1,46 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "light" | "dark" | "system";
+export type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
-  resolvedTheme: "light" | "dark";
+  resolvedTheme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-function getSystemTheme(): "light" | "dark" {
+function getStoredTheme(): Theme {
   if (typeof window === "undefined") return "light";
+  try {
+    const stored = localStorage.getItem("theme") as Theme | null;
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch {}
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  try {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      return stored;
-    }
-  } catch {}
-  return "system";
-}
-
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  const resolved =
-    theme === "system" ? getSystemTheme() : theme;
-
   root.classList.remove("light", "dark");
-  root.classList.add(resolved);
-  root.style.colorScheme = resolved;
+  root.classList.add(theme);
+  root.style.colorScheme = theme;
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+  const [theme, setThemeState] = useState<Theme>("light");
 
-  const systemIsDark = useMediaQuery("(prefers-color-scheme: dark)");
-
-  // Initialize from storage on mount (client only)
   useEffect(() => {
     const stored = getStoredTheme();
     setThemeState(stored);
-
-    const resolved = stored === "system" ? getSystemTheme() : stored;
-    setResolvedTheme(resolved);
     applyTheme(stored);
   }, []);
-
-  // React to system changes when in "system" mode
-  useEffect(() => {
-    if (theme !== "system") return;
-
-    const newResolved = systemIsDark ? "dark" : "light";
-    setResolvedTheme(newResolved);
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(newResolved);
-    root.style.colorScheme = newResolved;
-  }, [systemIsDark, theme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -83,28 +49,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("theme", newTheme);
     } catch {}
 
-    const resolved =
-      newTheme === "system" ? getSystemTheme() : newTheme;
-    setResolvedTheme(resolved);
     applyTheme(newTheme);
   };
 
   const toggleTheme = () => {
-    // Cycle: light -> dark -> system -> light
-    // Or simpler common: just toggle between light/dark, preserving system intent by setting explicit
-    if (theme === "light") {
-      setTheme("dark");
-    } else if (theme === "dark") {
-      setTheme("system");
-    } else {
-      // from system: go to explicit opposite of current resolved
-      setTheme(resolvedTheme === "dark" ? "light" : "dark");
-    }
+    setTheme(theme === "light" ? "dark" : "light");
   };
 
   return (
     <ThemeContext.Provider
-      value={{ theme, resolvedTheme, setTheme, toggleTheme }}
+      value={{ theme, resolvedTheme: theme, setTheme, toggleTheme }}
     >
       {children}
     </ThemeContext.Provider>
@@ -114,10 +68,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    // During SSR or if not wrapped, return safe defaults
     return {
-      theme: "system" as Theme,
-      resolvedTheme: "light" as const,
+      theme: "light" as Theme,
+      resolvedTheme: "light" as Theme,
       setTheme: () => {},
       toggleTheme: () => {},
     };
