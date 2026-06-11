@@ -6,11 +6,9 @@ import ArrowRightIcon from "@/components/icons/arrow-right";
 import LightningBoltIcon from "@/components/icons/lightning-bolt";
 import LoadingButton from "@/components/loading-button";
 import Spinner from "@/components/spinner";
-import bgImg from "@/public/halo.png";
 import * as Select from "@radix-ui/react-select";
 import assert from "assert";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   use,
@@ -27,6 +25,7 @@ import { Context } from "./providers";
 import Header from "@/components/header";
 import UploadIcon from "@/components/icons/upload-icon";
 import HyperspeedBackground from "@/components/hyperspeed-background";
+import BallpitBackground from "@/components/ballpit-background";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
@@ -169,13 +168,8 @@ export default function Home() {
         <div className={`${theme === "dark" && mounted ? "block" : "hidden"}`}>
           <HyperspeedBackground />
         </div>
-        <div className={`${theme === "dark" && mounted ? "hidden" : "flex"} absolute inset-0 justify-center`}>
-          <Image
-            src={bgImg}
-            alt=""
-            className="max-h-[953px] w-full max-w-[1200px] object-cover object-top mix-blend-screen dark:mix-blend-plus-lighter dark:opacity-60"
-            priority
-          />
+        <div className={`${theme === "dark" && mounted ? "hidden" : "block"}`}>
+          <BallpitBackground />
         </div>
       </div>
 
