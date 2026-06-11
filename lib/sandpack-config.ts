@@ -1,9 +1,47 @@
 import * as shadcnComponents from "@/lib/shadcn";
 
+function normalizePreviewPath(path: string) {
+  let normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
+  if (normalizedPath.startsWith("src/")) {
+    normalizedPath = normalizedPath.slice(4);
+  }
+
+  return normalizedPath;
+}
+
+function isGeneratedConfigFile(path: string, content: string) {
+  const normalizedPath = normalizePreviewPath(path).toLowerCase();
+  const filename = normalizedPath.split("/").pop() || normalizedPath;
+
+  if (
+    /^(tailwind|postcss|next|vite|tsconfig|package)(\.config)?\.(js|cjs|mjs|ts|tsx|json)$/.test(
+      filename,
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    filename === "file.tsx" &&
+    content.includes("tailwindcss-animate") &&
+    content.includes("plugins:")
+  );
+}
+
+function sanitizePreviewContent(content: string) {
+  return content
+    .replace(/^.*tailwindcss-animate.*$/gm, "")
+    .replace(/plugins\s*:\s*\[[^\]]*tailwindcss-animate[^\]]*\]\s*,?/g, "")
+    .replace(/plugins\s*:\s*\[\s*animate\s*\]\s*,?/g, "")
+    .replace(/require\(["']tailwindcss-animate["']\)/g, "undefined");
+}
+
 export function getSandpackConfig(
   files: Array<{ path: string; content: string }>,
 ) {
   const sandpackFiles: Record<string, string> = { ...shadcnFiles };
+  const previewUserFiles: Array<{ path: string; content: string }> = [];
 
   // Add tsconfig
   sandpackFiles["/tsconfig.json"] = `{
@@ -27,32 +65,24 @@ export function getSandpackConfig(
 
   // Add user files
   for (const file of files) {
-    // Normalize paths - remove leading slash if present, and ensure proper structure
-    let normalizedPath = file.path.startsWith("/")
-      ? file.path.slice(1)
-      : file.path;
+    if (isGeneratedConfigFile(file.path, file.content)) continue;
 
-    // If path starts with src/, remove it to place files at root level
-    if (normalizedPath.startsWith("src/")) {
-      normalizedPath = normalizedPath.slice(4);
-    }
+    const normalizedPath = normalizePreviewPath(file.path);
+    const sanitizedContent = sanitizePreviewContent(file.content);
 
-    sandpackFiles[normalizedPath] = file.content;
+    sandpackFiles[normalizedPath] = sanitizedContent;
+    previewUserFiles.push({ path: normalizedPath, content: sanitizedContent });
   }
 
   // Ensure App.tsx is the entry point, or if not present, create one that imports the first file
-  if (!sandpackFiles["App.tsx"] && files.length > 0) {
+  if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
     const mainFile =
-      files.find((f) => f.path.endsWith(".tsx") || f.path.endsWith(".jsx")) ||
-      files[0];
+      previewUserFiles.find(
+        (f) => f.path.endsWith(".tsx") || f.path.endsWith(".jsx"),
+      ) || previewUserFiles[0];
 
     // Normalize the path for import
-    let importPath = mainFile.path.startsWith("/")
-      ? mainFile.path.slice(1)
-      : mainFile.path;
-    if (importPath.startsWith("src/")) {
-      importPath = importPath.slice(4);
-    }
+    let importPath = normalizePreviewPath(mainFile.path);
     importPath = importPath.replace(/\.tsx?$/, "");
 
     sandpackFiles["App.tsx"] = `import React from 'react';
@@ -176,7 +206,6 @@ const dependencies = {
   "embla-carousel-react": "^8.1.8",
   "react-day-picker": "^8.10.1",
   "tailwind-merge": "^2.4.0",
-  "tailwindcss-animate": "^1.0.7",
   "framer-motion": "^11.15.0",
   vaul: "^0.9.1",
 };

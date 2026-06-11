@@ -2,19 +2,21 @@
 
 import ArrowRightIcon from "@/components/icons/arrow-right";
 import Spinner from "@/components/spinner";
+import { MODELS } from "@/lib/constants";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
-import { MODELS } from "@/lib/constants";
 
-// Supported file types for App-From-Screenshot / fullstack generation
 type SupportedFile = {
   name: string;
   type: string;
-  content: string; // base64 for images, text for code files
-  previewUrl?: string; // for images
+  content: string;
+  previewUrl?: string;
 };
+
+type ChatMode = "ask" | "plan" | "agent";
 
 export default function ChatBox({
   chat,
@@ -33,66 +35,20 @@ export default function ChatBox({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<'ask' | 'plan' | 'agent'>('agent'); // Default to powerful Agent mode
+  const [mode, setMode] = useState<ChatMode>("agent");
   const [attachedFiles, setAttachedFiles] = useState<SupportedFile[]>([]);
 
-  const textareaResizePrompt = prompt
-    .split("\n")
-    .map((text) => (text === "" ? "a" : text))
-    .join("\n");
+  const textareaResizePrompt = useMemo(
+    () =>
+      prompt
+        .split("\n")
+        .map((text) => (text === "" ? "a" : text))
+        .join("\n"),
+    [prompt],
+  );
 
   const modelLabel =
     MODELS.find((m) => m.value === chat.model)?.label || chat.model;
-
-  // Handle file selection (images, .html, .tsx, .jsx)
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newFiles: SupportedFile[] = [];
-
-    for (const file of Array.from(files)) {
-      const isImage = file.type.startsWith('image/');
-      const isCode = file.name.endsWith('.html') || file.name.endsWith('.tsx') || file.name.endsWith('.jsx') || file.name.endsWith('.js');
-
-      if (!isImage && !isCode) {
-        alert('Only images, .html, .tsx, .jsx files are supported for App-From-Screenshot / fullstack generation');
-        continue;
-      }
-
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => {
-          const content = reader.result as string;
-          newFiles.push({
-            name: file.name,
-            type: file.type,
-            content: isImage ? content.split(',')[1] : content, // base64 without prefix for images
-            previewUrl: isImage ? content : undefined,
-          });
-          resolve();
-        };
-        if (isImage) {
-          reader.readAsDataURL(file);
-        } else {
-          reader.readAsText(file);
-        }
-      });
-    }
-
-    setAttachedFiles((prev) => [...prev, ...newFiles]);
-    // Clear input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removeFile = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Trigger hidden file input
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -105,38 +61,84 @@ export default function ChatBox({
     }
   }, [disabled]);
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles: SupportedFile[] = [];
+
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith("image/");
+      const isCode =
+        file.name.endsWith(".html") ||
+        file.name.endsWith(".tsx") ||
+        file.name.endsWith(".jsx") ||
+        file.name.endsWith(".js");
+
+      if (!isImage && !isCode) {
+        window.alert(
+          "Only images, .html, .tsx, .jsx, and .js files are supported.",
+        );
+        continue;
+      }
+
+      const reader = new FileReader();
+      await new Promise<void>((resolve) => {
+        reader.onload = () => {
+          const content = reader.result as string;
+          newFiles.push({
+            name: file.name,
+            type: file.type,
+            content: isImage ? content.split(",")[1] : content,
+            previewUrl: isImage ? content : undefined,
+          });
+          resolve();
+        };
+
+        if (isImage) {
+          reader.readAsDataURL(file);
+        } else {
+          reader.readAsText(file);
+        }
+      });
+    }
+
+    setAttachedFiles((prev) => [...prev, ...newFiles]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!prompt.trim() && attachedFiles.length === 0) return;
 
     startTransition(async () => {
-      // Prepare files for DB (store base64/text)
-      const filesForDb = attachedFiles.map(f => ({
-        name: f.name,
-        type: f.type,
-        content: f.content,
-        isImage: f.type.startsWith('image/'),
+      const filesForDb = attachedFiles.map((file) => ({
+        name: file.name,
+        type: file.type,
+        content: file.content,
+        isImage: file.type.startsWith("image/"),
       }));
 
-      const message = await createMessage(chat.id, prompt || "[Uploaded files for App-From-Screenshot analysis]", "user", filesForDb);
+      const message = await createMessage(
+        chat.id,
+        prompt || "[Uploaded files for app analysis]",
+        "user",
+        filesForDb,
+      );
 
-      // Pass mode + files info to the streaming endpoint via custom header or body
-      const streamPromise = fetch(
-        "/api/get-next-completion-stream-promise",
-        {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json',
-            'x-app-mode': mode, // Pass the selected mode
-          },
-          body: JSON.stringify({
-            messageId: message.id,
-            model: chat.model,
-            mode, // also in body for safety
-            hasFiles: attachedFiles.length > 0,
-          }),
+      const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-app-mode": mode,
         },
-      ).then((res) => {
+        body: JSON.stringify({
+          messageId: message.id,
+          model: chat.model,
+          mode,
+          hasFiles: attachedFiles.length > 0,
+        }),
+      }).then((res) => {
         if (!res.body) {
           throw new Error("No body on response");
         }
@@ -154,53 +156,46 @@ export default function ChatBox({
 
   return (
     <div className="mx-auto mb-5 flex w-full max-w-prose shrink-0 px-4">
-      <form
-        className="relative flex w-full"
-        onSubmit={handleSubmit}
-      >
+      <form className="relative flex w-full" onSubmit={handleSubmit}>
         <fieldset className="w-full" disabled={disabled}>
-          <div className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm" role="form" aria-label="Chat input form">
-            
-            {/* Mode Selector + Upload Bar - Lovable.dev style */}
+          <div
+            className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm"
+            role="form"
+            aria-label="Chat input form"
+          >
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <div className="flex items-center gap-2">
-                {/* Mode Dropdown */}
-                <div className="relative">
-                  <select
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value as 'ask' | 'plan' | 'agent')}
-                    className="appearance-none rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={disabled}
-                    aria-label="Generation mode"
-                  >
-                    <option value="ask">Ask</option>
-                    <option value="plan">Plan</option>
-                    <option value="agent">Agent (Full Stack)</option>
-                  </select>
-                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                    ▼
-                  </div>
-                </div>
-
-                <div id="mode-description" className="text-[10px] text-muted-foreground" aria-live="polite">
-                  {mode === 'agent' && 'Full backend + SaaS admin'}
-                  {mode === 'plan' && 'Architecture first'}
-                  {mode === 'ask' && 'Quick answers'}
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as ChatMode)}
+                  className="appearance-none rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={disabled}
+                  aria-label="Generation mode"
+                >
+                  <option value="ask">Ask</option>
+                  <option value="plan">Plan</option>
+                  <option value="agent">Agent (Full Stack)</option>
+                </select>
+                <div
+                  id="mode-description"
+                  className="text-[10px] text-muted-foreground"
+                  aria-live="polite"
+                >
+                  {mode === "agent" && "Full backend + SaaS admin"}
+                  {mode === "plan" && "Architecture first"}
+                  {mode === "ask" && "Quick answers"}
                 </div>
               </div>
 
-              {/* Upload Button for screenshots, HTML, TSX */}
               <button
                 type="button"
-                onClick={triggerFileUpload}
+                onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-accent active:bg-accent"
-                aria-label="Upload screenshot, HTML or TSX file for analysis"
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Attach image or code file"
+                title="Attach image or code file"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Upload (img / .html / .tsx)
+                <Plus className="size-4" aria-hidden="true" />
               </button>
               <input
                 ref={fileInputRef}
@@ -212,38 +207,51 @@ export default function ChatBox({
               />
             </div>
 
-            {/* Attached Files Preview */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 border-b border-border px-3 py-2" role="list" aria-label="Attached files">
+              <div
+                className="flex flex-wrap gap-2 border-b border-border px-3 py-2"
+                role="list"
+                aria-label="Attached files"
+              >
                 {attachedFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={`${file.name}-${index}`}
                     className="flex items-center gap-2 rounded-lg border border-border bg-muted px-2 py-1 text-xs"
                   >
                     {file.previewUrl ? (
-                      <img src={file.previewUrl} alt={file.name} className="h-6 w-6 rounded object-cover" />
+                      <img
+                        src={file.previewUrl}
+                        alt={file.name}
+                        className="size-6 rounded object-cover"
+                      />
                     ) : (
-                      <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-[10px] font-mono text-primary">
-                        {file.name.split('.').pop()?.toUpperCase()}
+                      <div className="flex size-6 items-center justify-center rounded bg-primary/10 font-mono text-[10px] text-primary">
+                        {file.name.split(".").pop()?.toUpperCase()}
                       </div>
                     )}
-                    <span className="max-w-[120px] truncate font-medium text-foreground" title={file.name}>
+                    <span
+                      className="max-w-[120px] truncate font-medium text-foreground"
+                      title={file.name}
+                    >
                       {file.name}
                     </span>
                     <button
                       type="button"
-                      onClick={() => removeFile(index)}
+                      onClick={() =>
+                        setAttachedFiles((prev) =>
+                          prev.filter((_, i) => i !== index),
+                        )
+                      }
                       className="ml-1 text-muted-foreground hover:text-destructive"
                       aria-label={`Remove attached file ${file.name}`}
                     >
-                      ×
+                      x
                     </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Textarea */}
             <div className="relative w-full">
               <div className="w-full p-3 pb-12">
                 <p className="invisible min-h-[48px] w-full whitespace-pre-wrap text-sm">
@@ -253,17 +261,18 @@ export default function ChatBox({
               <textarea
                 ref={textareaRef}
                 placeholder={
-                  mode === 'agent' 
-                    ? "Describe the app, paste URL, or upload screenshot / .html / .tsx for 92% exact full-stack recreation..." 
-                    : mode === 'plan' 
-                    ? "What should we build? (Plan mode will create architecture first)" 
-                    : "Ask anything or describe changes..."
+                  mode === "agent"
+                    ? "Describe the app, paste URL, or attach a screenshot / .html / .tsx..."
+                    : mode === "plan"
+                      ? "What should we build?"
+                      : "Ask anything or describe changes..."
                 }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 required={attachedFiles.length === 0}
                 name="prompt"
-                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50" aria-describedby="mode-description"
+                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+                aria-describedby="mode-description"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -273,24 +282,32 @@ export default function ChatBox({
               />
             </div>
 
-            {/* Bottom Bar */}
             <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-border px-3 py-2">
-              <div className="flex items-center gap-2 pl-1 text-[10px] text-muted-foreground" aria-live="polite">
+              <div
+                className="flex items-center gap-2 pl-1 text-[10px] text-muted-foreground"
+                aria-live="polite"
+              >
                 <span>{modelLabel}</span>
-                <span className="text-muted-foreground/70" aria-hidden="true">•</span>
+                <span className="text-muted-foreground/70" aria-hidden="true">
+                  -
+                </span>
                 <span className="font-mono">{mode.toUpperCase()} MODE</span>
               </div>
 
               <button
                 type="submit"
-                disabled={disabled || (!prompt.trim() && attachedFiles.length === 0)}
+                disabled={
+                  disabled || (!prompt.trim() && attachedFiles.length === 0)
+                }
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label={mode === 'agent' ? 'Build full stack app' : 'Send message'}
+                aria-label={
+                  mode === "agent" ? "Build full stack app" : "Send message"
+                }
               >
                 <Spinner loading={disabled}>
-                  {mode === 'agent' ? 'Build Full Stack' : 'Send'}
+                  {mode === "agent" ? "Build Full Stack" : "Send"}
                 </Spinner>
-                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                <ArrowRightIcon className="size-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>

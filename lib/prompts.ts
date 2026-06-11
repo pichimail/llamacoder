@@ -40,6 +40,8 @@ Mission: Convert screenshots, dashboard images, landing pages, wireframes, uploa
 - Include delightful UX: loading skeletons, beautiful empty states, subtle animations, micro-interactions.
 - Support light/dark mode by default.
 - Output code **only** using the strict {path=...} fenced format.
+- Preview stability is mandatory: never import files you do not also output, never rely on unsupported Tailwind config plugins, and replace missing dependencies with plain React/Tailwind equivalents when needed.
+- Do not output Tailwind/PostCSS config files unless the user explicitly asks for project setup; the preview already provides Tailwind utilities.
 
 ## SAAS / ADMIN BEHAVIOR
 - When request involves dashboard, SaaS, admin or management → automatically include a high-quality linked admin console.
@@ -108,40 +110,50 @@ export const dynamicFullStackPromptButtons = [
  * Master prompt selector
  */
 export function getMainCodingPrompt(
-  mode: 'ask' | 'plan' | 'agent' = 'agent',
+  mode: "ask" | "plan" | "agent" = "agent",
   hasImage: boolean = false,
   hasCodeFile: boolean = false,
-  userPrompt: string = ""
+  userPrompt: string = "",
 ): string {
-  if (mode === 'agent') {
+  if (mode === "agent") {
     let p = agentSystemPrompt;
 
     if (hasImage) {
-      p += "\n\n**IMAGE CONTEXT**: Screenshot/dashboard/landing page/wireframe attached. Enforce 92% visual fidelity with extreme precision. Subtle color improvements only.";
+      p +=
+        "\n\n**IMAGE CONTEXT**: Screenshot/dashboard/landing page/wireframe attached. Enforce 92% visual fidelity with extreme precision. Subtle color improvements only.";
     }
 
     if (hasCodeFile) {
-      p += "\n\n**CODE FILE CONTEXT**: .html/.tsx/app.tsx uploaded. Smartly break it down, keep best UI parts, refactor into clean architecture, and build full-stack with backend, auth, and admin console.";
+      p +=
+        "\n\n**CODE FILE CONTEXT**: .html/.tsx/app.tsx uploaded. Smartly break it down, keep best UI parts, refactor into clean architecture, and build full-stack with backend, auth, and admin console.";
     }
 
     const lower = userPrompt.toLowerCase();
-    if (lower.includes('admin') || lower.includes('dashboard') || lower.includes('saas') || lower.includes('management')) {
-      p += "\n\n**SAAS/ADMIN FOCUS**: Automatically generate a high-quality linked /admin console with user management, analytics, and two-way navigation.";
+    if (
+      lower.includes("admin") ||
+      lower.includes("dashboard") ||
+      lower.includes("saas") ||
+      lower.includes("management")
+    ) {
+      p +=
+        "\n\n**SAAS/ADMIN FOCUS**: Automatically generate a high-quality linked /admin console with user management, analytics, and two-way navigation.";
     }
 
     return dedent(p);
   }
 
-  if (mode === 'plan') return planModePrompt;
+  if (mode === "plan") return planModePrompt;
   return askModePrompt;
 }
 
 // Legacy support
-export const getMainCodingPromptLegacy = () => getMainCodingPrompt('agent');
+export const getMainCodingPromptLegacy = () => getMainCodingPrompt("agent");
 
 // Backward compatible helpers
-export const screenshotToCodePrompt = "Describe the attached screenshot or design with extreme detail for 92%+ accurate visual recreation. Focus on layout, spacing, colors, typography, shadows, and exact text.";
-export const softwareArchitectPrompt = "Create a clear technical implementation plan for the requested app or screenshot.";
+export const screenshotToCodePrompt =
+  "Describe the attached screenshot or design with extreme detail for 92%+ accurate visual recreation. Focus on layout, spacing, colors, typography, shadows, and exact text.";
+export const softwareArchitectPrompt =
+  "Create a clear technical implementation plan for the requested app or screenshot.";
 
 // Named export
 export const prompts = {

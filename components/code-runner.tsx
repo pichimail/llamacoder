@@ -6,6 +6,8 @@ export default function CodeRunner({
   code,
   files,
   onRequestFix,
+  onPreviewError,
+  onPreviewReady,
   previewMode,
   onPreviewModeChange,
 }: {
@@ -13,6 +15,8 @@ export default function CodeRunner({
   code?: string;
   files?: Array<{ path: string; content: string }>;
   onRequestFix?: (e: string) => void;
+  onPreviewError?: (e: string) => void;
+  onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
@@ -22,6 +26,8 @@ export default function CodeRunner({
     <CodeRunnerReact
       files={actualFiles}
       onRequestFix={onRequestFix}
+      onPreviewError={onPreviewError}
+      onPreviewReady={onPreviewReady}
       previewMode={previewMode}
       onPreviewModeChange={onPreviewModeChange}
     />

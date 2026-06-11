@@ -12,7 +12,7 @@ import {
   Smartphone,
   TabletSmartphone,
 } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSandpackConfig } from "@/lib/sandpack-config";
 
 export type PreviewMode = "web" | "tab" | "mobile";
@@ -41,11 +41,15 @@ const previewModes: Array<{
 export default function ReactCodeRunner({
   files,
   onRequestFix,
+  onPreviewError,
+  onPreviewReady,
   previewMode,
   onPreviewModeChange,
 }: {
   files: Array<{ path: string; content: string }>;
   onRequestFix?: (e: string) => void;
+  onPreviewError?: (e: string) => void;
+  onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
@@ -53,8 +57,7 @@ export default function ReactCodeRunner({
   const [internalPreviewMode, setInternalPreviewMode] =
     useState<PreviewMode>("web");
   const activePreviewMode = previewMode ?? internalPreviewMode;
-  const handlePreviewModeChange =
-    onPreviewModeChange ?? setInternalPreviewMode;
+  const handlePreviewModeChange = onPreviewModeChange ?? setInternalPreviewMode;
   const activeModeConfig = useMemo(
     () =>
       previewModes.find((mode) => mode.value === activePreviewMode) ??
@@ -71,7 +74,7 @@ export default function ReactCodeRunner({
           "--preview-viewport-width": activeModeConfig.viewportWidth,
         } as CSSProperties
       }
-      className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background [&_.sp-preview-iframe]:shadow-sm"
+      className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background [&_.sp-preview-iframe]:shadow-sm"
       {...getSandpackConfig(files)}
     >
       <SandpackPreview
@@ -88,7 +91,11 @@ export default function ReactCodeRunner({
         }
         className="h-full w-full"
       />
-      {onRequestFix && <ErrorMessage onRequestFix={onRequestFix} />}
+      <PreviewStatusMonitor
+        onRequestFix={onRequestFix}
+        onPreviewError={onPreviewError}
+        onPreviewReady={onPreviewReady}
+      />
     </SandpackProvider>
   );
 }
@@ -128,14 +135,38 @@ function PreviewModeSwitcher({
   );
 }
 
-function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
+function PreviewStatusMonitor({
+  onRequestFix,
+  onPreviewError,
+  onPreviewReady,
+}: {
+  onRequestFix?: (e: string) => void;
+  onPreviewError?: (e: string) => void;
+  onPreviewReady?: () => void;
+}) {
   const { sandpack } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
+
+  useEffect(() => {
+    if (sandpack.error) {
+      onPreviewError?.(sandpack.error.message);
+      return;
+    }
+
+    const readyTimer = window.setTimeout(() => {
+      onPreviewReady?.();
+    }, 1800);
+
+    return () => window.clearTimeout(readyTimer);
+  }, [sandpack.error, onPreviewError, onPreviewReady]);
 
   if (!sandpack.error) return null;
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/70 text-base backdrop-blur-sm" role="alert">
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/70 text-base backdrop-blur-sm"
+      role="alert"
+    >
       <div className="max-w-[400px] rounded-md border border-border bg-destructive p-4 text-destructive-foreground shadow-xl shadow-black/20">
         <p className="text-lg font-medium">Error</p>
 
@@ -162,9 +193,11 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
           <button
             onClick={() => {
               if (!sandpack.error) return;
-              onRequestFix(sandpack.error.message);
+              onRequestFix?.(sandpack.error.message);
             }}
-            className="rounded bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline focus-visible:outline-2" aria-label="Try to automatically fix the error"
+            disabled={!onRequestFix}
+            className="rounded bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline focus-visible:outline-2"
+            aria-label="Try to automatically fix the error"
           >
             Try to fix
           </button>

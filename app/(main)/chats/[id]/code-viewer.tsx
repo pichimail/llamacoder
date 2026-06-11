@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   extractAllCodeBlocks,
   generateIntelligentFilename,
@@ -44,6 +45,12 @@ export default function CodeViewer({
   onTabChange,
   onClose,
   onRequestFix,
+  onPreviewError,
+  onPreviewReady,
+  autoFixEnabled,
+  onAutoFixEnabledChange,
+  autoFixAttempt,
+  autoFixStatus,
   onRestore,
 }: {
   chat: Chat;
@@ -54,6 +61,12 @@ export default function CodeViewer({
   onTabChange: (v: "code" | "preview") => void;
   onClose: () => void;
   onRequestFix: (e: string) => void;
+  onPreviewError: (e: string) => void;
+  onPreviewReady: () => void;
+  autoFixEnabled: boolean;
+  onAutoFixEnabledChange: (enabled: boolean) => void;
+  autoFixAttempt: number;
+  autoFixStatus: "idle" | "watching" | "fixing" | "fallback" | "ready";
   onRestore: (
     message: Message | undefined,
     oldVersion: number,
@@ -317,10 +330,15 @@ export default function CodeViewer({
 
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4" role="banner" aria-label="Code viewer header">
+      <div
+        className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4"
+        role="banner"
+        aria-label="Code viewer header"
+      >
         <div className="inline-flex items-center gap-4">
           <button
-            className="hidden text-muted-foreground hover:text-foreground md:block" aria-label="Close code viewer"
+            className="hidden text-muted-foreground hover:text-foreground md:block"
+            aria-label="Close code viewer"
             onClick={onClose}
           >
             <CloseIcon className="size-5" />
@@ -373,23 +391,52 @@ export default function CodeViewer({
             </button>
           )}
         </div>
-        <div className="rounded-lg border border-border p-1" role="tablist" aria-label="Code viewer tabs">
-          <button
-            onClick={() => onTabChange("code")}
-            data-active={activeTab === "code" ? true : undefined}
-            disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground" role="tab" aria-selected={activeTab === "code"} tabIndex={0}
+        <div className="flex items-center gap-3">
+          <label className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground">
+            <Switch
+              checked={autoFixEnabled}
+              onCheckedChange={onAutoFixEnabledChange}
+              aria-label="Auto fix preview errors"
+            />
+            <span>Auto Fix</span>
+            {autoFixEnabled && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {autoFixStatus === "fallback"
+                  ? "Fallback"
+                  : autoFixStatus === "fixing"
+                    ? `Try ${autoFixAttempt || 1}`
+                    : autoFixStatus}
+              </span>
+            )}
+          </label>
+          <div
+            className="rounded-lg border border-border p-1"
+            role="tablist"
+            aria-label="Code viewer tabs"
           >
-            Code
-          </button>
-          <button
-            onClick={() => onTabChange("preview")}
-            data-active={activeTab === "preview" ? true : undefined}
-            disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground" role="tab" aria-selected={activeTab === "preview"} tabIndex={0}
-          >
-            Preview
-          </button>
+            <button
+              onClick={() => onTabChange("code")}
+              data-active={activeTab === "code" ? true : undefined}
+              disabled={disabledControls}
+              className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground"
+              role="tab"
+              aria-selected={activeTab === "code"}
+              tabIndex={0}
+            >
+              Code
+            </button>
+            <button
+              onClick={() => onTabChange("preview")}
+              data-active={activeTab === "preview" ? true : undefined}
+              disabled={disabledControls}
+              className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground"
+              role="tab"
+              aria-selected={activeTab === "preview"}
+              tabIndex={0}
+            >
+              Preview
+            </button>
+          </div>
         </div>
       </div>
 
@@ -423,6 +470,8 @@ export default function CodeViewer({
               <div className="flex h-full items-center justify-center">
                 <CodeRunner
                   onRequestFix={onRequestFix}
+                  onPreviewError={onPreviewError}
+                  onPreviewReady={onPreviewReady}
                   language={language}
                   files={files.map((f) => ({ path: f.path, content: f.code }))}
                   key={refresh}
@@ -435,7 +484,10 @@ export default function CodeViewer({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-border px-4 py-4" role="contentinfo">
+      <div
+        className="flex items-center justify-between border-t border-border px-4 py-4"
+        role="contentinfo"
+      >
         <div className="inline-flex items-center gap-2.5 text-sm">
           <Share
             message={
@@ -464,7 +516,12 @@ export default function CodeViewer({
             Download
           </button>
         </div>
-        <div className="text-xs text-muted-foreground md:hidden" aria-label="Current model">{chat.model}</div>
+        <div
+          className="text-xs text-muted-foreground md:hidden"
+          aria-label="Current model"
+        >
+          {chat.model}
+        </div>
       </div>
     </>
   );
