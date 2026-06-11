@@ -163,3 +163,50 @@ a:hover {
 .text-gray-600 {
   color: hsl(var(--muted-foreground));
 }
+
+/* Subtle blue-white-violet gradient text for headline (mixed, low-contrast, elegant) */
+.hyperspeed-gradient-text {
+  background-image: linear-gradient(
+    100deg,
+    #5b8bf7 8%,
+    #a5c4ff 28%,
+    #f4f6ff 50%,
+    #d4c8ff 72%,
+    #8b7cf0 92%
+  );
+  background-size: 280% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  transition: filter 280ms ease, background-position 420ms ease;
+  animation: subtle-gradient-shift 14s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.hyperspeed-gradient-text span {
+  background-image: inherit;
+  background-size: inherit;
+  background-position: inherit;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Subtle continuous shift for elegant transitioning */
+@keyframes subtle-gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 180% 50%;
+  }
+}
+
+/* Mouse hover effect: gentle speed-up + lift in vibrance */
+.hyperspeed-gradient-text:hover,
+.hyperspeed-gradient-text:hover span {
+  animation-duration: 5.5s;
+  filter: brightness(1.12) saturate(1.08);
+}

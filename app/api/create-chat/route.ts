@@ -7,6 +7,7 @@ import {
 } from "@/lib/prompts";
 import Together from "together-ai";
 import { resolveModel } from "@/lib/constants";
+import { logGeneration } from "@/lib/braintrust";
 
 export async function POST(request: NextRequest) {
   try {
@@ -178,6 +179,15 @@ export async function POST(request: NextRequest) {
       .sort((a, b) => a.position - b.position)
       .at(-1);
     if (!lastMessage) throw new Error("No new message");
+
+    // Log initial generation to Braintrust for evals & measurement over time
+    logGeneration({
+      chatId: chat.id,
+      model: resolvedModel,
+      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode: "initial" },
+      output: userMessage, // the enriched prompt that was used
+      metadata: { type: "initial_generation", title },
+    });
 
     return NextResponse.json({
       chatId: chat.id,

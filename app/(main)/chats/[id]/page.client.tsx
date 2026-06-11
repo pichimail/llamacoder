@@ -251,33 +251,32 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const buildFixPrompt = useCallback(
     (error: string, attempt: number, useFallback: boolean) => {
       if (useFallback) {
-        return `Auto mode tried three normal fixes and the preview still fails. Switch to an alternative implementation method and complete the requested app now.
+        return `SELF-CORRECT (FALLBACK): The preview has failed multiple times. Completely rebuild the app from scratch while preserving the original user request and design intent.
 
-Fallback rules:
-- Rebuild the app from the current files if needed.
-- Return a complete working file set, not a partial patch.
-- Remove or replace unsupported dependencies, missing modules, broken aliases, Tailwind config plugins, and unavailable imports.
-- If a package fails inside Sandpack, inline the behavior or use plain React/Tailwind instead.
-- Keep the user's requested app, UI intent, and features intact.
-- Use only dependencies already available in the sandbox unless you include them through supported imports.
-- Make the preview compile cleanly.
+Rules for this self-correction pass:
+- Output a full, clean, working set of files.
+- Eliminate every possible source of runtime or compile error (bad imports, missing types, Sandpack-incompatible packages).
+- Inline any complex logic instead of relying on external packages when in doubt.
+- Add extra defensive code: error boundaries (via simple try/catch + fallback UI), input sanitization, loading states, and empty states.
+- Keep the exact same UI/UX the user asked for (use only shadcn + lucide + Tailwind patterns).
+- The app must render and function in the preview without any further errors.
 
-Current failing preview error:
-
+Failing error:
 ${error.trimStart()}`;
       }
 
-      return `Auto mode detected that the preview is not working. Fix it completely and return the updated files.
+      return `SELF-CORRECT: The current preview has an error. Analyze the error, identify the root cause, and emit a precise patch (only changed + new files) that fixes it while keeping all previous functionality and the user's original request.
 
-Attempt ${attempt} of 3 before fallback.
+Attempt ${attempt} of 3.
 
-Important:
-- Do not keep retrying the same broken dependency or import.
-- For missing dependencies like tailwindcss-animate, unsupported Tailwind plugins, or missing "@/..." modules, remove the dependency and replace the behavior with plain React/Tailwind.
-- Return all files needed for the app to run in preview.
+Self-correction guidelines:
+- Prefer minimal targeted changes over full rewrites.
+- If the error mentions a missing module/dependency, replace its usage with pure React + shadcn components or simple in-memory logic.
+- Add guards, validation, and user-friendly error UIs so the app is more resilient.
+- Maintain perfect visual and functional fidelity to what was already working.
+- Return the files in the exact \`\`\`tsx{path=...} format.
 
-Preview error:
-
+Current preview error:
 ${error.trimStart()}`;
     },
     [],

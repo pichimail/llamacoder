@@ -435,6 +435,8 @@ export default function ChatBox({
                 <Select.Portal>
                   <Select.Content
                     className="overflow-hidden rounded-md border border-border bg-popover shadow-md"
+                    position="popper"
+                    sideOffset={4}
                     role="listbox"
                   >
                     <Select.Viewport className="space-y-1 p-2">
@@ -487,6 +489,8 @@ export default function ChatBox({
                 <Select.Portal>
                   <Select.Content
                     className="overflow-hidden rounded-md border border-border bg-popover shadow-md"
+                    position="popper"
+                    sideOffset={4}
                     role="listbox"
                   >
                     <Select.Viewport className="space-y-1 p-2">
@@ -541,6 +545,8 @@ export default function ChatBox({
                     <Select.Portal>
                       <Select.Content
                         className="overflow-hidden rounded-md border border-border bg-popover text-sm shadow-md"
+                        position="popper"
+                        sideOffset={4}
                         role="listbox"
                       >
                         <Select.Viewport className="p-1">

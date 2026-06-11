@@ -4,7 +4,8 @@ import blog from "./examples/blog.json";
 import calculator from "./examples/calculator.json";
 import landing from "./examples/landing.json";
 import pomodoro from "./examples/pomodoro.json";
-import quiz from "./examples/quiz.json";
+// quiz example removed for cleanliness but import kept if needed later
+// import quiz from "./examples/quiz.json";
 
 export const examples = {
   "landing page": {
@@ -135,7 +136,17 @@ The user wants me to create a quiz app about American history with the following
 This is a straightforward app that should be organized into multiple files for better structure and maintainability. I'll create separate files for components, types, and utilities.
 
 \`\`\`tsx{path=src/App.tsx}
-${quiz.content.replace("export default function Quiz() {", 'import Quiz from "./components/Quiz";\n\nexport default function App() {\n  return (\n    <div className="min-h-screen bg-gray-50 py-8">\n      <div className="container mx-auto px-4">\n        <Quiz />\n      </div>\n    </div>\n  );\n')}
+import Quiz from "./components/Quiz";
+
+export default function App() {
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4">
+        <Quiz />
+      </div>
+    </div>
+  );
+}
 \`\`\`
 
 \`\`\`tsx{path=src/components/Quiz.tsx}
@@ -281,6 +292,197 @@ export interface TimerState {
   timeLeft: number;
   isRunning: boolean;
   completedSessions: number;
+}
+\`\`\`
+    `),
+  },
+
+  // NEW compact full self-contained shadcn whole-app examples (state + localStorage "backend", only shadcn + lucide, theme match)
+  "task manager": {
+    prompt: "Build a clean task manager with priorities, search, filters using shadcn.",
+    response: dedent(`
+A full Task Manager. CRUD + filters + persistence. Pure shadcn.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Search, Trash2, Edit2 } from "lucide-react";
+
+type Task = { id: string; title: string; priority: "low"|"medium"|"high"; dueDate: string; completed: boolean; };
+
+export default function TaskManager() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [search, setSearch] = useState(""); const [filter, setFilter] = useState<"all"|"active"|"done">("all");
+  const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Task|null>(null);
+  const [form, setForm] = useState({title:"", priority:"medium" as const, dueDate:""});
+
+  useEffect(() => { const s = localStorage.getItem("tasks"); if(s) setTasks(JSON.parse(s)); }, []);
+  useEffect(() => { localStorage.setItem("tasks", JSON.stringify(tasks)); }, [tasks]);
+
+  const save = () => {
+    if(!form.title.trim()) return;
+    const t = { id: editing?.id || Date.now().toString(36), title: form.title.trim(), priority: form.priority, dueDate: form.dueDate, completed: editing?.completed ?? false };
+    setTasks(prev => editing ? prev.map(x => x.id===editing.id ? t : x) : [...prev, t as any]);
+    setForm({title:"",priority:"medium",dueDate:""}); setEditing(null); setOpen(false);
+  };
+
+  const filtered = tasks.filter(t => {
+    const m = t.title.toLowerCase().includes(search.toLowerCase());
+    if(filter==="active") return m && !t.completed; if(filter==="done") return m && t.completed; return m;
+  });
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex justify-between mb-6">
+          <h1 className="text-3xl font-semibold tracking-tight">Tasks</h1>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4"/>New Task</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{editing?"Edit":"New"} Task</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Title</Label><Input value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Priority</Label>
+                    <select className="w-full rounded-md border bg-background p-2" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value as any})}>
+                      <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+                    </select>
+                  </div>
+                  <div><Label>Due</Label><Input type="date" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})}/></div>
+                </div>
+              </div>
+              <Button onClick={save} className="mt-2 w-full">{editing?"Save":"Add Task"}</Button>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input className="pl-9" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
+          <div className="flex gap-1">
+            {(["all","active","done"] as const).map(f => <Button key={f} variant={filter===f?"default":"outline"} size="sm" onClick={()=>setFilter(f)}>{f}</Button>)}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {filtered.length===0 && <div className="text-center py-8 text-muted-foreground">No tasks</div>}
+          {filtered.map(t => (
+            <Card key={t.id}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Checkbox checked={t.completed} onCheckedChange={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,completed:!x.completed}:x))}/>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={t.completed?"line-through text-muted-foreground":""}>{t.title}</span>
+                    <Badge variant={t.priority==="high"?"destructive":t.priority==="medium"?"default":"secondary"}>{t.priority}</Badge>
+                  </div>
+                  {t.dueDate && <div className="text-xs text-muted-foreground">Due {t.dueDate}</div>}
+                </div>
+                <Button size="icon" variant="ghost" onClick={()=>{setEditing(t);setForm({title:t.title,priority:t.priority,dueDate:t.dueDate});setOpen(true);}}><Edit2 className="h-4 w-4"/></Button>
+                <Button size="icon" variant="ghost" onClick={()=>setTasks(p=>p.filter(x=>x.id!==t.id))}><Trash2 className="h-4 w-4"/></Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+\`\`\`
+    `),
+  },
+
+  "contacts crm": {
+    prompt: "Build a contacts CRM with table, search, add via dialog using shadcn.",
+    response: dedent(`
+Full Contacts CRM. Table + filters + favorites + persistence. Only shadcn.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Search, Star, Trash2 } from "lucide-react";
+
+type Contact = {id:string; name:string; email:string; company:string; favorite:boolean;};
+
+export default function ContactsCRM() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [q, setQ] = useState(""); const [company, setCompany] = useState("all"); const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({name:"",email:"",company:""});
+
+  useEffect(()=>{const s=localStorage.getItem("contacts"); if(s)setContacts(JSON.parse(s)); else setContacts([{id:"1",name:"Alex Chen",email:"alex@acme.co",company:"Acme",favorite:true}]);},[]);
+  useEffect(()=>{localStorage.setItem("contacts",JSON.stringify(contacts));},[contacts]);
+
+  const filtered = contacts.filter(c => {
+    const ok = c.name.toLowerCase().includes(q.toLowerCase()) || c.email.includes(q);
+    return ok && (company==="all" || c.company===company);
+  }).sort((a,b)=>+b.favorite - +a.favorite);
+
+  const companies = Array.from(new Set(contacts.map(c=>c.company)));
+
+  const add = () => {
+    if(!form.name) return;
+    setContacts(p => [...p, {id:Date.now().toString(36), ...form, favorite:false} as any]);
+    setForm({name:"",email:"",company:""}); setOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex justify-between mb-6">
+          <h1 className="text-3xl font-semibold">Contacts</h1>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4"/>New</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New Contact</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <Input placeholder="Name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+                <Input placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/>
+                <Input placeholder="Company" value={form.company} onChange={e=>setForm({...form,company:e.target.value})}/>
+              </div>
+              <Button onClick={add} className="w-full mt-2">Add Contact</Button>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input className="pl-9" placeholder="Search" value={q} onChange={e=>setQ(e.target.value)}/></div>
+          <select className="rounded-md border bg-background px-3" value={company} onChange={e=>setCompany(e.target.value)}>
+            <option value="all">All</option>{companies.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <Card>
+          <Table>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Company</TableHead><TableHead className="w-24"></TableHead></TableRow></TableHeader>
+            <TableBody>
+              {filtered.map(c => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.name} {c.favorite && <Star className="inline h-3 w-3 text-yellow-500 fill-yellow-500"/>}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.email}</TableCell>
+                  <TableCell><Badge variant="outline">{c.company}</Badge></TableCell>
+                  <TableCell className="text-right">
+                    <Button size="icon" variant="ghost" onClick={()=>setContacts(p=>p.map(x=>x.id===c.id?{...x,favorite:!x.favorite}:x))}><Star className={\`h-4 w-4 \${c.favorite?"fill-yellow-500 text-yellow-500":""}\`}/></Button>
+                    <Button size="icon" variant="ghost" onClick={()=>setContacts(p=>p.filter(x=>x.id!==c.id))}><Trash2 className="h-4 w-4"/></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    </div>
+  );
 }
 \`\`\`
     `),
