@@ -17,6 +17,7 @@ import {
   useState,
   useRef,
   useTransition,
+  useLayoutEffect,
   useEffect,
   useMemo,
   memo,
@@ -25,11 +26,14 @@ import {
 import { Context } from "./providers";
 import Header from "@/components/header";
 import UploadIcon from "@/components/icons/upload-icon";
+import HyperspeedBackground from "@/components/hyperspeed-background";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
+import { useTheme } from "@/components/theme-provider";
 
 export default function Home() {
   const { setStreamPromise } = use(Context);
+  const { theme } = useTheme();
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("");
@@ -44,6 +48,7 @@ export default function Home() {
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(
     null,
   );
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -53,6 +58,10 @@ export default function Home() {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+  }, []);
+
+  useLayoutEffect(() => {
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -156,16 +165,21 @@ export default function Home() {
 
   return (
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
-      <div className="absolute inset-0 flex justify-center">
-        <Image
-          src={bgImg}
-          alt=""
-          className="max-h-[953px] w-full max-w-[1200px] object-cover object-top mix-blend-screen dark:mix-blend-plus-lighter dark:opacity-60"
-          priority
-        />
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <div className={`${theme === "dark" && mounted ? "block" : "hidden"}`}>
+          <HyperspeedBackground />
+        </div>
+        <div className={`${theme === "dark" && mounted ? "hidden" : "flex"} absolute inset-0 justify-center`}>
+          <Image
+            src={bgImg}
+            alt=""
+            className="max-h-[953px] w-full max-w-[1200px] object-cover object-top mix-blend-screen dark:mix-blend-plus-lighter dark:opacity-60"
+            priority
+          />
+        </div>
       </div>
 
-      <div className="isolate flex h-full grow flex-col">
+      <div className="relative z-10 isolate flex h-full grow flex-col">
         <Header />
 
         <div className="mt-10 flex grow flex-col items-center px-4 lg:mt-16">
