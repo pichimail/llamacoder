@@ -2,7 +2,6 @@
 
 import { createMessage } from "@/app/(main)/actions";
 import LogoSmall from "@/components/icons/logo-small";
-import LightRays from "@/components/LightRays";
 import {
   parseReplySegments,
   extractFirstCodeBlock,
@@ -23,7 +22,6 @@ import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
 import CodeViewer from "./code-viewer";
-import CodeViewerLayout from "./code-viewer-layout";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
@@ -57,9 +55,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
     Promise<ReadableStream> | undefined
   >(context.streamPromise);
   const [streamText, setStreamText] = useState("");
-  const [isShowingCodeViewer, setIsShowingCodeViewer] = useState(
-    chat.messages.some((m) => m.role === "assistant"),
-  );
   const [activeTab, setActiveTab] = useState<"code" | "preview">("preview");
   const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
@@ -84,9 +79,51 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
 
+  // Resizable state for left chat pane (subtle splitter like v0/lovable)
+  const [chatPanelWidth, setChatPanelWidth] = useState(300);
+
+  const dragRef = useRef<{
+    startX: number;
+    startChat: number;
+  } | null>(null);
+
+  const onSplitterMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = {
+      startX: e.clientX,
+      startChat: chatPanelWidth,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const { startX, startChat } = dragRef.current;
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(220, Math.min(520, startChat + delta));
+      setChatPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (dragRef.current) {
+        dragRef.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
   const searchParams = useSearchParams();
-  const isFullScreenPreview =
-    searchParams.get("fs") === "1" || searchParams.get("preview") === "1";
   const targetMessageId = searchParams.get("message");
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -132,7 +169,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === prev.id);
       if (msg) {
         setActiveMessage(msg);
-        setIsShowingCodeViewer(true);
+        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     } else if (currentIdx === -1 && assistantVersions.length > 0) {
@@ -141,7 +178,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === prev.id);
       if (msg) {
         setActiveMessage(msg);
-        setIsShowingCodeViewer(true);
+        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     }
@@ -152,7 +189,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === messageId);
       if (msg) {
         setActiveMessage(msg);
-        setIsShowingCodeViewer(true);
+        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     },
@@ -175,7 +212,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       );
       if (target) {
         setActiveMessage(target);
-        setIsShowingCodeViewer(true);
+        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     }
@@ -457,7 +494,7 @@ ${error.trimStart()}`;
               parseReplySegments(content).some((seg) => seg.type === "file")
             ) {
               didPushToCode = true;
-              setIsShowingCodeViewer(true);
+              // setIsShowingCodeViewer(true); // removed in new two-pane layout
               setActiveTab("code");
             }
 
@@ -468,7 +505,7 @@ ${error.trimStart()}`;
               )
             ) {
               didPushToPreview = true;
-              setIsShowingCodeViewer(true);
+              // setIsShowingCodeViewer(true); // removed in new two-pane layout
             }
           })
           .on("finalContent", async (finalText) => {
@@ -512,7 +549,7 @@ ${error.trimStart()}`;
                 }
                 setActiveMessage(message);
                 // When streaming finishes, switch to preview mode and keep the viewer open
-                setIsShowingCodeViewer(true);
+                // setIsShowingCodeViewer(true); // removed in new two-pane layout
                 setActiveTab("preview");
                 router.refresh();
               });
@@ -533,139 +570,114 @@ ${error.trimStart()}`;
   }, [chat.id, router, streamPromise, context, autoFixEnabled]);
 
   return (
-    <div className="h-dvh bg-background text-foreground relative overflow-hidden">
-      {/* Light rays background */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <LightRays
-          raysOrigin="top-center"
-          raysColor="#67e8f9"
-          raysSpeed={1.1}
-          lightSpread={0.8}
-          rayLength={1.6}
-          fadeDistance={1.4}
-          saturation={0.9}
-          followMouse={true}
-          mouseInfluence={0.18}
-          noiseAmount={0.1}
-          distortion={0.06}
-        />
+    <div className="h-dvh bg-background text-foreground flex flex-col overflow-hidden dark">
+      {/* Top bar exactly like the screenshot */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-zinc-950 px-3 text-sm">
+        <div className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+            <LogoSmall />
+            <span>Chinna-Coder</span>
+          </a>
+          <div className="mx-1 h-4 w-px bg-border" />
+          <div className="flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-2 py-1 text-xs text-muted-foreground">
+            <span className="font-mono">v1</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="hidden sm:inline truncate max-w-[180px]">{chat.title}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setActiveTab("code")} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">View Code</button>
+          <button onClick={() => setActiveTab("preview")} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">Preview App</button>
+          <button onClick={() => toast({ title: "Download", description: "Zip of files" })} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">Download Code (zip)</button>
+          <button onClick={() => window.open(`/chats/${chat.id}?fs=1&preview=1`, "_blank")} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500">Publish</button>
+          <ThemeToggle />
+        </div>
       </div>
 
-      <div className="relative z-10 flex h-full">
-        <div
-          className={`flex w-full shrink-0 flex-col overflow-hidden ${isFullScreenPreview ? "hidden" : isShowingCodeViewer ? "lg:w-[30%]" : "lg:w-full"}`}
-        >
-          <HeaderChat chat={chat} />
-
-          <ChatLog
-            chat={chat}
-            streamText={streamText}
-            activeMessage={activeMessage}
-            onMessageClick={(message) => {
-              if (message !== activeMessage) {
-                setActiveMessage(message);
-                setIsShowingCodeViewer(true);
-              } else {
-                setActiveMessage(undefined);
-                setIsShowingCodeViewer(false);
-              }
-            }}
-          />
-
-          <ChatBox
-            chat={chat}
-            onNewStreamPromise={setStreamPromise}
-            onAbortController={(c) => {
-              abortControllerRef.current = c;
-            }}
-            isStreaming={!!streamPromise}
-            onStop={stopStreaming}
-            onUndo={handleUndo}
-            versions={assistantVersions}
-            currentVersionId={activeMessage?.id}
-            onSwitchVersion={handleSwitchVersion}
-            shouldFocusInput={shouldFocusInput}
-            onInputFocused={() => setShouldFocusInput(false)}
-          />
-        </div>
-
-        <CodeViewerLayout
-          isShowing={isShowingCodeViewer || isFullScreenPreview}
-          onClose={() => {
-            setActiveMessage(undefined);
-            setIsShowingCodeViewer(false);
-          }}
-        >
-          {isShowingCodeViewer && (
-            <CodeViewer
-              streamText={streamText}
+      {/* Two pane with resizable subtle splitter - left chat with version badge, right builder exactly like the screenshot */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div style={{ width: chatPanelWidth + "px" }} className="flex flex-col border-r border-border bg-zinc-950 min-w-[260px] max-w-[420px] overflow-hidden">
+          {activeMessage && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-zinc-900/50 text-xs">
+              <span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 font-mono">v1</span>
+              <span className="font-medium text-foreground">Version 1</span>
+              <span className="text-muted-foreground">• 3 files edited</span>
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ChatLog
               chat={chat}
-              message={activeMessage}
-              onMessageChange={setActiveMessage}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onClose={() => {
-                setActiveMessage(undefined);
-                setIsShowingCodeViewer(false);
-              }}
-              onRequestFix={(error: string) => {
-                startTransition(async () => {
-                  await requestFix({
-                    error,
-                    auto: false,
-                    attempt: 1,
-                    fallback: false,
-                  });
-                });
-              }}
-              onPreviewError={handlePreviewError}
-              onPreviewReady={handlePreviewReady}
-              autoFixEnabled={autoFixEnabled}
-              onAutoFixEnabledChange={handleAutoFixEnabledChange}
-              autoFixAttempt={autoFixAttempt}
-              autoFixStatus={autoFixStatus}
-              onRestore={async (
-                message: Message | undefined,
-                oldVersion: number,
-                newVersion: number,
-              ) => {
-                startTransition(async () => {
-                  if (!message) return;
-
-                  // Helper to get files from a message (JSON field or extract from content)
-                  const getFilesFromMessage = (msg: Message) => {
-                    return (
-                      (msg.files as any[]) || extractAllCodeBlocks(msg.content)
-                    );
-                  };
-
-                  const restoredFiles = getFilesFromMessage(message);
-                  if (restoredFiles.length === 0) return;
-
-                  const explanation = `Version ${newVersion} was created by restoring version ${oldVersion}.`;
-                  const newContent =
-                    explanation +
-                    "\n\n" +
-                    restoredFiles
-                      .map(
-                        (file) =>
-                          `\`\`\`${file.language}{path=${file.path}}\n${file.code}\n\`\`\``,
-                      )
-                      .join("\n\n");
-
-                  const newMessage = await createMessage(
-                    chat.id,
-                    newContent,
-                    "assistant",
-                    restoredFiles,
-                  );
-                  setActiveMessage(newMessage);
-                  router.refresh();
-                });
+              streamText={streamText}
+              activeMessage={activeMessage}
+              onMessageClick={(message) => {
+                if (message !== activeMessage) {
+                  setActiveMessage(message);
+                  setActiveTab("preview");
+                } else {
+                  setActiveMessage(undefined);
+                }
               }}
             />
-          )}
-        </CodeViewerLayout>
+          </div>
+          <div className="shrink-0 border-t border-border bg-zinc-950 p-3">
+            <ChatBox
+              chat={chat}
+              onNewStreamPromise={setStreamPromise}
+              onAbortController={(c) => { abortControllerRef.current = c; }}
+              isStreaming={!!streamPromise}
+              onStop={stopStreaming}
+              onUndo={handleUndo}
+              versions={assistantVersions}
+              currentVersionId={activeMessage?.id}
+              onSwitchVersion={handleSwitchVersion}
+              shouldFocusInput={shouldFocusInput}
+              onInputFocused={() => setShouldFocusInput(false)}
+            />
+          </div>
+        </div>
+
+        <div
+          className="w-[6px] bg-border hover:bg-primary/50 cursor-col-resize flex-shrink-0 relative z-10 group"
+          onMouseDown={onSplitterMouseDown}
+        >
+          <div className="absolute inset-y-0 left-1/2 w-[2px] bg-current opacity-0 group-hover:opacity-100 transition" />
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950 min-w-[400px]">
+          <CodeViewer
+            streamText={streamText}
+            chat={chat}
+            message={activeMessage}
+            onMessageChange={setActiveMessage}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onClose={() => { setActiveMessage(undefined); }}
+            onRequestFix={(error: string) => {
+              startTransition(async () => {
+                await requestFix({ error, auto: false, attempt: 1, fallback: false });
+              });
+            }}
+            onPreviewError={handlePreviewError}
+            onPreviewReady={handlePreviewReady}
+            autoFixEnabled={autoFixEnabled}
+            onAutoFixEnabledChange={handleAutoFixEnabledChange}
+            autoFixAttempt={autoFixAttempt}
+            autoFixStatus={autoFixStatus}
+            onRestore={async (message, oldVersion, newVersion) => {
+              startTransition(async () => {
+                if (!message) return;
+                const getFilesFromMessage = (msg: Message) => (msg.files as any[]) || extractAllCodeBlocks(msg.content);
+                const restoredFiles = getFilesFromMessage(message);
+                if (restoredFiles.length === 0) return;
+                const explanation = `Version ${newVersion} was created by restoring version ${oldVersion}.`;
+                const newContent = explanation + "\n\n" + restoredFiles.map(f => `\`\`\`${f.language}{path=${f.path}}\n${f.code}\n\`\`\``).join("\n\n");
+                const newMessage = await createMessage(chat.id, newContent, "assistant", restoredFiles);
+                setActiveMessage(newMessage);
+                router.refresh();
+              });
+            }}
+          />
+        </div>
       </div>
     </div>
   );

@@ -1,16 +1,14 @@
 "use client";
 
-import ArrowRightIcon from "@/components/icons/arrow-right";
 import LightningBoltIcon from "@/components/icons/lightning-bolt";
 import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
-import { CheckIcon, ChevronDownIcon, Plus, Undo2 } from "lucide-react";
+import { ChevronDownIcon, Plus, Undo2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, useMemo } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
 import { MODELS } from "@/lib/constants";
-import { dynamicFullStackPromptButtons } from "@/lib/prompts";
 import { toast } from "@/hooks/use-toast";
 
 export default function ChatBox({
@@ -55,20 +53,6 @@ export default function ChatBox({
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
-
-  const textareaResizePrompt = useMemo(
-    () =>
-      prompt
-        .split("\n")
-        .map((text) => (text === "" ? "a" : text))
-        .join("\n"),
-    [prompt],
-  );
-
-  const selectedModel = useMemo(
-    () => MODELS.find((m) => m.value === model),
-    [model],
-  );
 
   const qualityOptions = useMemo(
     () => [
@@ -206,7 +190,10 @@ export default function ChatBox({
           model,
         }),
       })
-        .then((res) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            throw new Error((await res.text()) || "Failed to start generation");
+          }
           if (!res.body) {
             throw new Error("No body on response");
           }
@@ -218,6 +205,11 @@ export default function ChatBox({
             return null as any;
           }
           onAbortController?.(null);
+          toast({
+            title: "Generation failed",
+            description: err instanceof Error ? err.message : String(err),
+            variant: "destructive",
+          });
           throw err;
         });
 
@@ -238,34 +230,14 @@ export default function ChatBox({
   const canUndo = !!onUndo && versions.length > 1;
 
   return (
-    <div className="mx-auto mb-5 flex w-full max-w-prose shrink-0 px-4">
-      <form className="relative flex w-full" onSubmit={handleSubmit}>
-        {/* Very minimal suggestion chips — only shown when not streaming */}
-        {!isStreaming && (
-          <div className="mb-1 flex flex-wrap gap-1">
-            {dynamicFullStackPromptButtons.slice(0, 4).map((chip, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setPrompt(chip);
-                  setTimeout(() => textareaRef.current?.focus(), 0);
-                }}
-                className="rounded bg-muted/60 px-2 py-px text-[9px] leading-none text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-        )}
-
+    <div className="mx-auto w-full max-w-3xl px-1">
+      <form onSubmit={handleSubmit} className="relative">
+        {/* Completely redesigned premium chat input - v0/lovable style */}
         <div
-          className="relative flex w-full rounded-xl border border-border bg-card pb-10 shadow-sm"
+          className="group relative flex w-full flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-xl focus-within:border-zinc-700 transition-all"
           role="form"
           aria-label="Chat input form"
-          onDragOver={(e) => {
-            e.preventDefault();
-          }}
+          onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             const file = e.dataTransfer.files?.[0];
@@ -274,73 +246,55 @@ export default function ChatBox({
             }
           }}
         >
-          {screenshotLoading && (
-            <div className="relative mx-3 mt-3">
-              <div className="rounded-xl">
-                <div className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-muted">
-                  <Spinner />
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Attached screenshot preview (if any) */}
           {screenshotUrl && (
-            <div
-              className={`${isPending ? "invisible" : ""} relative mx-3 mt-3`}
-            >
-              <div className="rounded-xl">
+            <div className="relative mx-4 mt-3 flex items-center gap-2">
+              <div className="relative">
                 <img
-                  alt="screenshot"
                   src={screenshotUrl}
-                  className="group relative mb-2 h-16 w-[68px] rounded object-cover"
+                  alt="Attached screenshot"
+                  className="h-12 w-12 rounded-xl object-cover ring-1 ring-zinc-800"
                 />
-              </div>
-              <button
-                type="button"
-                id="x-circle-icon"
-                className="absolute -right-3 -top-4 left-14 z-10 size-5 rounded-full bg-background text-foreground shadow hover:text-muted-foreground"
-                aria-label="Remove attached screenshot"
-                onClick={() => {
-                  setScreenshotUrl(undefined);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                  }
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="size-6"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScreenshotUrl(undefined);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 ring-1 ring-zinc-800 hover:text-red-400"
+                  aria-label="Remove screenshot"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                  />
-                </svg>
-              </button>
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="text-[10px] text-muted-foreground">Screenshot attached</div>
             </div>
           )}
-          <div className="relative w-full">
-            <div className="p-3">
-              <p className="invisible w-full whitespace-pre-wrap">
-                {textareaResizePrompt}
-              </p>
-            </div>
+
+          {/* Clean auto-growing textarea */}
+          <div className="relative px-5 pt-4 pb-1">
             <textarea
               ref={textareaRef}
-              placeholder="Describe changes or ask a follow-up..."
+              placeholder="Continue the conversation..."
               required
               name="prompt"
-              rows={2}
-              className="peer absolute inset-0 w-full resize-none bg-transparent px-4 py-3 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50"
-              aria-label="Follow-up prompt"
+              className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-zinc-500 focus:outline-none disabled:opacity-60"
+              rows={1}
+              style={{ 
+                minHeight: '24px',
+                maxHeight: '140px',
+                height: Math.min(140, Math.max(24, (prompt.split('\n').length * 20) + 8)) + 'px'
+              }}
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) => {
+                setPrompt(e.target.value);
+                // Auto grow
+                if (textareaRef.current) {
+                  textareaRef.current.style.height = 'auto';
+                  textareaRef.current.style.height = Math.min(140, Math.max(24, textareaRef.current.scrollHeight)) + 'px';
+                }
+              }}
               onPaste={async (e) => {
-                // Handle pasted images first (from browser, screenshots, etc.)
                 const items = e.clipboardData?.items;
                 if (items) {
                   for (const item of Array.from(items)) {
@@ -355,272 +309,144 @@ export default function ChatBox({
                   }
                 }
 
-                // Clean up pasted text
                 e.preventDefault();
                 const pastedText = e.clipboardData.getData("text");
+                const cleanedText = pastedText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
-                const cleanedText = pastedText
-                  .replace(/\r\n/g, "\n")
-                  .replace(/\r/g, "\n")
-                  .replace(/\n{3,}/g, "\n\n")
-                  .trim();
-
-                // Support pasting a direct image URL (minimal attach, no extra UI)
-                const isImageUrl =
-                  /^https?:\/\/.+\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(
-                    cleanedText,
-                  );
+                const isImageUrl = /^https?:\/\/.+\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(cleanedText);
                 if (isImageUrl) {
                   setScreenshotUrl(cleanedText);
-                  if (prompt.length === 0)
-                    setPrompt("Update the app to match this");
+                  if (!prompt) setPrompt("Update the app to match this");
                   return;
                 }
 
                 const textarea = e.target as HTMLTextAreaElement;
                 const start = textarea.selectionStart;
                 const end = textarea.selectionEnd;
-                const newValue =
-                  prompt.slice(0, start) + cleanedText + prompt.slice(end);
-
+                const newValue = prompt.slice(0, start) + cleanedText + prompt.slice(end);
                 setPrompt(newValue);
-
-                setTimeout(() => {
-                  if (textareaRef.current) {
-                    textareaRef.current.selectionStart =
-                      start + cleanedText.length;
-                    textareaRef.current.selectionEnd =
-                      start + cleanedText.length;
-                  }
-                }, 0);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  const target = event.target;
-                  if (!(target instanceof HTMLTextAreaElement)) return;
+                  const target = event.target as HTMLTextAreaElement;
                   target.closest("form")?.requestSubmit();
                 }
               }}
             />
           </div>
 
-          <div className="absolute bottom-2 left-3 right-2.5 flex items-center justify-between">
-            <label
-              htmlFor="screenshot"
-              className={`absolute bottom-0 left-0 inline-flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-50 hover:bg-background hover:text-muted-foreground" : "cursor-pointer"}`}
-              aria-label="Attach screenshot"
-              title={
-                isScreenshotUploadAvailable
-                  ? "Attach screenshot"
-                  : "Attach disabled"
-              }
-            >
-              <Plus className="size-4" aria-hidden="true" />
-            </label>
-
-            <div className="flex items-center gap-3 pl-10">
-              <Select.Root value={model} onValueChange={setModel}>
-                <Select.Trigger
-                  className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                  aria-label="Select AI model"
-                >
-                  <Select.Value aria-label={model}>
-                    <span>{selectedModel?.label}</span>
-                  </Select.Value>
-                  <Select.Icon>
-                    <ChevronDownIcon className="size-3" />
-                  </Select.Icon>
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    className="overflow-hidden rounded-md border border-border bg-popover shadow-md"
-                    position="popper"
-                    sideOffset={4}
-                    role="listbox"
-                  >
-                    <Select.Viewport className="space-y-1 p-2">
-                      {MODELS.filter((m) => !m.hidden).map((m) => (
-                        <Select.Item
-                          key={m.value}
-                          value={m.value}
-                          className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm text-foreground data-[highlighted]:bg-accent data-[highlighted]:outline-none"
-                          role="option"
-                        >
-                          <Select.ItemText className="inline-flex items-center gap-2 text-foreground">
-                            {m.label}
-                          </Select.ItemText>
-                          <Select.ItemIndicator>
-                            <CheckIcon className="size-3 text-blue-600" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
-                    <Select.ScrollDownButton />
-                    <Select.Arrow />
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
-
-              <div
-                className="h-4 w-px bg-border max-sm:hidden"
-                aria-hidden="true"
+          {/* Bottom toolbar - subtle and premium */}
+          <div className="flex items-center justify-between border-t border-zinc-800 px-3 py-[7px]">
+            <div className="flex items-center gap-1.5 pl-1">
+              {/* Attach */}
+              <label
+                htmlFor="screenshot"
+                className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl text-zinc-400 transition hover:bg-zinc-800 hover:text-white ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-40" : ""}`}
+                title={isScreenshotUploadAvailable ? "Attach screenshot" : "Attachments disabled"}
+              >
+                <Plus className="h-4 w-4" />
+              </label>
+              <input
+                id="screenshot"
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                onChange={handleScreenshotUpload}
+                className="hidden"
+                ref={fileInputRef}
+                disabled={!isScreenshotUploadAvailable}
               />
 
-              <Select.Root value={quality} onValueChange={setQuality}>
-                <Select.Trigger
-                  className="inline-flex items-center gap-1 rounded p-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                  aria-label="Select quality"
-                >
-                  <Select.Value aria-label={quality}>
-                    <span className="max-sm:hidden">
-                      {quality === "low"
-                        ? "Low quality [faster]"
-                        : "High quality [slower]"}
-                    </span>
-                    <span className="sm:hidden">
-                      <LightningBoltIcon className="size-3" />
-                    </span>
-                  </Select.Value>
-                  <Select.Icon>
-                    <ChevronDownIcon className="size-3" />
-                  </Select.Icon>
+              {/* Model */}
+              <Select.Root value={model} onValueChange={setModel}>
+                <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                  <Select.Value />
+                  <ChevronDownIcon className="h-3 w-3" />
                 </Select.Trigger>
                 <Select.Portal>
-                  <Select.Content
-                    className="overflow-hidden rounded-md border border-border bg-popover shadow-md"
-                    position="popper"
-                    sideOffset={4}
-                    role="listbox"
-                  >
-                    <Select.Viewport className="space-y-1 p-2">
-                      {qualityOptions.map((q) => (
-                        <Select.Item
-                          key={q.value}
-                          value={q.value}
-                          className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm text-foreground data-[highlighted]:bg-accent data-[highlighted]:outline-none"
-                          role="option"
-                        >
-                          <Select.ItemText className="inline-flex items-center gap-2 text-foreground">
-                            {q.label}
-                          </Select.ItemText>
-                          <Select.ItemIndicator>
-                            <CheckIcon className="size-3 text-blue-600" />
-                          </Select.ItemIndicator>
+                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                    <Select.Viewport className="p-1">
+                      {MODELS.filter((m) => !m.hidden).map((m) => (
+                        <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                          <Select.ItemText>{m.label}</Select.ItemText>
                         </Select.Item>
                       ))}
                     </Select.Viewport>
-                    <Select.ScrollDownButton />
-                    <Select.Arrow />
                   </Select.Content>
                 </Select.Portal>
               </Select.Root>
 
-              {versions.length > 0 && onSwitchVersion && (
-                <>
-                  <div
-                    className="h-4 w-px bg-border max-sm:hidden"
-                    aria-hidden="true"
-                  />
-                  <Select.Root
-                    value={currentVersionId || ""}
-                    onValueChange={(val) => onSwitchVersion(val)}
-                    disabled={isStreaming || disabled}
-                  >
-                    <Select.Trigger
-                      className="inline-flex items-center gap-1 rounded-md p-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                      aria-label="Switch version"
-                    >
-                      <Select.Value>
-                        {versions.find((v) => v.id === currentVersionId)
-                          ?.label ||
-                          (versions.length
-                            ? versions[versions.length - 1].label
-                            : "v?")}
-                      </Select.Value>
-                      <Select.Icon>
-                        <ChevronDownIcon className="size-3" />
-                      </Select.Icon>
-                    </Select.Trigger>
-                    <Select.Portal>
-                      <Select.Content
-                        className="overflow-hidden rounded-md border border-border bg-popover text-sm shadow-md"
-                        position="popper"
-                        sideOffset={4}
-                        role="listbox"
-                      >
-                        <Select.Viewport className="p-1">
-                          {versions
-                            .slice()
-                            .reverse()
-                            .map((v) => (
-                              <Select.Item
-                                key={v.id}
-                                value={v.id}
-                                className="flex cursor-pointer items-center gap-2 rounded p-1 text-foreground data-[highlighted]:bg-accent data-[highlighted]:outline-none"
-                              >
-                                <Select.ItemText>{v.label}</Select.ItemText>
-                              </Select.Item>
-                            ))}
-                        </Select.Viewport>
-                      </Select.Content>
-                    </Select.Portal>
-                  </Select.Root>
-                </>
-              )}
+              {/* Quality */}
+              <Select.Root value={quality} onValueChange={setQuality}>
+                <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                  <LightningBoltIcon className="h-3.5 w-3.5" />
+                  <Select.Value />
+                  <ChevronDownIcon className="h-3 w-3" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                    <Select.Viewport className="p-1">
+                      {qualityOptions.map((q) => (
+                        <Select.Item key={q.value} value={q.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                          <Select.ItemText>{q.label}</Select.ItemText>
+                        </Select.Item>
+                      ))}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2 pr-1">
+              {/* Versions + Undo */}
+              {versions.length > 0 && onSwitchVersion && (
+                <Select.Root value={currentVersionId || ""} onValueChange={(val) => onSwitchVersion(val)} disabled={isStreaming || disabled}>
+                  <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                    <Select.Value />
+                    <ChevronDownIcon className="h-3 w-3" />
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                      <Select.Viewport className="p-1">
+                        {versions.slice().reverse().map((v) => (
+                          <Select.Item key={v.id} value={v.id} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                            <Select.ItemText>{v.label}</Select.ItemText>
+                          </Select.Item>
+                        ))}
+                      </Select.Viewport>
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
+              )}
+
               {onUndo && (
                 <button
                   type="button"
                   onClick={onUndo}
                   disabled={!canUndo || disabled || isStreaming}
-                  className="inline-flex size-6 items-center justify-center rounded border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Undo last changes"
-                  title="Undo last changes (switch to previous version)"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-400 transition hover:bg-zinc-800 hover:text-white disabled:opacity-50"
+                  aria-label="Undo last version"
                 >
-                  <Undo2 className="size-3.5" />
+                  <Undo2 className="h-4 w-4" />
                 </button>
               )}
 
-              <div className="relative flex shrink-0 has-[:disabled]:opacity-50">
-                <div className="pointer-events-none absolute inset-0 -bottom-[1px] rounded bg-blue-500" />
-                <button
-                  type={isStreaming && onStop ? "button" : "submit"}
-                  onClick={isStreaming && onStop ? onStop : undefined}
-                  disabled={
-                    isStreaming && onStop
-                      ? isPending
-                      : disabled ||
-                        screenshotLoading ||
-                        (!prompt.trim() && !screenshotUrl)
-                  }
-                  className="relative inline-flex size-6 items-center justify-center rounded bg-blue-500 font-medium text-white shadow-lg outline-blue-300 hover:bg-blue-500/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-90"
-                  aria-label={
-                    isStreaming && onStop ? "Stop build" : "Send message"
-                  }
-                  title={
-                    isStreaming && onStop ? "Stop the current build" : undefined
-                  }
-                >
-                  <Spinner loading={isPending || screenshotLoading}>
-                    <ArrowRightIcon />
-                  </Spinner>
-                </button>
-              </div>
+              {/* Primary Send / Stop */}
+              <button
+                type={isStreaming && onStop ? "button" : "submit"}
+                onClick={isStreaming && onStop ? onStop : undefined}
+                disabled={
+                  isStreaming && onStop ? isPending : disabled || screenshotLoading || (!prompt.trim() && !screenshotUrl)
+                }
+                className="inline-flex h-9 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow transition hover:bg-zinc-200 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={isStreaming && onStop ? "Stop generation" : "Send"}
+              >
+                <Spinner loading={isPending || screenshotLoading}>
+                  {isStreaming && onStop ? "Stop" : "Send"}
+                </Spinner>
+              </button>
             </div>
           </div>
-
-          <input
-            id="screenshot"
-            type="file"
-            accept="image/png, image/jpeg, image/webp"
-            onChange={handleScreenshotUpload}
-            className="hidden"
-            ref={fileInputRef}
-            disabled={!isScreenshotUploadAvailable}
-          />
         </div>
       </form>
     </div>

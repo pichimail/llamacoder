@@ -37,13 +37,9 @@ export default function CodeViewerLayout({
           </DrawerContent>
         </Drawer>
       ) : (
-        <div
-          className={`${isShowing ? "w-[70%]" : "w-0"} hidden h-full overflow-hidden py-5 transition-[width] lg:block`}
-        >
-          <div className="ml-3 flex h-full flex-col rounded-l-xl shadow-lg shadow-black/10 dark:shadow-black/60">
-            <div className="flex h-full flex-col rounded-l-xl shadow shadow-black/10 dark:shadow-black/70">
-              {children}
-            </div>
+        <div className="hidden h-full flex-1 overflow-hidden border-l lg:flex lg:flex-col bg-background">
+          <div className="flex h-full flex-col overflow-hidden rounded-l-xl border border-border/60 shadow-sm">
+            {children}
           </div>
         </div>
       )}

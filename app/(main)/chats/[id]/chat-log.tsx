@@ -32,19 +32,20 @@ export default function ChatLog({
 
   return (
     <StickToBottom
-      className="relative grow overflow-hidden"
+      className="relative flex-1 min-h-0 overflow-hidden bg-background"
       resize="smooth"
       initial="smooth"
     >
-      <StickToBottom.Content className="mx-auto flex w-full max-w-prose flex-col gap-8 py-8 pl-4 pr-2">
-        <div
-          className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-background via-background/0 to-background"
-          style={{ transform: "translateY(-1px)" }}
-        />
-        <UserMessage content={chat.prompt} />
+      <StickToBottom.Content className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+        {/* Initial user prompt - clean modern bubble */}
+        <div className="flex justify-end">
+          <div className="max-w-[75%] rounded-2xl bg-primary text-primary-foreground px-4 py-3 text-sm shadow-sm">
+            {chat.prompt}
+          </div>
+        </div>
 
         {chat.totalMessages > chat.messages.length && (
-          <div className="py-2 text-center text-sm text-muted-foreground">
+          <div className="py-1 text-center text-xs text-muted-foreground">
             Only last messages loaded. Full history not available.
           </div>
         )}
@@ -52,7 +53,11 @@ export default function ChatLog({
         {chat.messages.slice(2).map((message) => (
           <Fragment key={message.id}>
             {message.role === "user" ? (
-              <UserMessage content={message.content} />
+              <div className="flex justify-end">
+                <div className="max-w-[75%] rounded-2xl bg-primary text-primary-foreground px-4 py-3 text-sm shadow-sm">
+                  {message.content}
+                </div>
+              </div>
             ) : (
               <AssistantMessage
                 content={message.content}
@@ -90,16 +95,6 @@ export default function ChatLog({
         )}
       </StickToBottom.Content>
     </StickToBottom>
-  );
-}
-
-function UserMessage({ content }: { content: string }) {
-  return (
-    <div className="relative inline-flex max-w-[80%] items-end gap-3 self-end">
-      <div className="whitespace-pre-wrap break-words rounded-md border border-border bg-card px-4 py-2 text-foreground shadow-sm" role="log">
-        {content}
-      </div>
-    </div>
   );
 }
 
@@ -168,16 +163,13 @@ function AssistantMessage({
   const displayFileCount = fileSegments.length;
 
   if (displayFileCount > 0) {
-    // Handle single-file replies with interleaved text and one file
     return (
-      <div className="">
+      <div className="space-y-3">
         {segments.map((seg, i) => {
           if (seg.type === "text") {
             return (
-              <div key={i}>
-                <Streamdown className="prose dark:prose-invert break-words">
-                  {seg.content}
-                </Streamdown>
+              <div key={i} className="prose prose-sm dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
+                <Streamdown>{seg.content}</Streamdown>
               </div>
             );
           }
@@ -185,25 +177,15 @@ function AssistantMessage({
           return (
             <div
               key={i}
-              className="m-0.5 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm" role="status"
+              className="inline-flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+              role="status"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-foreground" aria-hidden="true"
-              >
-                <path
-                  d="M10.5 3.5L11.5 2.5L12.5 3.5L11.5 4.5L10.5 3.5ZM2.5 9.5V11.5H4.5L9.5 6.5L7.5 4.5L2.5 9.5ZM0.5 12.5H13.5V14.5H0.5V12.5Z"
-                  fill="currentColor"
-                />
-              </svg>
-              <span className="font-medium text-foreground">{seg.path}</span>
+              <span className="font-mono text-xs text-muted-foreground">📄</span>
+              <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
             </div>
           );
         })}
+
         <AppVersionButton
           version={version}
           fileCount={displayFileCount}
@@ -216,7 +198,10 @@ function AssistantMessage({
       </div>
     );
   } else {
-    // No code blocks, just show text
-    return <Streamdown className="prose dark:prose-invert break-words">{content}</Streamdown>;
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
+        <Streamdown>{content}</Streamdown>
+      </div>
+    );
   }
 }
