@@ -4,9 +4,7 @@
 import Fieldset from "@/components/fieldset";
 import ArrowRightIcon from "@/components/icons/arrow-right";
 import LoadingButton from "@/components/loading-button";
-import Spinner from "@/components/spinner";
 import * as Select from "@radix-ui/react-select";
-import assert from "assert";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -16,7 +14,6 @@ import {
   useTransition,
   useLayoutEffect,
   useEffect,
-  useMemo,
   memo,
 } from "react";
 
@@ -40,14 +37,18 @@ export default function Home() {
     MODELS.find((m) => !m.hidden)?.value || MODELS[0].value,
   );
   const [mode, setMode] = useState<Mode>("agent");
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(undefined);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
+    undefined,
+  );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
+  const [blobUploadConfigured, setBlobUploadConfigured] = useState<
+    boolean | null
+  >(null);
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (textareaRef.current) textareaRef.current.focus();
@@ -59,7 +60,9 @@ export default function Home() {
     let cancelled = false;
     async function loadUploadConfig() {
       try {
-        const res = await fetch("/api/blob-upload/config", { cache: "no-store" });
+        const res = await fetch("/api/blob-upload/config", {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (!cancelled) setBlobUploadConfigured(!!data.configured);
@@ -68,7 +71,9 @@ export default function Home() {
       }
     }
     loadUploadConfig();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isScreenshotUploadAvailable = blobUploadConfigured === true;
@@ -97,13 +102,20 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/blob-upload", { method: "POST", body: formData });
+      const res = await fetch("/api/blob-upload", {
+        method: "POST",
+        body: formData,
+      });
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
       setScreenshotUrl(data.url);
       if (!prompt) setPrompt("Build this");
     } catch (err) {
-      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
+      toast({
+        title: "Upload failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
     } finally {
       setScreenshotLoading(false);
     }
@@ -120,12 +132,14 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="relative z-10 isolate flex h-full grow flex-col">
+      <div className="relative isolate z-10 flex h-full grow flex-col">
         <Header />
 
         <div className="mt-10 flex grow flex-col items-center px-4 lg:mt-16">
           <h1 className="mt-4 text-balance text-center text-4xl leading-none text-foreground md:text-[64px] lg:mt-8">
-            Turn your <span className="text-blue-500">idea</span><br className="hidden md:block" /> into an <span className="text-blue-500">app</span>
+            Turn your <span className="text-blue-500">idea</span>
+            <br className="hidden md:block" /> into an{" "}
+            <span className="text-blue-500">app</span>
           </h1>
 
           <form
@@ -143,15 +157,22 @@ export default function Home() {
 
                 if (!res.ok) {
                   const err = await res.json().catch(() => ({}));
-                  toast({ title: "Failed to create chat", description: err.error || "Unknown error", variant: "destructive" });
+                  toast({
+                    title: "Failed to create chat",
+                    description: err.error || "Unknown error",
+                    variant: "destructive",
+                  });
                   return;
                 }
 
                 const { chatId, lastMessageId } = await res.json();
-                const streamPromise = fetch("/api/get-next-completion-stream-promise", {
-                  method: "POST",
-                  body: JSON.stringify({ messageId: lastMessageId, model }),
-                }).then((r) => r.body!);
+                const streamPromise = fetch(
+                  "/api/get-next-completion-stream-promise",
+                  {
+                    method: "POST",
+                    body: JSON.stringify({ messageId: lastMessageId, model }),
+                  },
+                ).then((r) => r.body!);
 
                 setStreamPromise(streamPromise);
                 router.push(`/chats/${chatId}`);
@@ -165,12 +186,15 @@ export default function Home() {
                   <div className="mb-3 flex items-center gap-2">
                     <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1 text-sm">
                       <span>📎</span>
-                      <span className="font-mono text-xs">{screenshotUrl.split("/").pop()?.slice(0, 20)}...</span>
+                      <span className="font-mono text-xs">
+                        {screenshotUrl.split("/").pop()?.slice(0, 20)}...
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
                           setScreenshotUrl(undefined);
-                          if (fileInputRef.current) fileInputRef.current.value = "";
+                          if (fileInputRef.current)
+                            fileInputRef.current.value = "";
                         }}
                         className="ml-1 text-muted-foreground hover:text-red-500"
                       >
@@ -186,7 +210,7 @@ export default function Home() {
                   placeholder="Describe what to build"
                   required
                   rows={4}
-                  className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[110px]"
+                  className="min-h-[110px] w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
@@ -218,9 +242,14 @@ export default function Home() {
                     />
 
                     {/* Mode Selector */}
-                    <Select.Root value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                    <Select.Root
+                      value={mode}
+                      onValueChange={(v) => setMode(v as Mode)}
+                    >
                       <Select.Trigger className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
-                        <span>{currentMode.icon} {currentMode.label}</span>
+                        <span>
+                          {currentMode.icon} {currentMode.label}
+                        </span>
                         <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
@@ -236,12 +265,16 @@ export default function Home() {
                                 value={m.value}
                                 className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-accent data-[highlighted]:bg-accent"
                               >
-                                <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
-                                {mode === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
+                                <Select.ItemText>
+                                  {m.icon} {m.label}
+                                </Select.ItemText>
+                                {mode === m.value && (
+                                  <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />
+                                )}
                               </Select.Item>
                             ))}
                             <div className="my-1 h-px bg-border" />
-                            <div className="px-3 py-2 text-xs text-muted-foreground hover:bg-accent rounded-lg cursor-pointer">
+                            <div className="cursor-pointer rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-accent">
                               Configure Custom Agents...
                             </div>
                           </Select.Viewport>
@@ -252,11 +285,17 @@ export default function Home() {
                     {/* Model Selector */}
                     <Select.Root value={model} onValueChange={setModel}>
                       <Select.Trigger className="flex h-9 min-w-[210px] items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm hover:bg-accent">
-                        <Select.Value>{getModelDisplayLabel(model)}</Select.Value>
+                        <Select.Value>
+                          {getModelDisplayLabel(model)}
+                        </Select.Value>
                         <ChevronDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </Select.Trigger>
                       <Select.Portal>
-                        <Select.Content className="z-[100] max-h-[320px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl" position="popper" sideOffset={8}>
+                        <Select.Content
+                          className="z-[100] max-h-[320px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+                          position="popper"
+                          sideOffset={8}
+                        >
                           <Select.Viewport className="p-1">
                             {MODELS.filter((m) => !m.hidden).map((m) => (
                               <Select.Item
@@ -265,7 +304,9 @@ export default function Home() {
                                 className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-accent data-[highlighted]:bg-accent"
                               >
                                 <Select.ItemText>{m.label}</Select.ItemText>
-                                {model === m.value && <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />}
+                                {model === m.value && (
+                                  <CheckIcon className="ml-auto h-4 w-4 text-blue-500" />
+                                )}
                               </Select.Item>
                             ))}
                           </Select.Viewport>
@@ -317,19 +358,6 @@ const Footer = memo(() => (
     <div>Build production-ready apps from a single prompt.</div>
   </footer>
 ));
-
-function LoadingMessage({ isHighQuality, screenshotUrl }: { isHighQuality: boolean; screenshotUrl?: string }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/80">
-      <div className="flex flex-col items-center gap-3 text-muted-foreground">
-        <Spinner />
-        <span className="text-sm">
-          {isHighQuality ? "Planning your app..." : screenshotUrl ? "Analyzing screenshot..." : "Generating your app..."}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export const runtime = "edge";
 export const maxDuration = 60;

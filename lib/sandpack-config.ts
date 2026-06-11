@@ -1,5 +1,18 @@
 import * as shadcnComponents from "@/lib/shadcn";
 
+function inferPathFromContent(path: string, content: string) {
+  const firstLine = content.split("\n", 1)[0]?.trim() || "";
+  const commentPathMatch = firstLine.match(
+    /^(?:\/\/|\/\*|#)\s*([A-Za-z0-9_@./()[\]-]+\.(?:tsx|ts|jsx|js|css|json|mjs|cjs|mdx|prisma))/,
+  );
+
+  if (commentPathMatch) {
+    return commentPathMatch[1].replace(/\*\/$/, "");
+  }
+
+  return path;
+}
+
 function normalizePreviewPath(path: string) {
   let normalizedPath = path.startsWith("/") ? path.slice(1) : path;
 
@@ -11,7 +24,9 @@ function normalizePreviewPath(path: string) {
 }
 
 function isGeneratedConfigFile(path: string, content: string) {
-  const normalizedPath = normalizePreviewPath(path).toLowerCase();
+  const normalizedPath = normalizePreviewPath(
+    inferPathFromContent(path, content),
+  ).toLowerCase();
   const filename = normalizedPath.split("/").pop() || normalizedPath;
 
   if (
@@ -23,10 +38,41 @@ function isGeneratedConfigFile(path: string, content: string) {
   }
 
   return (
-    filename === "file.tsx" &&
-    content.includes("tailwindcss-animate") &&
-    content.includes("plugins:")
+    content.includes("export default config") &&
+    (content.includes("plugins:") ||
+      content.includes("content:") ||
+      content.includes("darkMode:")) &&
+    !content.includes("return (")
   );
+}
+
+function isPreviewRuntimeFile(path: string, content: string) {
+  const normalizedPath = normalizePreviewPath(
+    inferPathFromContent(path, content),
+  ).toLowerCase();
+  const filename = normalizedPath.split("/").pop() || normalizedPath;
+
+  if (isGeneratedConfigFile(path, content)) return false;
+  if (normalizedPath.includes("/api/")) return false;
+  if (normalizedPath.startsWith("api/")) return false;
+  if (normalizedPath.startsWith("prisma/")) return false;
+  if (normalizedPath.endsWith(".prisma")) return false;
+  if (normalizedPath.endsWith(".md") || normalizedPath.endsWith(".mdx")) {
+    return false;
+  }
+
+  if (
+    filename === "package.json" ||
+    filename === "layout.tsx" ||
+    filename === "layout.ts" ||
+    filename === "middleware.ts" ||
+    filename === "route.ts" ||
+    filename === "route.tsx"
+  ) {
+    return false;
+  }
+
+  return /\.(tsx|ts|jsx|js|css)$/.test(normalizedPath);
 }
 
 function sanitizePreviewContent(content: string) {
@@ -34,7 +80,26 @@ function sanitizePreviewContent(content: string) {
     .replace(/^.*tailwindcss-animate.*$/gm, "")
     .replace(/plugins\s*:\s*\[[^\]]*tailwindcss-animate[^\]]*\]\s*,?/g, "")
     .replace(/plugins\s*:\s*\[\s*animate\s*\]\s*,?/g, "")
-    .replace(/require\(["']tailwindcss-animate["']\)/g, "undefined");
+    .replace(/require\(["']tailwindcss-animate["']\)/g, "undefined")
+    .replace(/from\s+["']next\/navigation["']/g, 'from "@/lib/next-navigation"')
+    .replace(/from\s+["']next\/link["']/g, 'from "@/lib/next-link"')
+    .replace(/from\s+["']next\/image["']/g, 'from "@/lib/next-image"');
+}
+
+function isLikelyRenderableReactFile(path: string, content: string) {
+  const normalizedPath = normalizePreviewPath(
+    inferPathFromContent(path, content),
+  ).toLowerCase();
+
+  if (!/\.(tsx|jsx)$/.test(normalizedPath)) return false;
+  if (isGeneratedConfigFile(path, content)) return false;
+
+  return (
+    /export\s+default\s+function\s+[A-ZA-Za-z0-9_]*/.test(content) ||
+    /export\s+default\s+[A-ZA-Za-z0-9_]+/.test(content) ||
+    /return\s*\(/.test(content) ||
+    /<[A-Za-z][A-Za-z0-9]*(\s|>|\/>)/.test(content)
+  );
 }
 
 export function getSandpackConfig(
@@ -65,9 +130,11 @@ export function getSandpackConfig(
 
   // Add user files
   for (const file of files) {
-    if (isGeneratedConfigFile(file.path, file.content)) continue;
+    if (!isPreviewRuntimeFile(file.path, file.content)) continue;
 
-    const normalizedPath = normalizePreviewPath(file.path);
+    const normalizedPath = normalizePreviewPath(
+      inferPathFromContent(file.path, file.content),
+    );
     const sanitizedContent = sanitizePreviewContent(file.content);
 
     sandpackFiles[normalizedPath] = sanitizedContent;
@@ -77,20 +144,25 @@ export function getSandpackConfig(
   // Ensure App.tsx is the entry point, or if not present, create one that imports the first file
   if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
     const mainFile =
-      previewUserFiles.find(
-        (f) => f.path.endsWith(".tsx") || f.path.endsWith(".jsx"),
-      ) || previewUserFiles[0];
+      previewUserFiles.find((f) => f.path === "app/page.tsx") ||
+      previewUserFiles.find((f) => f.path === "pages/index.tsx") ||
+      previewUserFiles.find((f) => f.path.endsWith("/App.tsx")) ||
+      previewUserFiles.find((f) =>
+        isLikelyRenderableReactFile(f.path, f.content),
+      );
 
-    // Normalize the path for import
-    let importPath = normalizePreviewPath(mainFile.path);
-    importPath = importPath.replace(/\.tsx?$/, "");
+    if (mainFile) {
+      // Normalize the path for import
+      let importPath = normalizePreviewPath(mainFile.path);
+      importPath = importPath.replace(/\.(tsx|jsx)$/, "");
 
-    sandpackFiles["App.tsx"] = `import React from 'react';
+      sandpackFiles["App.tsx"] = `import React from 'react';
 import MainComponent from './${importPath}';
 
 export default function App() {
   return <MainComponent />;
 }`;
+    }
   }
 
   return {
@@ -109,6 +181,52 @@ export default function App() {
 
 const shadcnFiles = {
   "/lib/utils.ts": shadcnComponents.utils,
+  "/lib/next-navigation.ts": `
+  export function useRouter() {
+    return {
+      push: (url: string) => {
+        if (typeof window !== "undefined") window.history.pushState({}, "", url)
+      },
+      replace: (url: string) => {
+        if (typeof window !== "undefined") window.history.replaceState({}, "", url)
+      },
+      back: () => {
+        if (typeof window !== "undefined") window.history.back()
+      },
+      refresh: () => {}
+    }
+  }
+
+  export function usePathname() {
+    return typeof window === "undefined" ? "/" : window.location.pathname
+  }
+
+  export function useSearchParams() {
+    return new URLSearchParams(
+      typeof window === "undefined" ? "" : window.location.search
+    )
+  }
+  `,
+  "/lib/next-link.tsx": `
+  import * as React from "react"
+
+  export default function Link({
+    href,
+    children,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+    return <a href={href} {...props}>{children}</a>
+  }
+  `,
+  "/lib/next-image.tsx": `
+  import * as React from "react"
+
+  export default function Image(
+    props: React.ImgHTMLAttributes<HTMLImageElement>
+  ) {
+    return <img {...props} />
+  }
+  `,
   "/components/ui/accordion.tsx": shadcnComponents.accordian,
   "/components/ui/alert-dialog.tsx": shadcnComponents.alertDialog,
   "/components/ui/alert.tsx": shadcnComponents.alert,

@@ -8,7 +8,8 @@ import { resolveModel } from "@/lib/constants";
 function optimizeMessagesForTokens(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
 ): { role: "system" | "user" | "assistant"; content: string }[] {
-  // Strip code blocks from assistant messages except the last 2 to save tokens
+  // Keep system + first user + last 2 full assistant messages (with code).
+  // For older assistants, strip all code blocks and keep only a very short summary of intent.
   const assistantIndices: number[] = [];
   for (
     let i = messages.length - 1;
@@ -19,12 +20,20 @@ function optimizeMessagesForTokens(
       assistantIndices.push(i);
     }
   }
+
   return messages.map((msg, index) => {
     if (msg.role === "assistant" && !assistantIndices.includes(index)) {
-      const stripped = msg.content.replace(/```[\s\S]*?```/g, "").trim();
+      // Keep only the non-code text + a one-line intent summary
+      let text = msg.content.replace(/```[\s\S]*?```/g, "").trim();
+      // Extract a tiny summary from the beginning if present
+      const firstLine =
+        text.split("\n").find((l) => l.trim().length > 10) || "";
+      const summary = firstLine.slice(0, 120);
       return {
         ...msg,
-        content: stripped || "[code omitted]",
+        content: summary
+          ? `[Previous version summary: ${summary}]`
+          : "[earlier version omitted]",
       };
     }
     return msg;

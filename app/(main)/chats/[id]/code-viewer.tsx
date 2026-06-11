@@ -2,7 +2,7 @@
 
 import CloseIcon from "@/components/icons/close-icon";
 import RefreshIcon from "@/components/icons/refresh";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, ExternalLink, Maximize2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   Select,
@@ -267,10 +267,27 @@ export default function CodeViewer({
 
   const [refresh, setRefresh] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
+  const [isFsPreview, setIsFsPreview] = useState(false);
   const disabledControls = !!streamText || files.length === 0;
   const selectValue = disabledControls
     ? undefined
     : (allAssistantMessages.length - 1 - currentVersionIndex).toString();
+
+  const openFullScreenPreview = () => {
+    if (!message) return;
+    let url = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    params.set("fs", "1");
+    if (message?.id) params.set("message", message.id);
+    window.open(`${url}?${params.toString()}`, "_blank", "noopener");
+  };
+
+  const handleLocalFullscreen = () => {
+    if (activeTab !== "preview") {
+      onTabChange("preview");
+    }
+    setIsFsPreview(true);
+  };
 
   const timeAgo = (date: Date) => {
     const now = new Date();
@@ -437,6 +454,31 @@ export default function CodeViewer({
               Preview
             </button>
           </div>
+
+          {activeTab === "preview" && !disabledControls && (
+            <>
+              <button
+                onClick={handleLocalFullscreen}
+                disabled={disabledControls}
+                className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-sm text-foreground transition hover:bg-accent disabled:opacity-50"
+                title="Fullscreen preview (current tab)"
+                aria-label="Fullscreen preview"
+              >
+                <Maximize2 className="size-3" />
+                <span className="hidden text-xs md:inline">Full</span>
+              </button>
+              <button
+                onClick={openFullScreenPreview}
+                disabled={disabledControls}
+                className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-sm text-foreground transition hover:bg-accent disabled:opacity-50"
+                title="Open this preview in a new tab (full screen)"
+                aria-label="Open preview in new tab"
+              >
+                <ExternalLink className="size-3" />
+                <span className="hidden text-xs md:inline">New tab</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -523,6 +565,42 @@ export default function CodeViewer({
           {chat.model}
         </div>
       </div>
+
+      {/* Local full screen preview overlay (for the current version) */}
+      {isFsPreview && activeTab === "preview" && files.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+          <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-2 text-sm">
+            <div className="font-medium">{appTitle} — Fullscreen Preview</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openFullScreenPreview}
+                className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs hover:bg-accent"
+              >
+                <ExternalLink className="size-3" /> New tab
+              </button>
+              <button
+                onClick={() => setIsFsPreview(false)}
+                className="inline-flex items-center justify-center rounded border border-border px-2 py-0.5 text-xs hover:bg-accent"
+                aria-label="Close fullscreen preview"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="relative grow">
+            <CodeRunner
+              onRequestFix={onRequestFix}
+              onPreviewError={onPreviewError}
+              onPreviewReady={onPreviewReady}
+              language={language}
+              files={files.map((f) => ({ path: f.path, content: f.code }))}
+              key={`fs-${refresh}`}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
