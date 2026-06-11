@@ -27,6 +27,7 @@ import Header from "@/components/header";
 import { useS3Upload } from "next-s3-upload";
 import UploadIcon from "@/components/icons/upload-icon";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
+import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { setStreamPromise } = use(Context);
@@ -70,10 +71,20 @@ export default function Home() {
     if (prompt.length === 0) setPrompt("Build this");
     setQuality("low");
     setScreenshotLoading(true);
-    let file = event.target.files[0];
-    const { url } = await uploadToS3(file);
-    setScreenshotUrl(url);
-    setScreenshotLoading(false);
+
+    try {
+      const file = event.target.files[0];
+      const { url } = await uploadToS3(file);
+      setScreenshotUrl(url);
+    } catch (error) {
+      console.error("Screenshot upload failed:", error);
+      setScreenshotUrl(undefined);
+      alert(
+        "Screenshot upload is not available right now. You can still generate the app without an attachment.",
+      );
+    } finally {
+      setScreenshotLoading(false);
+    }
   };
 
   const textareaResizePrompt = useMemo(
@@ -130,7 +141,17 @@ export default function Home() {
                 });
 
                 if (!response.ok) {
-                  throw new Error("Failed to create chat");
+                  let message = "Failed to create chat";
+                  try {
+                    const err = await response.json();
+                    if (err?.error) message = err.error;
+                  } catch {}
+                  toast({
+                    title: "Failed to create chat",
+                    description: message,
+                    variant: "destructive",
+                  });
+                  return; // Graceful exit instead of throwing (prevents uncaught error + stuck loading state)
                 }
 
                 const { chatId, lastMessageId } = await response.json();

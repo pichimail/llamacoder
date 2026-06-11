@@ -13,6 +13,22 @@ export async function POST(request: NextRequest) {
     const { prompt, model, quality, screenshotUrl } = await request.json();
     const resolvedModel = resolveModel(model);
 
+    // Fail fast with clear messages if required secrets are missing
+    if (!process.env.DATABASE_URL) {
+      console.error("Missing DATABASE_URL environment variable");
+      return NextResponse.json(
+        { error: "Server misconfiguration: missing database URL" },
+        { status: 500 },
+      );
+    }
+    if (!process.env.TOGETHER_API_KEY) {
+      console.error("Missing TOGETHER_API_KEY environment variable");
+      return NextResponse.json(
+        { error: "Server misconfiguration: missing Together AI API key" },
+        { status: 500 },
+      );
+    }
+
     const prisma = getPrisma();
     const chat = await prisma.chat.create({
       data: {
@@ -37,7 +53,10 @@ export async function POST(request: NextRequest) {
 
     const together = new Together(options);
 
-    async function fetchTitle() {
+    // Title generation is non-critical — always provide a fallback so we don't 500 the whole creation
+    let title = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
+    if (title.length > 60) title = title.slice(0, 57) + "...";
+    try {
       const responseForChatTitle = await together.chat.completions.create({
         model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
         messages: [
@@ -52,11 +71,13 @@ export async function POST(request: NextRequest) {
           },
         ],
       });
-      const title = responseForChatTitle.choices[0].message?.content || prompt;
-      return title;
+      const aiTitle = responseForChatTitle.choices?.[0]?.message?.content?.trim();
+      if (aiTitle && aiTitle.length > 0 && aiTitle.length < 100) {
+        title = aiTitle;
+      }
+    } catch (titleErr) {
+      console.warn("Failed to generate AI title, using fallback from prompt:", titleErr);
     }
-
-    const title = await fetchTitle();
 
     let fullScreenshotDescription;
     if (screenshotUrl) {
@@ -91,27 +112,35 @@ export async function POST(request: NextRequest) {
 
     let userMessage: string;
     if (quality === "high") {
-      let initialRes = await together.chat.completions.create({
-        model: "Qwen/Qwen3-Coder-Next-FP8",
-        messages: [
-          {
-            role: "system",
-            content: softwareArchitectPrompt,
-          },
-          {
-            role: "user",
-            content: fullScreenshotDescription
-              ? fullScreenshotDescription + prompt
-              : prompt,
-          },
-        ],
-        temperature: 0.4,
-        max_tokens: 3000,
-      });
+      // High-quality plan generation is important but we still want to avoid hard 500s
+      let planContent: string | undefined;
+      try {
+        const initialRes = await together.chat.completions.create({
+          model: "Qwen/Qwen3-Coder-Next-FP8",
+          messages: [
+            {
+              role: "system",
+              content: softwareArchitectPrompt,
+            },
+            {
+              role: "user",
+              content: fullScreenshotDescription
+                ? fullScreenshotDescription + prompt
+                : prompt,
+            },
+          ],
+          temperature: 0.4,
+          max_tokens: 3000,
+        });
 
-      console.log("PLAN:", initialRes.choices[0].message?.content);
-
-      userMessage = initialRes.choices[0].message?.content ?? prompt;
+        planContent = initialRes.choices?.[0]?.message?.content ?? undefined;
+        if (planContent) {
+          console.log("PLAN:", planContent);
+        }
+      } catch (planErr) {
+        console.warn("High quality plan generation failed, falling back to raw prompt:", planErr);
+      }
+      userMessage = planContent ?? prompt;
     } else if (fullScreenshotDescription) {
       userMessage =
         prompt +
@@ -156,9 +185,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating chat:", error);
-    return NextResponse.json(
-      { error: "Failed to create chat" },
-      { status: 500 },
-    );
+
+    // In development / preview, surface the real error to make debugging easy.
+    // In production we keep the generic message.
+    const isDev = process.env.NODE_ENV !== "production";
+    const message =
+      isDev && error instanceof Error
+        ? `Failed to create chat: ${error.message}`
+        : "Failed to create chat";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
