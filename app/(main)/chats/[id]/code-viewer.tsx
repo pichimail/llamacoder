@@ -23,6 +23,7 @@ import { Share } from "./share";
 import { StickToBottom } from "use-stick-to-bottom";
 import JSZip from "jszip";
 import dynamic from "next/dynamic";
+import type { PreviewMode } from "@/components/code-runner-react";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), {
   ssr: false,
@@ -252,6 +253,7 @@ export default function CodeViewer({
     (chat.assistantMessagesCountBefore || 0) + currentVersionIndex;
 
   const [refresh, setRefresh] = useState(0);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   const disabledControls = !!streamText || files.length === 0;
   const selectValue = disabledControls
     ? undefined
@@ -424,6 +426,8 @@ export default function CodeViewer({
                   language={language}
                   files={files.map((f) => ({ path: f.path, content: f.code }))}
                   key={refresh}
+                  previewMode={previewMode}
+                  onPreviewModeChange={setPreviewMode}
                 />
               </div>
             )}
