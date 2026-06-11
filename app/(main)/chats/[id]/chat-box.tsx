@@ -234,7 +234,7 @@ export default function ChatBox({
       <form onSubmit={handleSubmit} className="relative">
         {/* Completely redesigned premium chat input - v0/lovable style */}
         <div
-          className="group relative flex w-full flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-xl focus-within:border-zinc-700 transition-all"
+          className="group relative flex w-full flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-xl focus-within:border-ring/40 transition-all"
           role="form"
           aria-label="Chat input form"
           onDragOver={(e) => e.preventDefault()}
@@ -253,7 +253,7 @@ export default function ChatBox({
                 <img
                   src={screenshotUrl}
                   alt="Attached screenshot"
-                  className="h-12 w-12 rounded-xl object-cover ring-1 ring-zinc-800"
+                  className="h-12 w-12 rounded-xl object-cover ring-1 ring-border"
                 />
                 <button
                   type="button"
@@ -261,7 +261,7 @@ export default function ChatBox({
                     setScreenshotUrl(undefined);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 ring-1 ring-zinc-800 hover:text-red-400"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground ring-1 ring-border hover:text-red-400"
                   aria-label="Remove screenshot"
                 >
                   <X className="h-3 w-3" />
@@ -276,16 +276,13 @@ export default function ChatBox({
             <textarea
               ref={textareaRef}
               placeholder="Continue the conversation..."
-              required
               name="prompt"
-              className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-zinc-500 focus:outline-none disabled:opacity-60"
+              aria-label="Message to the AI app builder"
+              className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-60"
               rows={1}
-              style={{ 
-                minHeight: '24px',
-                maxHeight: '140px',
-                height: Math.min(140, Math.max(24, (prompt.split('\n').length * 20) + 8)) + 'px'
-              }}
+              style={{ minHeight: "24px", maxHeight: "140px" }}
               value={prompt}
+              disabled={disabled}
               onChange={(e) => {
                 setPrompt(e.target.value);
                 // Auto grow
@@ -325,6 +322,11 @@ export default function ChatBox({
                 const end = textarea.selectionEnd;
                 const newValue = prompt.slice(0, start) + cleanedText + prompt.slice(end);
                 setPrompt(newValue);
+                // Restore caret right after the pasted text
+                requestAnimationFrame(() => {
+                  const pos = start + cleanedText.length;
+                  textarea.setSelectionRange(pos, pos);
+                });
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -337,12 +339,12 @@ export default function ChatBox({
           </div>
 
           {/* Bottom toolbar - subtle and premium */}
-          <div className="flex items-center justify-between border-t border-zinc-800 px-3 py-[7px]">
+          <div className="flex items-center justify-between border-t border-border px-3 py-[7px]">
             <div className="flex items-center gap-1.5 pl-1">
               {/* Attach */}
               <label
                 htmlFor="screenshot"
-                className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl text-zinc-400 transition hover:bg-zinc-800 hover:text-white ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-40" : ""}`}
+                className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-accent hover:text-foreground ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-40" : ""}`}
                 title={isScreenshotUploadAvailable ? "Attach screenshot" : "Attachments disabled"}
               >
                 <Plus className="h-4 w-4" />
@@ -359,15 +361,15 @@ export default function ChatBox({
 
               {/* Model */}
               <Select.Root value={model} onValueChange={setModel}>
-                <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                <Select.Trigger aria-label="Select AI model" className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Select.Value />
                   <ChevronDownIcon className="h-3 w-3" />
                 </Select.Trigger>
                 <Select.Portal>
-                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl">
                     <Select.Viewport className="p-1">
                       {MODELS.filter((m) => !m.hidden).map((m) => (
-                        <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                        <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent">
                           <Select.ItemText>{m.label}</Select.ItemText>
                         </Select.Item>
                       ))}
@@ -378,16 +380,16 @@ export default function ChatBox({
 
               {/* Quality */}
               <Select.Root value={quality} onValueChange={setQuality}>
-                <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                <Select.Trigger aria-label="Select generation quality" className="inline-flex h-8 items-center gap-1.5 rounded-2xl px-3 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <LightningBoltIcon className="h-3.5 w-3.5" />
                   <Select.Value />
                   <ChevronDownIcon className="h-3 w-3" />
                 </Select.Trigger>
                 <Select.Portal>
-                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                  <Select.Content className="z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl">
                     <Select.Viewport className="p-1">
                       {qualityOptions.map((q) => (
-                        <Select.Item key={q.value} value={q.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                        <Select.Item key={q.value} value={q.value} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent">
                           <Select.ItemText>{q.label}</Select.ItemText>
                         </Select.Item>
                       ))}
@@ -401,15 +403,15 @@ export default function ChatBox({
               {/* Versions + Undo */}
               {versions.length > 0 && onSwitchVersion && (
                 <Select.Root value={currentVersionId || ""} onValueChange={(val) => onSwitchVersion(val)} disabled={isStreaming || disabled}>
-                  <Select.Trigger className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white focus:outline-none">
+                  <Select.Trigger aria-label="Switch app version" className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-border bg-background px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Select.Value />
                     <ChevronDownIcon className="h-3 w-3" />
                   </Select.Trigger>
                   <Select.Portal>
-                    <Select.Content className="z-50 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                    <Select.Content className="z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl">
                       <Select.Viewport className="p-1">
                         {versions.slice().reverse().map((v) => (
-                          <Select.Item key={v.id} value={v.id} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800">
+                          <Select.Item key={v.id} value={v.id} className="flex cursor-pointer items-center rounded-xl px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent">
                             <Select.ItemText>{v.label}</Select.ItemText>
                           </Select.Item>
                         ))}
@@ -424,7 +426,7 @@ export default function ChatBox({
                   type="button"
                   onClick={onUndo}
                   disabled={!canUndo || disabled || isStreaming}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-400 transition hover:bg-zinc-800 hover:text-white disabled:opacity-50"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
                   aria-label="Undo last version"
                 >
                   <Undo2 className="h-4 w-4" />
@@ -438,7 +440,7 @@ export default function ChatBox({
                 disabled={
                   isStreaming && onStop ? isPending : disabled || screenshotLoading || (!prompt.trim() && !screenshotUrl)
                 }
-                className="inline-flex h-9 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow transition hover:bg-zinc-200 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 items-center justify-center rounded-2xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label={isStreaming && onStop ? "Stop generation" : "Send"}
               >
                 <Spinner loading={isPending || screenshotLoading}>

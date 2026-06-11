@@ -13,15 +13,24 @@ export default function CodeRunner({
 }: {
   language?: string;
   code?: string;
-  files?: Array<{ path: string; content: string }>;
+  files?: Array<{ path: string; content?: string; code?: string }>;
   onRequestFix?: (e: string) => void;
   onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
-  const actualFiles =
-    files || (code ? [{ path: "App.tsx", content: code }] : []);
+  const actualFiles = (
+    files || (code ? [{ path: "App.tsx", content: code }] : [])
+  ).map((f) => ({
+    path: f.path,
+    content:
+      typeof f.content === "string"
+        ? f.content
+        : typeof f.code === "string"
+          ? f.code
+          : "",
+  }));
   return (
     <CodeRunnerReact
       files={actualFiles}

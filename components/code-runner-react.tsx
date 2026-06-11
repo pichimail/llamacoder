@@ -144,21 +144,41 @@ function PreviewStatusMonitor({
   onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
 }) {
-  const { sandpack } = useSandpack();
+  const { sandpack, listen } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
 
+  // Report errors immediately
   useEffect(() => {
     if (sandpack.error) {
       onPreviewError?.(sandpack.error.message);
-      return;
     }
+  }, [sandpack.error, onPreviewError]);
 
-    const readyTimer = window.setTimeout(() => {
-      onPreviewReady?.();
-    }, 1800);
+  // Report "ready" only after the bundler actually finishes without errors,
+  // debounced so a crash right after mount still counts as an error.
+  useEffect(() => {
+    let readyTimer: number | undefined;
 
-    return () => window.clearTimeout(readyTimer);
-  }, [sandpack.error, onPreviewError, onPreviewReady]);
+    const unsubscribe = listen((message) => {
+      if (message.type === "done" && !(message as any).compilatonError) {
+        window.clearTimeout(readyTimer);
+        readyTimer = window.setTimeout(() => {
+          if (!sandpack.error) {
+            onPreviewReady?.();
+          }
+        }, 1200);
+      }
+      if (message.type === "action" && (message as any).action === "show-error") {
+        window.clearTimeout(readyTimer);
+      }
+    });
+
+    return () => {
+      window.clearTimeout(readyTimer);
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listen, onPreviewReady]);
 
   if (!sandpack.error) return null;
 

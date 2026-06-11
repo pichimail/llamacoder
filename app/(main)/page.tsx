@@ -15,11 +15,13 @@ import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  use,
   useState,
   useRef,
   useTransition,
   useEffect,
 } from "react";
+import { Context } from "./providers";
 import { useTheme } from "@/components/theme-provider";
 
 import Header from "@/components/header";
@@ -51,6 +53,7 @@ const staggeredSocialItems = [
 
 export default function Home() {
   const router = useRouter();
+  const context = use(Context);
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(
@@ -206,8 +209,28 @@ export default function Home() {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prompt, model, mode, screenshotUrl }),
               });
-              if (!res.ok) { toast({ title: "Error", variant: "destructive" }); return; }
-              const { chatId } = await res.json();
+              if (!res.ok) {
+                let description = "Failed to create chat";
+                try {
+                  const data = await res.json();
+                  if (data?.error) description = data.error;
+                } catch {}
+                toast({ title: "Error", description, variant: "destructive" });
+                return;
+              }
+              const { chatId, lastMessageId } = await res.json();
+
+              // CRITICAL: start the first generation immediately so the chat
+              // page begins streaming the app instead of sitting empty.
+              const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+                method: "POST",
+                body: JSON.stringify({ messageId: lastMessageId, model }),
+              }).then(async (r) => {
+                if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
+                if (!r.body) throw new Error("No body on response");
+                return r.body;
+              });
+              context.setStreamPromise(streamPromise);
               router.push(`/chats/${chatId}`);
             });
           }}>

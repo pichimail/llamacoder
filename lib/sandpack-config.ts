@@ -1,7 +1,7 @@
 import * as shadcnComponents from "@/lib/shadcn";
 
 function inferPathFromContent(path: string, content: string) {
-  const firstLine = content.split("\n", 1)[0]?.trim() || "";
+  const firstLine = (content ?? "").split("\n", 1)[0]?.trim() || "";
   const commentPathMatch = firstLine.match(
     /^(?:\/\/|\/\*|#)\s*([A-Za-z0-9_@./()[\]-]+\.(?:tsx|ts|jsx|js|css|json|mjs|cjs|mdx|prisma))/,
   );
@@ -103,8 +103,21 @@ function isLikelyRenderableReactFile(path: string, content: string) {
 }
 
 export function getSandpackConfig(
-  files: Array<{ path: string; content: string }>,
+  inputFiles: Array<{ path: string; content?: string; code?: string }>,
 ) {
+  // Defensive normalization: accept both { content } and legacy { code } shapes.
+  const files: Array<{ path: string; content: string }> = (inputFiles || [])
+    .filter((f) => f && typeof f.path === "string")
+    .map((f) => ({
+      path: f.path,
+      content:
+        typeof f.content === "string"
+          ? f.content
+          : typeof f.code === "string"
+            ? f.code
+            : "",
+    }));
+
   const sandpackFiles: Record<string, string> = { ...shadcnFiles };
   const previewUserFiles: Array<{ path: string; content: string }> = [];
 

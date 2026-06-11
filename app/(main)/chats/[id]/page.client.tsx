@@ -9,7 +9,6 @@ import {
 } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  memo,
   startTransition,
   use,
   useCallback,
@@ -19,35 +18,28 @@ import {
   useMemo,
 } from "react";
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
+import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
-import CodeViewer from "./code-viewer";
+import CodeViewer, { downloadFilesAsZip } from "./code-viewer";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { toast } from "@/hooks/use-toast";
+import { Download, ExternalLink, Loader2 } from "lucide-react";
 
-const HeaderChat = memo(({ chat }: { chat: Chat }) => (
-  <div className="flex items-center justify-between gap-4 px-4 py-4">
-    <a href="/" className="inline-flex items-center gap-3">
-      <LogoSmall />
-      <span
-        className="text-sm font-semibold tracking-tight text-foreground"
-        aria-label="Chinna-Coder logo link"
-      >
-        Chinna-Coder
-      </span>
-    </a>
-    <div className="flex items-center gap-3">
-      <p className="italic text-muted-foreground" aria-live="polite">
-        {chat.title}
-      </p>
-      <ThemeToggle />
-    </div>
-  </div>
-));
+const CodeRunner = dynamic(() => import("@/components/code-runner"), {
+  ssr: false,
+});
 
-HeaderChat.displayName = "HeaderChat";
+const MIN_CHAT_WIDTH = 260;
+const MAX_CHAT_WIDTH = 520;
+
+function getMessageFiles(message: Message) {
+  const stored = message.files as any[] | null;
+  if (stored && Array.isArray(stored) && stored.length > 0) return stored;
+  return extractAllCodeBlocks(message.content);
+}
 
 export default function PageClient({ chat }: { chat: Chat }) {
   const context = use(Context);
@@ -79,22 +71,34 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
 
-  // Resizable state for left chat pane (subtle splitter like v0/lovable)
-  const [chatPanelWidth, setChatPanelWidth] = useState(300);
+  // Resizable left chat pane
+  const [chatPanelWidth, setChatPanelWidth] = useState(320);
 
-  const dragRef = useRef<{
-    startX: number;
-    startChat: number;
-  } | null>(null);
+  const dragRef = useRef<{ startX: number; startChat: number } | null>(null);
 
   const onSplitterMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = {
-      startX: e.clientX,
-      startChat: chatPanelWidth,
-    };
+    dragRef.current = { startX: e.clientX, startChat: chatPanelWidth };
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+  };
+
+  // Keyboard-accessible splitter resize
+  const onSplitterKeyDown = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setChatPanelWidth((w) => Math.max(MIN_CHAT_WIDTH, w - step));
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setChatPanelWidth((w) => Math.min(MAX_CHAT_WIDTH, w + step));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setChatPanelWidth(MIN_CHAT_WIDTH);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setChatPanelWidth(MAX_CHAT_WIDTH);
+    }
   };
 
   useEffect(() => {
@@ -102,8 +106,9 @@ export default function PageClient({ chat }: { chat: Chat }) {
       if (!dragRef.current) return;
       const { startX, startChat } = dragRef.current;
       const delta = e.clientX - startX;
-      const newWidth = Math.max(220, Math.min(520, startChat + delta));
-      setChatPanelWidth(newWidth);
+      setChatPanelWidth(
+        Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, startChat + delta)),
+      );
     };
 
     const handleMouseUp = () => {
@@ -116,7 +121,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
@@ -125,6 +129,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const searchParams = useSearchParams();
   const targetMessageId = searchParams.get("message");
+  const isFullscreenPreview = searchParams.get("fs") === "1";
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -151,34 +156,36 @@ export default function PageClient({ chat }: { chat: Chat }) {
     );
     return assistants.map((m, idx) => {
       const v = (chat.assistantMessagesCountBefore || 0) + idx + 1;
-      return {
-        id: m.id,
-        version: v,
-        label: `v${v}`,
-      };
+      return { id: m.id, version: v, label: `v${v}` };
     });
   }, [chat.messages, chat.assistantMessagesCountBefore]);
+
+  const activeVersion = useMemo(() => {
+    if (!activeMessage) return undefined;
+    return assistantVersions.find((v) => v.id === activeMessage.id);
+  }, [activeMessage, assistantVersions]);
+
+  const activeFileCount = useMemo(
+    () => (activeMessage ? getMessageFiles(activeMessage).length : 0),
+    [activeMessage],
+  );
 
   const handleUndo = useCallback(() => {
     if (assistantVersions.length < 2) return;
     const currentIdx = activeMessage
       ? assistantVersions.findIndex((v) => v.id === activeMessage.id)
       : assistantVersions.length - 1;
-    if (currentIdx > 0) {
-      const prev = assistantVersions[currentIdx - 1];
+    const targetIdx =
+      currentIdx > 0
+        ? currentIdx - 1
+        : currentIdx === -1
+          ? assistantVersions.length - 2
+          : -1;
+    if (targetIdx >= 0) {
+      const prev = assistantVersions[targetIdx];
       const msg = chat.messages.find((m) => m.id === prev.id);
       if (msg) {
         setActiveMessage(msg);
-        // setIsShowingCodeViewer(true); // removed in new two-pane layout
-        setActiveTab("preview");
-      }
-    } else if (currentIdx === -1 && assistantVersions.length > 0) {
-      // switch to second to last if none active
-      const prev = assistantVersions[assistantVersions.length - 2];
-      const msg = chat.messages.find((m) => m.id === prev.id);
-      if (msg) {
-        setActiveMessage(msg);
-        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     }
@@ -189,7 +196,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === messageId);
       if (msg) {
         setActiveMessage(msg);
-        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     },
@@ -204,7 +210,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
     streamTextRef.current = streamText;
   }, [streamText]);
 
-  // Auto-activate target version for full screen new tab links
+  // Auto-activate target version for deep links (?message=...)
   useEffect(() => {
     if (targetMessageId && chat.messages.length > 0) {
       const target = chat.messages.find(
@@ -212,18 +218,16 @@ export default function PageClient({ chat }: { chat: Chat }) {
       );
       if (target) {
         setActiveMessage(target);
-        // setIsShowingCodeViewer(true); // removed in new two-pane layout
         setActiveTab("preview");
       }
     }
   }, [targetMessageId, chat.messages]);
 
-  // Minimal keyboard shortcuts (highest leverage, zero UI)
+  // Keyboard shortcuts
   useEffect(() => {
     const handleGlobalKey = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
 
-      // Cmd/Ctrl + .  or Escape → stop current build
       if ((isMod && e.key === ".") || e.key === "Escape") {
         if (streamPromise) {
           e.preventDefault();
@@ -231,7 +235,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
         }
       }
 
-      // /  (when not typing in an input) → focus the prompt
       if (
         e.key === "/" &&
         document.activeElement &&
@@ -367,7 +370,12 @@ ${error.trimStart()}`;
             return null as any;
           }
           abortControllerRef.current = null;
-          toast({ title: "Generation failed", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+          toast({
+            title: "Generation failed",
+            description:
+              err instanceof Error ? err.message : String(err),
+            variant: "destructive",
+          });
           throw err;
         });
 
@@ -480,12 +488,10 @@ ${error.trimStart()}`;
       }
 
       let didPushToCode = false;
-      let didPushToPreview = false;
 
       try {
         ChatCompletionStream.fromReadableStream(stream)
           .on("content", (delta, content) => {
-            // Stop consuming if aborted
             if (!streamPromiseRef.current) return;
             setStreamText((text) => text + delta);
 
@@ -494,39 +500,25 @@ ${error.trimStart()}`;
               parseReplySegments(content).some((seg) => seg.type === "file")
             ) {
               didPushToCode = true;
-              // setIsShowingCodeViewer(true); // removed in new two-pane layout
               setActiveTab("code");
-            }
-
-            if (
-              !didPushToPreview &&
-              parseReplySegments(content).some(
-                (seg) => seg.type === "file" && !seg.isPartial,
-              )
-            ) {
-              didPushToPreview = true;
-              // setIsShowingCodeViewer(true); // removed in new two-pane layout
             }
           })
           .on("finalContent", async (finalText) => {
             abortControllerRef.current = null;
             startTransition(async () => {
-              // Get all previous assistant messages with files
+              // Merge cumulative files: previous versions + current patch
               const previousAssistantMessages = chat.messages.filter(
                 (m) =>
                   m.role === "assistant" &&
                   extractAllCodeBlocks(m.content).length > 0,
               );
 
-              // Extract all files from previous messages
               const previousFiles = previousAssistantMessages.flatMap((msg) =>
-                extractAllCodeBlocks(msg.content),
+                getMessageFiles(msg),
               );
 
-              // Extract files from current AI response
               const currentFiles = extractAllCodeBlocks(finalText);
 
-              // Merge files (current overrides previous for same paths)
               const fileMap = new Map();
               previousFiles.forEach((file) => fileMap.set(file.path, file));
               currentFiles.forEach((file) => fileMap.set(file.path, file));
@@ -534,9 +526,9 @@ ${error.trimStart()}`;
 
               const message = await createMessage(
                 chat.id,
-                finalText, // Store original AI response content (only changed files)
+                finalText,
                 "assistant",
-                allFiles, // Store cumulative files
+                allFiles,
               );
 
               startTransition(() => {
@@ -548,8 +540,6 @@ ${error.trimStart()}`;
                   setAutoFixStatus("watching");
                 }
                 setActiveMessage(message);
-                // When streaming finishes, switch to preview mode and keep the viewer open
-                // setIsShowingCodeViewer(true); // removed in new two-pane layout
                 setActiveTab("preview");
                 router.refresh();
               });
@@ -569,42 +559,124 @@ ${error.trimStart()}`;
     f();
   }, [chat.id, router, streamPromise, context, autoFixEnabled]);
 
+  const handleDownloadZip = useCallback(() => {
+    const files = activeMessage ? getMessageFiles(activeMessage) : [];
+    void downloadFilesAsZip(files, chat.title || "app");
+  }, [activeMessage, chat.title]);
+
+  const handlePublish = useCallback(async () => {
+    if (!activeMessage) {
+      toast({
+        title: "Nothing to publish yet",
+        description: "Generate a version first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const url = `${window.location.origin}/share/v2/${activeMessage.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: "Published — link copied",
+        description: "Anyone with the link can view this version live.",
+      });
+    } catch {}
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [activeMessage]);
+
+  // Fullscreen preview mode (?fs=1) — used by "open in new tab" links
+  if (isFullscreenPreview) {
+    const files = activeMessage ? getMessageFiles(activeMessage) : [];
+    return (
+      <main
+        className="h-dvh w-full bg-background text-foreground"
+        aria-label={`Fullscreen preview of ${chat.title}`}
+      >
+        {files.length > 0 ? (
+          <CodeRunner
+            files={files.map((f: any) => ({
+              path: f.path,
+              content: f.code ?? f.content ?? "",
+            }))}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+            <p>No generated version to preview yet.</p>
+          </div>
+        )}
+      </main>
+    );
+  }
+
   return (
-    <div className="h-dvh bg-background text-foreground flex flex-col overflow-hidden dark">
-      {/* Top bar exactly like the screenshot */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-zinc-950 px-3 text-sm">
-        <div className="flex items-center gap-3">
-          <a href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      {/* Top bar */}
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm">
+        <div className="flex min-w-0 items-center gap-3">
+          <a
+            href="/"
+            className="flex items-center gap-2 font-semibold tracking-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            aria-label="Chinna-Coder home"
+          >
             <LogoSmall />
             <span>Chinna-Coder</span>
           </a>
-          <div className="mx-1 h-4 w-px bg-border" />
-          <div className="flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-2 py-1 text-xs text-muted-foreground">
-            <span className="font-mono">v1</span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline truncate max-w-[180px]">{chat.title}</span>
+          <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+          <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+            <span className="font-mono">
+              {activeVersion ? activeVersion.label : "—"}
+            </span>
+            <span className="hidden sm:inline" aria-hidden="true">
+              •
+            </span>
+            <span className="hidden max-w-[220px] truncate sm:inline">
+              {chat.title}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setActiveTab("code")} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">View Code</button>
-          <button onClick={() => setActiveTab("preview")} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">Preview App</button>
-          <button onClick={() => toast({ title: "Download", description: "Zip of files" })} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-zinc-900 px-3 py-1 text-xs font-medium text-foreground hover:bg-zinc-800">Download Code (zip)</button>
-          <button onClick={() => window.open(`/chats/${chat.id}?fs=1&preview=1`, "_blank")} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500">Publish</button>
+          <button
+            onClick={handleDownloadZip}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            aria-label="Download generated code as a zip file"
+          >
+            <Download className="size-3.5" aria-hidden="true" />
+            <span className="hidden md:inline">Download zip</span>
+          </button>
+          <button
+            onClick={handlePublish}
+            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            aria-label="Publish and open shareable link"
+          >
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+            Publish
+          </button>
           <ThemeToggle />
         </div>
-      </div>
+      </header>
 
-      {/* Two pane with resizable subtle splitter - left chat with version badge, right builder exactly like the screenshot */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div style={{ width: chatPanelWidth + "px" }} className="flex flex-col border-r border-border bg-zinc-950 min-w-[260px] max-w-[420px] overflow-hidden">
-          {activeMessage && (
-            <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-zinc-900/50 text-xs">
-              <span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 font-mono">v1</span>
-              <span className="font-medium text-foreground">Version 1</span>
-              <span className="text-muted-foreground">• 3 files edited</span>
+      {/* Two-pane layout with resizable splitter */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        <section
+          style={{ ["--chat-w" as any]: chatPanelWidth + "px" }}
+          className="order-2 flex h-[45dvh] w-full flex-col overflow-hidden border-t border-border bg-card md:order-none md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[520px] md:border-r md:border-t-0"
+          aria-label="Chat panel"
+        >
+          {activeMessage && activeVersion && (
+            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2 text-xs">
+              <span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">
+                {activeVersion.label}
+              </span>
+              <span className="font-medium text-foreground">
+                Version {activeVersion.version}
+              </span>
+              <span className="text-muted-foreground">
+                • {activeFileCount} file{activeFileCount === 1 ? "" : "s"}
+              </span>
             </div>
           )}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <ChatLog
               chat={chat}
               streamText={streamText}
@@ -613,17 +685,17 @@ ${error.trimStart()}`;
                 if (message !== activeMessage) {
                   setActiveMessage(message);
                   setActiveTab("preview");
-                } else {
-                  setActiveMessage(undefined);
                 }
               }}
             />
           </div>
-          <div className="shrink-0 border-t border-border bg-zinc-950 p-3">
+          <div className="shrink-0 border-t border-border bg-card p-3">
             <ChatBox
               chat={chat}
               onNewStreamPromise={setStreamPromise}
-              onAbortController={(c) => { abortControllerRef.current = c; }}
+              onAbortController={(c) => {
+                abortControllerRef.current = c;
+              }}
               isStreaming={!!streamPromise}
               onStop={stopStreaming}
               onUndo={handleUndo}
@@ -634,16 +706,30 @@ ${error.trimStart()}`;
               onInputFocused={() => setShouldFocusInput(false)}
             />
           </div>
-        </div>
+        </section>
 
         <div
-          className="w-[6px] bg-border hover:bg-primary/50 cursor-col-resize flex-shrink-0 relative z-10 group"
+          role="separator"
+          tabIndex={0}
+          aria-orientation="vertical"
+          aria-label="Resize chat panel (arrow keys to adjust)"
+          aria-valuemin={MIN_CHAT_WIDTH}
+          aria-valuemax={MAX_CHAT_WIDTH}
+          aria-valuenow={chatPanelWidth}
           onMouseDown={onSplitterMouseDown}
+          onKeyDown={onSplitterKeyDown}
+          className="group relative z-10 hidden w-[6px] flex-shrink-0 cursor-col-resize bg-border transition hover:bg-primary/50 focus-visible:bg-primary/60 focus-visible:outline-none md:block"
         >
-          <div className="absolute inset-y-0 left-1/2 w-[2px] bg-current opacity-0 group-hover:opacity-100 transition" />
+          <div
+            className="absolute inset-y-0 left-1/2 w-[2px] bg-current opacity-0 transition group-hover:opacity-100"
+            aria-hidden="true"
+          />
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950 min-w-[400px]">
+        <section
+          className="order-1 flex min-h-0 flex-1 flex-col overflow-hidden bg-background md:order-none md:min-w-[360px]"
+          aria-label="Code and preview panel"
+        >
           <CodeViewer
             streamText={streamText}
             chat={chat}
@@ -651,10 +737,14 @@ ${error.trimStart()}`;
             onMessageChange={setActiveMessage}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            onClose={() => { setActiveMessage(undefined); }}
             onRequestFix={(error: string) => {
               startTransition(async () => {
-                await requestFix({ error, auto: false, attempt: 1, fallback: false });
+                await requestFix({
+                  error,
+                  auto: false,
+                  attempt: 1,
+                  fallback: false,
+                });
               });
             }}
             onPreviewError={handlePreviewError}
@@ -663,21 +753,8 @@ ${error.trimStart()}`;
             onAutoFixEnabledChange={handleAutoFixEnabledChange}
             autoFixAttempt={autoFixAttempt}
             autoFixStatus={autoFixStatus}
-            onRestore={async (message, oldVersion, newVersion) => {
-              startTransition(async () => {
-                if (!message) return;
-                const getFilesFromMessage = (msg: Message) => (msg.files as any[]) || extractAllCodeBlocks(msg.content);
-                const restoredFiles = getFilesFromMessage(message);
-                if (restoredFiles.length === 0) return;
-                const explanation = `Version ${newVersion} was created by restoring version ${oldVersion}.`;
-                const newContent = explanation + "\n\n" + restoredFiles.map(f => `\`\`\`${f.language}{path=${f.path}}\n${f.code}\n\`\`\``).join("\n\n");
-                const newMessage = await createMessage(chat.id, newContent, "assistant", restoredFiles);
-                setActiveMessage(newMessage);
-                router.refresh();
-              });
-            }}
           />
-        </div>
+        </section>
       </div>
     </div>
   );

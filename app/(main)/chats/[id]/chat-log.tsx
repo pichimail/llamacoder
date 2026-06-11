@@ -36,7 +36,12 @@ export default function ChatLog({
       resize="smooth"
       initial="smooth"
     >
-      <StickToBottom.Content className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+      <StickToBottom.Content
+        className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6"
+        role="log"
+        aria-label="Conversation history"
+        aria-live="polite"
+      >
         {/* Initial user prompt - clean modern bubble */}
         <div className="flex justify-end">
           <div className="max-w-[75%] rounded-2xl bg-primary text-primary-foreground px-4 py-3 text-sm shadow-sm">
@@ -177,10 +182,11 @@ function AssistantMessage({
           return (
             <div
               key={i}
-              className="inline-flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
               role="status"
+              aria-label={`Generated file ${seg.path}`}
             >
-              <span className="font-mono text-xs text-muted-foreground">📄</span>
+              <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
               <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
             </div>
           );

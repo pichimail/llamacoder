@@ -6,19 +6,32 @@ import {
   softwareArchitectPrompt,
 } from "@/lib/prompts";
 import Together from "together-ai";
+import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 
+const createChatSchema = z.object({
+  prompt: z.string().trim().min(1, "Prompt is required").max(20000),
+  model: z.string().min(1),
+  quality: z.enum(["low", "high"]).optional().default("low"),
+  screenshotUrl: z.string().url().optional(),
+  mode: z.enum(["ask", "plan", "agent"]).optional().default("agent"),
+});
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const {
-      prompt,
-      model,
-      quality = "low",
-      screenshotUrl,
-      mode = "agent",
-    } = body;
+    const json = await request.json().catch(() => null);
+    const parsed = createChatSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error:
+            parsed.error.issues[0]?.message || "Invalid request body",
+        },
+        { status: 400 },
+      );
+    }
+    const { prompt, model, quality, screenshotUrl, mode } = parsed.data;
     const resolvedModel = resolveModel(model);
 
     // Fail fast with clear messages if required secrets are missing
