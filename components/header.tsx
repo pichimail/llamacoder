@@ -10,7 +10,12 @@ function Header() {
         <img
           src="/chinna-coder-logo.svg"
           alt="Chinna-Coder"
-          className="h-9 w-auto object-contain sm:h-10"
+          className="h-9 w-auto object-contain sm:h-10 dark:hidden"
+        />
+        <img
+          src="/chinna-coder-logo-dark.svg"
+          alt="Chinna-Coder"
+          className="hidden h-9 w-auto object-contain sm:h-10 dark:block"
         />
       </Link>
       <ThemeToggle />

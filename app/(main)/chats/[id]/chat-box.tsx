@@ -159,17 +159,17 @@ export default function ChatBox({
         onSubmit={handleSubmit}
       >
         <fieldset className="w-full" disabled={disabled}>
-          <div className="relative flex flex-col rounded-2xl border border-gray-400 bg-white shadow-sm dark:border-gray-700 dark:bg-zinc-950" role="form" aria-label="Chat input form">
+          <div className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm" role="form" aria-label="Chat input form">
             
             {/* Mode Selector + Upload Bar - Lovable.dev style */}
-            <div className="flex items-center justify-between border-b border-gray-300 px-3 py-2 dark:border-gray-700">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <div className="flex items-center gap-2">
                 {/* Mode Dropdown */}
                 <div className="relative">
                   <select
                     value={mode}
                     onChange={(e) => setMode(e.target.value as 'ask' | 'plan' | 'agent')}
-                    className="appearance-none rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-zinc-900 dark:text-gray-200"
+                    className="appearance-none rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={disabled}
                     aria-label="Generation mode"
                   >
@@ -177,12 +177,12 @@ export default function ChatBox({
                     <option value="plan">Plan</option>
                     <option value="agent">Agent (Full Stack)</option>
                   </select>
-                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-500">
+                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
                     ▼
                   </div>
                 </div>
 
-                <div id="mode-description" className="text-[10px] text-gray-600 dark:text-gray-400" aria-live="polite">
+                <div id="mode-description" className="text-[10px] text-muted-foreground" aria-live="polite">
                   {mode === 'agent' && 'Full backend + SaaS admin'}
                   {mode === 'plan' && 'Architecture first'}
                   {mode === 'ask' && 'Quick answers'}
@@ -194,7 +194,7 @@ export default function ChatBox({
                 type="button"
                 onClick={triggerFileUpload}
                 disabled={disabled}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-200 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-zinc-800"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-accent active:bg-accent"
                 aria-label="Upload screenshot, HTML or TSX file for analysis"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -214,26 +214,26 @@ export default function ChatBox({
 
             {/* Attached Files Preview */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 border-b border-gray-300 px-3 py-2 dark:border-gray-700" role="list" aria-label="Attached files">
+              <div className="flex flex-wrap gap-2 border-b border-border px-3 py-2" role="list" aria-label="Attached files">
                 {attachedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs dark:border-gray-700 dark:bg-zinc-900"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-muted px-2 py-1 text-xs"
                   >
                     {file.previewUrl ? (
                       <img src={file.previewUrl} alt={file.name} className="h-6 w-6 rounded object-cover" />
                     ) : (
-                      <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-100 text-[10px] font-mono text-blue-600 dark:bg-blue-950 dark:text-blue-400">
+                      <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-[10px] font-mono text-primary">
                         {file.name.split('.').pop()?.toUpperCase()}
                       </div>
                     )}
-                    <span className="max-w-[120px] truncate font-medium text-gray-800 dark:text-gray-200" title={file.name}>
+                    <span className="max-w-[120px] truncate font-medium text-foreground" title={file.name}>
                       {file.name}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeFile(index)}
-                      className="ml-1 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                      className="ml-1 text-muted-foreground hover:text-destructive"
                       aria-label={`Remove attached file ${file.name}`}
                     >
                       ×
@@ -263,7 +263,7 @@ export default function ChatBox({
                 onChange={(e) => setPrompt(e.target.value)}
                 required={attachedFiles.length === 0}
                 name="prompt"
-                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder-gray-600 focus:outline-none disabled:opacity-50 dark:placeholder-gray-400" aria-describedby="mode-description"
+                className="peer absolute inset-0 w-full resize-none bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50" aria-describedby="mode-description"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -274,17 +274,17 @@ export default function ChatBox({
             </div>
 
             {/* Bottom Bar */}
-            <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-gray-300 px-3 py-2 dark:border-gray-700">
-              <div className="flex items-center gap-2 pl-1 text-[10px] text-gray-600 dark:text-gray-400" aria-live="polite">
+            <div className="flex w-full items-center justify-between rounded-b-2xl border-t border-border px-3 py-2">
+              <div className="flex items-center gap-2 pl-1 text-[10px] text-muted-foreground" aria-live="polite">
                 <span>{modelLabel}</span>
-                <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">•</span>
+                <span className="text-muted-foreground/70" aria-hidden="true">•</span>
                 <span className="font-mono">{mode.toUpperCase()} MODE</span>
               </div>
 
               <button
                 type="submit"
                 disabled={disabled || (!prompt.trim() && attachedFiles.length === 0)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label={mode === 'agent' ? 'Build full stack app' : 'Send message'}
               >
                 <Spinner loading={disabled}>

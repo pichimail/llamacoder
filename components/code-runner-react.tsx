@@ -43,8 +43,8 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
   if (!sandpack.error) return null;
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/5 text-base backdrop-blur-sm dark:bg-black/40" role="alert">
-      <div className="max-w-[400px] rounded-md bg-red-500 p-4 text-white shadow-xl shadow-black/20">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/70 text-base backdrop-blur-sm" role="alert">
+      <div className="max-w-[400px] rounded-md border border-border bg-destructive p-4 text-destructive-foreground shadow-xl shadow-black/20">
         <p className="text-lg font-medium">Error</p>
 
         <p className="mt-4 line-clamp-[10] overflow-x-auto whitespace-pre font-mono text-xs">
@@ -63,7 +63,7 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
               setDidCopy(false);
             }}
-            className="rounded border-red-300 px-2.5 py-1.5 text-sm font-semibold text-red-50"
+            className="rounded border border-destructive-foreground/30 px-2.5 py-1.5 text-sm font-semibold text-destructive-foreground"
           >
             {didCopy ? <CheckIcon size={18} /> : <CopyIcon size={18} />}
           </button>
@@ -72,7 +72,7 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
               if (!sandpack.error) return;
               onRequestFix(sandpack.error.message);
             }}
-            className="rounded bg-white px-2.5 py-1.5 text-sm font-medium text-black dark:bg-zinc-100 dark:text-black hover:bg-gray-100 dark:hover:bg-zinc-200 focus-visible:outline focus-visible:outline-2" aria-label="Try to automatically fix the error"
+            className="rounded bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline focus-visible:outline-2" aria-label="Try to automatically fix the error"
           >
             Try to fix
           </button>

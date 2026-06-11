@@ -315,10 +315,10 @@ export default function CodeViewer({
 
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-400 px-4 dark:border-gray-700" role="banner" aria-label="Code viewer header">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4" role="banner" aria-label="Code viewer header">
         <div className="inline-flex items-center gap-4">
           <button
-            className="hidden text-gray-600 hover:text-gray-900 md:block dark:text-gray-400 dark:hover:text-gray-100" aria-label="Close code viewer"
+            className="hidden text-muted-foreground hover:text-foreground md:block" aria-label="Close code viewer"
             onClick={onClose}
           >
             <CloseIcon className="size-5" />
@@ -345,7 +345,7 @@ export default function CodeViewer({
                           (allAssistantMessages.length - 1 - i) +
                           1}
                       </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-muted-foreground">
                         {timeAgo(msg.createdAt)}
                       </span>
                     </div>
@@ -365,18 +365,18 @@ export default function CodeViewer({
                     1,
                 )
               }
-              className="inline-flex h-[38px] items-center justify-center rounded bg-blue-500 px-2 text-xs font-medium text-white hover:bg-blue-600"
+              className="inline-flex h-[38px] items-center justify-center rounded bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
             >
               Restore
             </button>
           )}
         </div>
-        <div className="rounded-lg border-2 border-gray-400 p-1 dark:border-gray-600" role="tablist" aria-label="Code viewer tabs">
+        <div className="rounded-lg border border-border p-1" role="tablist" aria-label="Code viewer tabs">
           <button
             onClick={() => onTabChange("code")}
             data-active={activeTab === "code" ? true : undefined}
             disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-gray-800 disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-600 data-[active]:text-white dark:text-gray-200 dark:data-[active]:bg-blue-500" role="tab" aria-selected={activeTab === "code"} tabIndex={0}
+            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground" role="tab" aria-selected={activeTab === "code"} tabIndex={0}
           >
             Code
           </button>
@@ -384,14 +384,14 @@ export default function CodeViewer({
             onClick={() => onTabChange("preview")}
             data-active={activeTab === "preview" ? true : undefined}
             disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-gray-800 disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-600 data-[active]:text-white dark:text-gray-200 dark:data-[active]:bg-blue-500" role="tab" aria-selected={activeTab === "preview"} tabIndex={0}
+            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-primary data-[active]:text-primary-foreground" role="tab" aria-selected={activeTab === "preview"} tabIndex={0}
           >
             Preview
           </button>
         </div>
       </div>
 
-      <div className="flex grow flex-col overflow-y-auto bg-white dark:bg-zinc-950">
+      <div className="flex grow flex-col overflow-y-auto bg-background">
         {activeTab === "code" ? (
           <StickToBottom
             className="relative grow overflow-hidden *:!h-[inherit]"
@@ -431,7 +431,7 @@ export default function CodeViewer({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-400 px-4 py-4 dark:border-gray-700" role="contentinfo">
+      <div className="flex items-center justify-between border-t border-border px-4 py-4" role="contentinfo">
         <div className="inline-flex items-center gap-2.5 text-sm">
           <Share
             message={
@@ -443,7 +443,7 @@ export default function CodeViewer({
             }
           />
           <button
-            className="inline-flex items-center gap-1 rounded border border-gray-400 px-1.5 py-0.5 text-sm text-gray-700 transition enabled:hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:enabled:hover:bg-zinc-800"
+            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-sm text-foreground transition enabled:hover:bg-accent disabled:opacity-50"
             onClick={() => setRefresh((r) => r + 1)}
             disabled={disabledControls}
           >
@@ -451,7 +451,7 @@ export default function CodeViewer({
             Refresh
           </button>
           <button
-            className="hidden items-center gap-1 rounded border border-gray-400 px-1.5 py-0.5 text-sm text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 md:inline-flex dark:border-gray-600 dark:text-gray-300 dark:hover:bg-zinc-800"
+            className="hidden items-center gap-1 rounded border border-border px-1.5 py-0.5 text-sm text-foreground transition hover:bg-accent disabled:opacity-50 md:inline-flex"
             onClick={handleDownloadFiles}
             disabled={disabledControls}
             title="Download files"
@@ -460,7 +460,7 @@ export default function CodeViewer({
             Download
           </button>
         </div>
-        <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden" aria-label="Current model">{chat.model}</div>
+        <div className="text-xs text-muted-foreground md:hidden" aria-label="Current model">{chat.model}</div>
       </div>
     </>
   );

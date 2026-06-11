@@ -22,12 +22,12 @@ const HeaderChat = memo(({ chat }: { chat: Chat }) => (
   <div className="flex items-center justify-between gap-4 px-4 py-4">
     <a href="/" className="inline-flex items-center gap-3">
       <LogoSmall />
-      <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100" aria-label="Chinna-Coder logo link">
+      <span className="text-sm font-semibold tracking-tight text-foreground" aria-label="Chinna-Coder logo link">
         Chinna-Coder
       </span>
     </a>
     <div className="flex items-center gap-3">
-      <p className="italic text-gray-600 dark:text-gray-400" aria-live="polite">{chat.title}</p>
+      <p className="italic text-muted-foreground" aria-live="polite">{chat.title}</p>
       <ThemeToggle />
     </div>
   </div>

@@ -24,7 +24,7 @@ export default function CodeRunnerServerAction({
           <form action={action} className="mt-4">
             <button
               disabled={isPending}
-              className="inline-flex rounded border border-gray-400 px-2.5 py-1 text-sm text-gray-700 transition enabled:hover:bg-gray-100 disabled:opacity-75 dark:border-gray-600 dark:text-gray-300 dark:enabled:hover:bg-zinc-800" aria-label="Run or fix code"
+              className="inline-flex rounded border border-border px-2.5 py-1 text-sm text-foreground transition enabled:hover:bg-accent disabled:opacity-75" aria-label="Run or fix code"
             >
               <Spinner loading={isPending}>
                 <span className="inline-flex items-center gap-1">

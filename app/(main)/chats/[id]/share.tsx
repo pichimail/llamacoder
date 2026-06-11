@@ -25,7 +25,7 @@ export function Share({ message }: { message?: Message }) {
       <button
         type="submit"
         disabled={!message}
-        className="inline-flex items-center gap-1 rounded border border-gray-400 px-1.5 py-0.5 text-sm text-gray-700 enabled:hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:enabled:hover:bg-zinc-800" aria-label="Share published app link"
+        className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-sm text-foreground transition enabled:hover:bg-accent disabled:opacity-50" aria-label="Share published app link"
       >
         <ShareIcon className="size-3" />
         Share

@@ -17,7 +17,7 @@ function ThemeToggle() {
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
       aria-pressed={isDark}
       title={`Theme: ${label}. Click to change`}
-      className="group relative inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.985] dark:text-gray-400 dark:hover:border-gray-700 dark:hover:bg-zinc-800 dark:hover:text-gray-100"
+      className="group relative inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-all hover:border-border hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]"
     >
       <Icon
         className="size-[18px] transition-all group-active:scale-90"

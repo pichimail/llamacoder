@@ -24,14 +24,14 @@ export function AppVersionButton({
     <div className="my-4">
       <button
         disabled={disabled}
-        className={`inline-flex w-full items-center gap-2 rounded-lg border-4 border-gray-400 p-1.5 dark:border-gray-600 ${
+        className={`inline-flex w-full items-center gap-2 rounded-lg border-2 border-border p-1.5 text-foreground shadow-sm ${
           generating
             ? "animate-pulse"
             : isActive !== undefined
               ? isActive
-                ? "bg-white dark:bg-zinc-950"
-                : "bg-gray-200 hover:border-gray-400 hover:bg-gray-300 dark:bg-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
-              : "bg-white dark:bg-zinc-950"
+                ? "bg-background"
+                : "bg-muted hover:bg-accent"
+              : "bg-background"
         }`}
         onClick={onClick}
       >
@@ -39,9 +39,9 @@ export function AppVersionButton({
           className={`flex size-8 items-center justify-center rounded font-bold ${
             isActive !== undefined
               ? isActive
-                ? "bg-gray-200 dark:bg-zinc-700 dark:text-gray-100"
-                : "bg-gray-300 dark:bg-zinc-800 dark:text-gray-200"
-              : "bg-gray-200 dark:bg-zinc-700"
+                ? "bg-muted text-foreground"
+                : "bg-accent text-foreground"
+              : "bg-muted"
           }`} aria-hidden="true"
         >
           V{version}
@@ -57,7 +57,7 @@ export function AppVersionButton({
                 Version {version}
                 {appTitle ? ` - ${appTitle}` : ""}
               </div>
-              <div className="text-xs leading-none text-gray-500 dark:text-gray-400">
+              <div className="text-xs leading-none text-muted-foreground">
                 {fileCount} file{fileCount !== 1 ? "s" : ""} edited
               </div>
             </>
@@ -66,7 +66,7 @@ export function AppVersionButton({
               <div className="text-sm font-medium leading-none">
                 {toTitleCase(filename.name)} {version !== 1 && `v${version}`}
               </div>
-              <div className="text-xs leading-none text-gray-500 dark:text-gray-400">
+              <div className="text-xs leading-none text-muted-foreground">
                 {filename.name}
                 {version !== 1 && `-v${version}`}
                 {"."}
