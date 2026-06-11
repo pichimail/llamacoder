@@ -3,39 +3,48 @@
 
 import Fieldset from "@/components/fieldset";
 import ArrowRightIcon from "@/components/icons/arrow-right";
+import Hyperspeed from "@/components/Hyperspeed";
+import { hyperspeedPresets } from "@/components/HyperSpeedPresets";
 import LoadingButton from "@/components/loading-button";
 import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useState, useRef, useTransition, useLayoutEffect, useEffect, memo } from "react";
-import { Context } from "./providers";
+import {
+  useState,
+  useRef,
+  useTransition,
+  useEffect,
+} from "react";
+
 import Header from "@/components/header";
-import Hyperspeed from "@/components/Hyperspeed";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
-import { useTheme } from "@/components/theme-provider";
 
 type Mode = "ask" | "plan" | "agent";
 
 export default function Home() {
-  const { setStreamPromise } = use(Context);
-  const { theme } = useTheme();
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(MODELS.find((m) => !m.hidden)?.value || MODELS[0].value);
+  const [model, setModel] = useState(
+    MODELS.find((m) => !m.hidden)?.value || MODELS[0].value,
+  );
   const [mode, setMode] = useState<Mode>("agent");
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(undefined);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
+    undefined,
+  );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [blobUploadConfigured, setBlobUploadConfigured] = useState<
+    boolean | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
-  useEffect(() => { if (textareaRef.current) textareaRef.current.focus(); }, []);
-  useLayoutEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.focus();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,48 +86,10 @@ export default function Home() {
     finally { setScreenshotLoading(false); }
   };
 
-  // Four preset options for Hyperspeed (React Bits style)
-  const hyperspeedOptions = {
-    distortion: "LongRaceDistortion",
-    length: 400,
-    roadWidth: 10,
-    islandWidth: 5,
-    lanesPerRoad: 2,
-    fov: 90,
-    fovSpeedUp: 150,
-    speedUp: 2,
-    carLightsFade: 0.4,
-    totalSideLightSticks: 50,
-    lightPairsPerRoadWay: 70,
-    shoulderLinesWidthPercentage: 0.05,
-    brokenLinesWidthPercentage: 0.1,
-    brokenLinesLengthPercentage: 0.5,
-    lightStickWidth: [0.12, 0.5] as [number, number],
-    lightStickHeight: [1.3, 1.7] as [number, number],
-    movingAwaySpeed: [60, 80] as [number, number],
-    movingCloserSpeed: [-120, -160] as [number, number],
-    carLightsLength: [20, 60] as [number, number],
-    carLightsRadius: [0.05, 0.14] as [number, number],
-    carWidthPercentage: [0.3, 0.5] as [number, number],
-    carShiftX: [-0.2, 0.2] as [number, number],
-    carFloorSeparation: [0.05, 1] as [number, number],
-    colors: {
-      roadColor: 0x080808,
-      islandColor: 0x0a0a0a,
-      background: 0x000000,
-      shoulderLines: 0x131318,
-      brokenLines: 0x131318,
-      leftCars: [0xff5f73, 0xe74d60, 0xff102a],
-      rightCars: [0xa4e3e6, 0x80d1d4, 0x53c2c6],
-      sticks: 0xa4e3e6,
-    },
-  };
-
   return (
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
-      {/* New React Bits Hyperspeed as full background */}
-      <div className="pointer-events-none absolute inset-0 z-0">
-        <Hyperspeed effectOptions={hyperspeedOptions} interactive={true} />
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <Hyperspeed effectOptions={hyperspeedPresets.four} interactive={true} />
       </div>
 
       <div className="relative z-10 isolate flex h-full grow flex-col">

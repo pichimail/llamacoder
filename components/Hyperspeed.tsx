@@ -25,7 +25,7 @@ interface Colors {
   sticks: number;
 }
 
-interface HyperspeedOptions {
+export interface HyperspeedOptions {
   onSpeedUp?: (ev: MouseEvent | TouchEvent) => void;
   onSlowDown?: (ev: MouseEvent | TouchEvent) => void;
   distortion?: string | Distortion;
@@ -57,6 +57,7 @@ interface HyperspeedOptions {
 
 interface HyperspeedProps {
   effectOptions?: Partial<HyperspeedOptions>;
+  interactive?: boolean;
 }
 
 const defaultOptions: HyperspeedOptions = {
@@ -919,6 +920,7 @@ function resizeRendererToDisplaySize(
 class App {
   container: HTMLElement;
   options: HyperspeedOptions;
+  interactive: boolean;
   renderer: THREE.WebGLRenderer;
   composer: EffectComposer;
   camera: THREE.PerspectiveCamera;
@@ -939,8 +941,9 @@ class App {
   timeOffset: number;
   hasValidSize: boolean;
 
-  constructor(container: HTMLElement, options: HyperspeedOptions) {
+  constructor(container: HTMLElement, options: HyperspeedOptions, interactive: boolean) {
     this.options = options;
+    this.interactive = interactive;
     if (!this.options.distortion) {
       this.options.distortion = {
         uniforms: distortion_uniforms,
@@ -1106,14 +1109,16 @@ class App {
     this.leftSticks.init();
     this.leftSticks.mesh.position.setX(-(options.roadWidth + options.islandWidth / 2));
 
-    this.container.addEventListener('mousedown', this.onMouseDown);
-    this.container.addEventListener('mouseup', this.onMouseUp);
-    this.container.addEventListener('mouseout', this.onMouseUp);
+    if (this.interactive) {
+      this.container.addEventListener('mousedown', this.onMouseDown);
+      this.container.addEventListener('mouseup', this.onMouseUp);
+      this.container.addEventListener('mouseout', this.onMouseUp);
 
-    this.container.addEventListener('touchstart', this.onTouchStart, { passive: true });
-    this.container.addEventListener('touchend', this.onTouchEnd, { passive: true });
-    this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
-    this.container.addEventListener('contextmenu', this.onContextMenu);
+      this.container.addEventListener('touchstart', this.onTouchStart, { passive: true });
+      this.container.addEventListener('touchend', this.onTouchEnd, { passive: true });
+      this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
+      this.container.addEventListener('contextmenu', this.onContextMenu);
+    }
 
     this.tick();
   }
@@ -1219,14 +1224,16 @@ class App {
 
     window.removeEventListener('resize', this.onWindowResize);
     if (this.container) {
-      this.container.removeEventListener('mousedown', this.onMouseDown);
-      this.container.removeEventListener('mouseup', this.onMouseUp);
-      this.container.removeEventListener('mouseout', this.onMouseUp);
+      if (this.interactive) {
+        this.container.removeEventListener('mousedown', this.onMouseDown);
+        this.container.removeEventListener('mouseup', this.onMouseUp);
+        this.container.removeEventListener('mouseout', this.onMouseUp);
 
-      this.container.removeEventListener('touchstart', this.onTouchStart);
-      this.container.removeEventListener('touchend', this.onTouchEnd);
-      this.container.removeEventListener('touchcancel', this.onTouchEnd);
-      this.container.removeEventListener('contextmenu', this.onContextMenu);
+        this.container.removeEventListener('touchstart', this.onTouchStart);
+        this.container.removeEventListener('touchend', this.onTouchEnd);
+        this.container.removeEventListener('touchcancel', this.onTouchEnd);
+        this.container.removeEventListener('contextmenu', this.onContextMenu);
+      }
     }
   }
 
@@ -1272,7 +1279,7 @@ class App {
 
 const DEFAULT_EFFECT_OPTIONS: Partial<HyperspeedOptions> = {};
 
-const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
+const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTIONS, interactive = true }) => {
   const hyperspeed = useRef<HTMLDivElement>(null);
   const appRef = useRef<App | null>(null);
 
@@ -1300,7 +1307,7 @@ const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTION
       options.distortion = distortions[options.distortion];
     }
 
-    const myApp = new App(container, options);
+    const myApp = new App(container, options, interactive);
     appRef.current = myApp;
     myApp.loadAssets().then(myApp.init);
 
@@ -1309,9 +1316,9 @@ const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTION
         appRef.current.dispose();
       }
     };
-  }, [effectOptions]);
+  }, [effectOptions, interactive]);
 
-  return <div id="lights" ref={hyperspeed}></div>;
+  return <div id="lights" ref={hyperspeed} className={interactive ? "" : "pointer-events-none"}></div>;
 };
 
 export default Hyperspeed;
