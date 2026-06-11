@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
             data: [
               {
                 role: "system",
-                content: getMainCodingPrompt('agent', !!fullScreenshotDescription),
+                content: getMainCodingPrompt('agent', !!fullScreenshotDescription), // 2 args to match current getMainCodingPrompt(mode, hasScreenshot) signature
                 position: 0,
               },
               { role: "user", content: userMessage, position: 1 },
