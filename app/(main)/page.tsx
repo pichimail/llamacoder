@@ -89,7 +89,11 @@ export default function Home() {
   return (
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
       <div className="absolute inset-0 z-0 overflow-hidden">
-        <Hyperspeed effectOptions={hyperspeedPresets.four} interactive={true} />
+        <Hyperspeed
+          effectOptions={hyperspeedPresets.four}
+          interactive={true}
+          interactiveScope="page"
+        />
       </div>
 
       <div className="relative z-10 isolate flex h-full grow flex-col">

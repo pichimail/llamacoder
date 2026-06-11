@@ -58,6 +58,7 @@ export interface HyperspeedOptions {
 interface HyperspeedProps {
   effectOptions?: Partial<HyperspeedOptions>;
   interactive?: boolean;
+  interactiveScope?: "container" | "page";
 }
 
 const defaultOptions: HyperspeedOptions = {
@@ -921,6 +922,7 @@ class App {
   container: HTMLElement;
   options: HyperspeedOptions;
   interactive: boolean;
+  interactiveScope: "container" | "page";
   renderer: THREE.WebGLRenderer;
   composer: EffectComposer;
   camera: THREE.PerspectiveCamera;
@@ -941,9 +943,15 @@ class App {
   timeOffset: number;
   hasValidSize: boolean;
 
-  constructor(container: HTMLElement, options: HyperspeedOptions, interactive: boolean) {
+  constructor(
+    container: HTMLElement,
+    options: HyperspeedOptions,
+    interactive: boolean,
+    interactiveScope: "container" | "page",
+  ) {
     this.options = options;
     this.interactive = interactive;
+    this.interactiveScope = interactiveScope;
     if (!this.options.distortion) {
       this.options.distortion = {
         uniforms: distortion_uniforms,
@@ -1018,6 +1026,10 @@ class App {
     this.onTouchStart = this.onTouchStart.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
     this.onContextMenu = this.onContextMenu.bind(this);
+    this.handleGlobalMouseDown = this.handleGlobalMouseDown.bind(this);
+    this.handleGlobalMouseUp = this.handleGlobalMouseUp.bind(this);
+    this.handleGlobalTouchStart = this.handleGlobalTouchStart.bind(this);
+    this.handleGlobalTouchEnd = this.handleGlobalTouchEnd.bind(this);
 
     this.onWindowResize = this.onWindowResize.bind(this);
     window.addEventListener('resize', this.onWindowResize);
@@ -1110,14 +1122,28 @@ class App {
     this.leftSticks.mesh.position.setX(-(options.roadWidth + options.islandWidth / 2));
 
     if (this.interactive) {
-      this.container.addEventListener('mousedown', this.onMouseDown);
-      this.container.addEventListener('mouseup', this.onMouseUp);
-      this.container.addEventListener('mouseout', this.onMouseUp);
+      const target = this.interactiveScope === "page" ? window : this.container;
+      const mouseDownListener = (
+        this.interactiveScope === "page" ? this.handleGlobalMouseDown : this.onMouseDown
+      ) as EventListener;
+      const mouseUpListener = (
+        this.interactiveScope === "page" ? this.handleGlobalMouseUp : this.onMouseUp
+      ) as EventListener;
+      const touchStartListener = (
+        this.interactiveScope === "page" ? this.handleGlobalTouchStart : this.onTouchStart
+      ) as EventListener;
+      const touchEndListener = (
+        this.interactiveScope === "page" ? this.handleGlobalTouchEnd : this.onTouchEnd
+      ) as EventListener;
 
-      this.container.addEventListener('touchstart', this.onTouchStart, { passive: true });
-      this.container.addEventListener('touchend', this.onTouchEnd, { passive: true });
-      this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
-      this.container.addEventListener('contextmenu', this.onContextMenu);
+      target.addEventListener('mousedown', mouseDownListener);
+      target.addEventListener('mouseup', mouseUpListener);
+      target.addEventListener('mouseout', mouseUpListener);
+
+      target.addEventListener('touchstart', touchStartListener, { passive: true });
+      target.addEventListener('touchend', touchEndListener, { passive: true });
+      target.addEventListener('touchcancel', touchEndListener, { passive: true });
+      target.addEventListener('contextmenu', this.onContextMenu as EventListener);
     }
 
     this.tick();
@@ -1149,6 +1175,33 @@ class App {
 
   onContextMenu(ev: MouseEvent) {
     ev.preventDefault();
+  }
+
+  shouldIgnoreEventTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest(
+      'input, textarea, select, button, [contenteditable="true"], [contenteditable=""]',
+    );
+  }
+
+  handleGlobalMouseDown(ev: MouseEvent) {
+    if (this.shouldIgnoreEventTarget(ev.target)) return;
+    this.onMouseDown(ev);
+  }
+
+  handleGlobalMouseUp(ev: MouseEvent) {
+    if (this.shouldIgnoreEventTarget(ev.target)) return;
+    this.onMouseUp(ev);
+  }
+
+  handleGlobalTouchStart(ev: TouchEvent) {
+    if (this.shouldIgnoreEventTarget(ev.target)) return;
+    this.onTouchStart(ev);
+  }
+
+  handleGlobalTouchEnd(ev: TouchEvent) {
+    if (this.shouldIgnoreEventTarget(ev.target)) return;
+    this.onTouchEnd(ev);
   }
 
   update(delta: number) {
@@ -1225,14 +1278,28 @@ class App {
     window.removeEventListener('resize', this.onWindowResize);
     if (this.container) {
       if (this.interactive) {
-        this.container.removeEventListener('mousedown', this.onMouseDown);
-        this.container.removeEventListener('mouseup', this.onMouseUp);
-        this.container.removeEventListener('mouseout', this.onMouseUp);
+        const target = this.interactiveScope === "page" ? window : this.container;
+        const mouseDownListener = (
+          this.interactiveScope === "page" ? this.handleGlobalMouseDown : this.onMouseDown
+        ) as EventListener;
+        const mouseUpListener = (
+          this.interactiveScope === "page" ? this.handleGlobalMouseUp : this.onMouseUp
+        ) as EventListener;
+        const touchStartListener = (
+          this.interactiveScope === "page" ? this.handleGlobalTouchStart : this.onTouchStart
+        ) as EventListener;
+        const touchEndListener = (
+          this.interactiveScope === "page" ? this.handleGlobalTouchEnd : this.onTouchEnd
+        ) as EventListener;
 
-        this.container.removeEventListener('touchstart', this.onTouchStart);
-        this.container.removeEventListener('touchend', this.onTouchEnd);
-        this.container.removeEventListener('touchcancel', this.onTouchEnd);
-        this.container.removeEventListener('contextmenu', this.onContextMenu);
+        target.removeEventListener('mousedown', mouseDownListener);
+        target.removeEventListener('mouseup', mouseUpListener);
+        target.removeEventListener('mouseout', mouseUpListener);
+
+        target.removeEventListener('touchstart', touchStartListener);
+        target.removeEventListener('touchend', touchEndListener);
+        target.removeEventListener('touchcancel', touchEndListener);
+        target.removeEventListener('contextmenu', this.onContextMenu as EventListener);
       }
     }
   }
@@ -1279,7 +1346,11 @@ class App {
 
 const DEFAULT_EFFECT_OPTIONS: Partial<HyperspeedOptions> = {};
 
-const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTIONS, interactive = true }) => {
+const Hyperspeed: FC<HyperspeedProps> = ({
+  effectOptions = DEFAULT_EFFECT_OPTIONS,
+  interactive = true,
+  interactiveScope = "container",
+}) => {
   const hyperspeed = useRef<HTMLDivElement>(null);
   const appRef = useRef<App | null>(null);
 
@@ -1307,7 +1378,7 @@ const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTION
       options.distortion = distortions[options.distortion];
     }
 
-    const myApp = new App(container, options, interactive);
+    const myApp = new App(container, options, interactive, interactiveScope);
     appRef.current = myApp;
     myApp.loadAssets().then(myApp.init);
 
@@ -1316,7 +1387,7 @@ const Hyperspeed: FC<HyperspeedProps> = ({ effectOptions = DEFAULT_EFFECT_OPTION
         appRef.current.dispose();
       }
     };
-  }, [effectOptions, interactive]);
+  }, [effectOptions, interactive, interactiveScope]);
 
   return <div id="lights" ref={hyperspeed} className={interactive ? "" : "pointer-events-none"}></div>;
 };
