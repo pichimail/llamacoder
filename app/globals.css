@@ -116,3 +116,26 @@
   background: rgba(0, 0, 0, 0.2);
   border-radius: 10px;
 }
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Stronger dark mode presence - richer surfaces and borders */
+.dark {
+  --card: 0 0% 5.5%;
+  --popover: 0 0% 4.5%;
+  --muted: 0 0% 11%;
+  --border: 0 0% 16%;
+  --input: 0 0% 15%;
+  --secondary: 0 0% 12%;
+}
+
+/* Slightly stronger elevation for cards/surfaces in dark */
+.dark .shadow {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}

@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
 import "./globals.css";
 
-let title = "Llama Coder – AI Code Generator";
-let description = "Generate your next app with Llama 3.1 405B";
+let title = "Chinna-Coder";
+let description = "Turn ideas into apps with Chinna-Coder.";
 let url = "https://llamacoder.io/";
 let ogimage = "https://llamacoder.io/og-image.png";
-let sitename = "llamacoder.io";
+let sitename = "Chinna-Coder";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   description,
   icons: {
     icon: "/favicon.ico",
+    apple: "/apple-icon.png",
   },
   openGraph: {
     images: [ogimage],
@@ -38,9 +39,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <PlausibleProvider domain="llamacoder.io" />
+        {/* Prevent FOUC by setting theme class before hydration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var stored = localStorage.getItem('theme');
+    var theme = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system';
+    var resolved = theme;
+    if (theme === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(resolved);
+  } catch (e) {}
+})();
+            `,
+          }}
+        />
       </head>
 
       {children}

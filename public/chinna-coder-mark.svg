@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chinna-Coder mark">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB" />
+      <stop offset="1" stop-color="#7C3AED" />
+    </linearGradient>
+    <linearGradient id="shine" x1="156" y1="128" x2="356" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+    <filter id="shadow" x="72" y="72" width="368" height="368" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#0F172A" flood-opacity="0.22" />
+    </filter>
+  </defs>
+
+  <rect x="86" y="86" width="340" height="340" rx="96" fill="url(#bg)" filter="url(#shadow)" />
+  <rect x="110" y="110" width="292" height="292" rx="76" fill="url(#shine)" />
+
+  <path d="M286 178H250.5C208 178 174 212 174 254.5C174 297 208 331 250.5 331H286"
+        stroke="white" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M244 219L220 256L244 293"
+        stroke="#E0E7FF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M268 219L292 256L268 293"
+        stroke="#E0E7FF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

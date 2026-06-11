@@ -1,5 +1,9 @@
-import { ComponentProps } from "react";
-
-export default function LogoSmall(props: ComponentProps<"svg">) {
-  return <img src="/logo.svg" className="size-[24px]" />;
+export default function LogoSmall() {
+  return (
+    <img
+      src="/chinna-coder-mark.svg"
+      alt="Chinna-Coder"
+      className="size-[24px] shrink-0"
+    />
+  );
 }

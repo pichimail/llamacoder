@@ -43,7 +43,7 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
   if (!sandpack.error) return null;
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/5 text-base backdrop-blur-sm">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/5 text-base backdrop-blur-sm dark:bg-black/30">
       <div className="max-w-[400px] rounded-md bg-red-500 p-4 text-white shadow-xl shadow-black/20">
         <p className="text-lg font-medium">Error</p>
 
@@ -72,7 +72,7 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
               if (!sandpack.error) return;
               onRequestFix(sandpack.error.message);
             }}
-            className="rounded bg-white px-2.5 py-1.5 text-sm font-medium text-black"
+            className="rounded bg-white px-2.5 py-1.5 text-sm font-medium text-black dark:bg-zinc-100"
           >
             Try to fix
           </button>

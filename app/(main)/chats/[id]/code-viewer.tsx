@@ -196,9 +196,7 @@ export default function CodeViewer({
       : files.find((f) => f.path === "App.tsx") ||
         files.find((f) => f.path.endsWith(".tsx")) ||
         files[0];
-  const code = mainFile ? mainFile.code : "";
   const language = mainFile ? mainFile.language : "";
-  const rawFilename = mainFile ? mainFile.path : "";
 
   // Generate app title for display
   const generateAppTitle = (fileList: typeof files) => {
@@ -285,7 +283,7 @@ export default function CodeViewer({
 
     // Generate app title for filename
     const appTitle = generateAppTitle(files);
-    const filename = `${appTitle.replace(/[^a-zA-Z0-9]/g, "-")}-llamacoder.zip`;
+    const filename = `${appTitle.replace(/[^a-zA-Z0-9]/g, "-")}-chinna-coder.zip`;
 
     // Create a download link and trigger the download
     const url = URL.createObjectURL(content);
@@ -317,10 +315,10 @@ export default function CodeViewer({
 
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-300 px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-300 px-4 dark:border-gray-800">
         <div className="inline-flex items-center gap-4">
           <button
-            className="hidden text-gray-400 hover:text-gray-700 md:block"
+            className="hidden text-gray-400 hover:text-gray-700 md:block dark:hover:text-gray-200"
             onClick={onClose}
           >
             <CloseIcon className="size-5" />
@@ -347,7 +345,7 @@ export default function CodeViewer({
                           (allAssistantMessages.length - 1 - i) +
                           1}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {timeAgo(msg.createdAt)}
                       </span>
                     </div>
@@ -373,12 +371,12 @@ export default function CodeViewer({
             </button>
           )}
         </div>
-        <div className="rounded-lg border-2 border-gray-300 p-1">
+        <div className="rounded-lg border-2 border-gray-300 p-1 dark:border-gray-700">
           <button
             onClick={() => onTabChange("code")}
             data-active={activeTab === "code" ? true : undefined}
             disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-500 data-[active]:text-white"
+            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-500 data-[active]:text-white dark:text-gray-300"
           >
             Code
           </button>
@@ -386,14 +384,14 @@ export default function CodeViewer({
             onClick={() => onTabChange("preview")}
             data-active={activeTab === "preview" ? true : undefined}
             disabled={disabledControls}
-            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-500 data-[active]:text-white"
+            className="inline-flex h-7 w-16 items-center justify-center rounded text-xs font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 data-[active]:bg-blue-500 data-[active]:text-white dark:text-gray-300"
           >
             Preview
           </button>
         </div>
       </div>
 
-      <div className="flex grow flex-col overflow-y-auto bg-white">
+      <div className="flex grow flex-col overflow-y-auto bg-white dark:bg-zinc-950">
         {activeTab === "code" ? (
           <StickToBottom
             className="relative grow overflow-hidden *:!h-[inherit]"
@@ -433,7 +431,7 @@ export default function CodeViewer({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-300 px-4 py-4">
+      <div className="flex items-center justify-between border-t border-gray-300 px-4 py-4 dark:border-gray-800">
         <div className="inline-flex items-center gap-2.5 text-sm">
           <Share
             message={
@@ -445,7 +443,7 @@ export default function CodeViewer({
             }
           />
           <button
-            className="inline-flex items-center gap-1 rounded border border-gray-300 px-1.5 py-0.5 text-sm text-gray-600 transition enabled:hover:bg-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded border border-gray-300 px-1.5 py-0.5 text-sm text-gray-600 transition enabled:hover:bg-white disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:enabled:hover:bg-zinc-900"
             onClick={() => setRefresh((r) => r + 1)}
             disabled={disabledControls}
           >
@@ -453,7 +451,7 @@ export default function CodeViewer({
             Refresh
           </button>
           <button
-            className="hidden items-center gap-1 rounded border border-gray-300 px-1.5 py-0.5 text-sm text-gray-600 transition hover:bg-white disabled:opacity-50 md:inline-flex"
+            className="hidden items-center gap-1 rounded border border-gray-300 px-1.5 py-0.5 text-sm text-gray-600 transition hover:bg-white disabled:opacity-50 md:inline-flex dark:border-gray-700 dark:text-gray-400 dark:hover:bg-zinc-900"
             onClick={handleDownloadFiles}
             disabled={disabledControls}
             title="Download files"
@@ -462,7 +460,7 @@ export default function CodeViewer({
             Download
           </button>
         </div>
-        <div className="text-xs text-gray-500 md:hidden">{chat.model}</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">{chat.model}</div>
       </div>
     </>
   );

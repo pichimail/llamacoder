@@ -7,8 +7,7 @@ import {
   extractFirstCodeBlock,
   extractAllCodeBlocks,
 } from "@/lib/utils";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { memo, startTransition, use, useEffect, useRef, useState } from "react";
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
 import ChatBox from "./chat-box";
@@ -17,13 +16,20 @@ import CodeViewer from "./code-viewer";
 import CodeViewerLayout from "./code-viewer-layout";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
+import ThemeToggle from "@/components/theme-toggle";
 
 const HeaderChat = memo(({ chat }: { chat: Chat }) => (
-  <div className="flex items-center gap-4 px-4 py-4">
-    <a href="/" target="_blank">
+  <div className="flex items-center justify-between gap-4 px-4 py-4">
+    <a href="/" className="inline-flex items-center gap-3">
       <LogoSmall />
+      <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+        Chinna-Coder
+      </span>
     </a>
-    <p className="italic text-gray-500">{chat.title}</p>
+    <div className="flex items-center gap-3">
+      <p className="italic text-gray-500 dark:text-gray-400">{chat.title}</p>
+      <ThemeToggle />
+    </div>
   </div>
 ));
 
@@ -31,7 +37,6 @@ HeaderChat.displayName = "HeaderChat";
 
 export default function PageClient({ chat }: { chat: Chat }) {
   const context = use(Context);
-  const searchParams = useSearchParams();
   const [streamPromise, setStreamPromise] = useState<
     Promise<ReadableStream> | undefined
   >(context.streamPromise);

@@ -38,17 +38,13 @@ export default function ChatLog({
     >
       <StickToBottom.Content className="mx-auto flex w-full max-w-prose flex-col gap-8 py-8 pl-4 pr-2">
         <div
-          className="pointer-events-none absolute inset-0 z-10"
-          style={{
-            background:
-              "linear-gradient(to bottom, #F4F4F5 0%, rgba(244,244,245,0) 20px, rgba(244,244,245,0) calc(100% - 20px), #F4F4F5 100%)",
-            transform: "translateY(-1px)",
-          }}
+          className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-zinc-100 via-zinc-100/0 to-zinc-100 dark:from-zinc-950 dark:via-zinc-950/0 dark:to-zinc-950"
+          style={{ transform: "translateY(-1px)" }}
         />
         <UserMessage content={chat.prompt} />
 
         {chat.totalMessages > chat.messages.length && (
-          <div className="py-2 text-center text-sm text-gray-500">
+          <div className="py-2 text-center text-sm text-gray-500 dark:text-gray-400">
             Only last messages loaded. Full history not available.
           </div>
         )}
@@ -100,7 +96,7 @@ export default function ChatLog({
 function UserMessage({ content }: { content: string }) {
   return (
     <div className="relative inline-flex max-w-[80%] items-end gap-3 self-end">
-      <div className="whitespace-pre-wrap break-words rounded bg-white px-4 py-2 text-gray-600 shadow">
+      <div className="whitespace-pre-wrap break-words rounded bg-white px-4 py-2 text-gray-600 shadow dark:bg-zinc-900 dark:text-gray-300">
         {content}
       </div>
     </div>
@@ -189,7 +185,7 @@ function AssistantMessage({
           return (
             <div
               key={i}
-              className="m-0.5 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm"
+              className="m-0.5 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-800 dark:bg-zinc-950"
             >
               <svg
                 width="14"
@@ -197,14 +193,14 @@ function AssistantMessage({
                 viewBox="0 0 14 14"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="text-gray-600"
+                className="text-gray-600 dark:text-gray-400"
               >
                 <path
                   d="M10.5 3.5L11.5 2.5L12.5 3.5L11.5 4.5L10.5 3.5ZM2.5 9.5V11.5H4.5L9.5 6.5L7.5 4.5L2.5 9.5ZM0.5 12.5H13.5V14.5H0.5V12.5Z"
                   fill="currentColor"
                 />
               </svg>
-              <span className="font-medium text-gray-700">{seg.path}</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{seg.path}</span>
             </div>
           );
         })}
