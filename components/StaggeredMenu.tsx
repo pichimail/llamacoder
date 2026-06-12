@@ -2,6 +2,7 @@
 
 import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import Link from "next/link";
 
 import "./StaggeredMenu.css";
 
@@ -54,12 +55,11 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
   onMenuClose,
 }: StaggeredMenuProps) => {
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const openRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const preLayersRef = useRef<HTMLDivElement | null>(null);
   const preLayerElsRef = useRef<HTMLElement[]>([]);
-  const plusHRef = useRef<HTMLSpanElement | null>(null);
-  const plusVRef = useRef<HTMLSpanElement | null>(null);
   const iconRef = useRef<HTMLSpanElement | null>(null);
   const textInnerRef = useRef<HTMLSpanElement | null>(null);
   const textWrapRef = useRef<HTMLSpanElement | null>(null);
@@ -73,16 +73,24 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
   const toggleBtnRef = useRef<HTMLButtonElement | null>(null);
   const busyRef = useRef(false);
   const itemEntranceTweenRef = useRef<gsap.core.Tween | null>(null);
+  const effectivePosition = isMobile ? "right" : position;
+
+  React.useEffect(() => {
+    const query = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(query.matches);
+
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
       const panel = panelRef.current;
       const preContainer = preLayersRef.current;
-      const plusH = plusHRef.current;
-      const plusV = plusVRef.current;
       const icon = iconRef.current;
       const textInner = textInnerRef.current;
-      if (!panel || !plusH || !plusV || !icon || !textInner) return;
+      if (!panel || !icon || !textInner) return;
 
       let preLayers: HTMLElement[] = [];
       if (preContainer) {
@@ -92,13 +100,11 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
       }
       preLayerElsRef.current = preLayers;
 
-      const offscreen = position === "left" ? -100 : 100;
+      const offscreen = effectivePosition === "left" ? -100 : 100;
       gsap.set([panel, ...preLayers], { xPercent: offscreen, opacity: 1 });
       if (preContainer) {
         gsap.set(preContainer, { xPercent: 0, opacity: 1 });
       }
-      gsap.set(plusH, { transformOrigin: "50% 50%", rotate: 0 });
-      gsap.set(plusV, { transformOrigin: "50% 50%", rotate: 90 });
       gsap.set(icon, { rotate: 0, transformOrigin: "50% 50%" });
       gsap.set(textInner, { yPercent: 0 });
       if (toggleBtnRef.current) {
@@ -107,7 +113,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     });
 
     return () => ctx.revert();
-  }, [menuButtonColor, position]);
+  }, [menuButtonColor, effectivePosition]);
 
   const buildOpenTimeline = useCallback(() => {
     const panel = panelRef.current;
@@ -134,7 +140,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
       panel.querySelectorAll(".sm-socials-link"),
     ) as HTMLElement[];
 
-    const offscreen = position === "left" ? -100 : 100;
+    const offscreen = effectivePosition === "left" ? -100 : 100;
     const layerStates = layers.map((el) => ({ el, start: offscreen }));
     const panelStart = offscreen;
 
@@ -232,7 +238,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 
     openTlRef.current = tl;
     return tl;
-  }, [position]);
+  }, [effectivePosition]);
 
   const playOpen = useCallback(() => {
     if (busyRef.current) return;
@@ -259,7 +265,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 
     const all: HTMLElement[] = [...layers, panel];
     closeTweenRef.current?.kill();
-    const offscreen = position === "left" ? -100 : 100;
+    const offscreen = effectivePosition === "left" ? -100 : 100;
     closeTweenRef.current = gsap.to(all, {
       xPercent: offscreen,
       duration: 0.32,
@@ -289,24 +295,27 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         busyRef.current = false;
       },
     });
-  }, [position]);
+  }, [effectivePosition]);
 
   const animateIcon = useCallback((opening: boolean) => {
     const icon = iconRef.current;
     if (!icon) return;
     spinTweenRef.current?.kill();
+    gsap.set(icon, { rotate: 0 });
     if (opening) {
       spinTweenRef.current = gsap.to(icon, {
-        rotate: 225,
-        duration: 0.8,
-        ease: "power4.out",
+        scale: 0.98,
+        duration: 0.2,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1,
         overwrite: "auto",
       });
     } else {
       spinTweenRef.current = gsap.to(icon, {
-        rotate: 0,
-        duration: 0.35,
-        ease: "power3.inOut",
+        scale: 1,
+        duration: 0.15,
+        ease: "power2.out",
         overwrite: "auto",
       });
     }
@@ -429,7 +438,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         (isFixed ? " fixed-wrapper" : "")
       }
       style={accentColor ? { ["--sm-accent" as any]: accentColor } : undefined}
-      data-position={position}
+      data-position={effectivePosition}
       data-open={open || undefined}
     >
       <div ref={preLayersRef} className="sm-prelayers" aria-hidden="true">
@@ -479,8 +488,9 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
             </span>
           </span>
           <span ref={iconRef} className="sm-icon" aria-hidden="true">
-            <span ref={plusHRef} className="sm-icon-line" />
-            <span ref={plusVRef} className="sm-icon-line sm-icon-line-v" />
+            <span className="sm-icon-line sm-icon-line-top" />
+            <span className="sm-icon-line sm-icon-line-mid" />
+            <span className="sm-icon-line sm-icon-line-bot" />
           </span>
         </button>
       </header>
@@ -500,9 +510,15 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
             {items && items.length ? (
               items.map((it, idx) => (
                 <li className="sm-panel-itemWrap" key={it.label + idx}>
-                  <a className="sm-panel-item" href={it.link} aria-label={it.ariaLabel} data-index={idx + 1}>
+                  <Link
+                    className="sm-panel-item"
+                    href={it.link}
+                    aria-label={it.ariaLabel}
+                    data-index={idx + 1}
+                    onClick={closeMenu}
+                  >
                     <span className="sm-panel-itemLabel">{it.label}</span>
-                  </a>
+                  </Link>
                 </li>
               ))
             ) : (
@@ -524,6 +540,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="sm-socials-link"
+                      onClick={closeMenu}
                     >
                       {s.label}
                     </a>

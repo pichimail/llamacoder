@@ -176,7 +176,7 @@ export default function Home() {
       )}
 
       <StaggeredMenu
-        className="[&_.staggered-menu-header]:top-20 [&_.staggered-menu-header]:justify-start [&_.sm-logo]:hidden [&_.sm-panel]:pt-32"
+        className="[&_.sm-logo]:hidden [&_.sm-toggle-textWrap]:hidden [&_.staggered-menu-panel]:pt-24"
         position="left"
         isFixed={true}
         logoUrl="/chinna-coder-logo-dark.svg"
@@ -184,7 +184,7 @@ export default function Home() {
         socialItems={staggeredSocialItems}
         displaySocials={true}
         displayItemNumbering={true}
-        menuButtonColor="#fff"
+        menuButtonColor="#0f172a"
         openMenuButtonColor="#fff"
         changeMenuColorOnOpen={true}
         colors={["#0f172a", "#111827", "#1f2937"]}
@@ -192,7 +192,7 @@ export default function Home() {
       />
 
       <div className="relative z-10 isolate flex h-full grow flex-col">
-        <Header />
+        <Header hideLogo />
 
         <div className="mt-8 flex grow flex-col items-center px-4 lg:mt-14">
           <h1 className="text-balance text-center text-4xl font-semibold tracking-tight md:text-6xl min-h-[4.25rem] md:min-h-[5.25rem]">

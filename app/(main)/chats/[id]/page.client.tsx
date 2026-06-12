@@ -1,7 +1,6 @@
 "use client";
 
 import { createMessage } from "@/app/(main)/actions";
-import LogoSmall from "@/components/icons/logo-small";
 import {
   parseReplySegments,
   extractFirstCodeBlock,
@@ -656,14 +655,6 @@ ${error.trimStart()}`;
       {/* Top bar */}
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <a
-            href="/"
-            className="flex items-center gap-2 font-semibold tracking-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Chinna-Coder home"
-          >
-            <LogoSmall />
-            <span>Chinna-Coder</span>
-          </a>
           <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
           <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
             <span className="font-mono">

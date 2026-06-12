@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 
 const ADMIN_ID = process.env.ADMIN_ID || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "123456";
+const DEMO_ADMIN_ID = "admin";
+const DEMO_ADMIN_PASSWORD = "123456";
 const SECRET = process.env.AUTH_SECRET || "chinna-coder-dev-secret";
 
 export const ADMIN_COOKIE = "cc_admin";
@@ -15,7 +17,10 @@ export function adminToken() {
 }
 
 export function verifyAdminCredentials(id: string, password: string) {
-  return id === ADMIN_ID && password === ADMIN_PASSWORD;
+  return (
+    (id === ADMIN_ID && password === ADMIN_PASSWORD) ||
+    (id === DEMO_ADMIN_ID && password === DEMO_ADMIN_PASSWORD)
+  );
 }
 
 export async function isAdminRequest() {

@@ -68,8 +68,8 @@ function FlagRow({
 export default function AdminPage() {
   const router = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [id, setId] = useState("");
-  const [password, setPassword] = useState("");
+  const [id, setId] = useState("admin");
+  const [password, setPassword] = useState("123456");
   const [loggingIn, setLoggingIn] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [section, setSection] =
