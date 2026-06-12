@@ -1,33 +1,47 @@
-"use client";
-import * as React from "react";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { cn } from "@/lib/utils";
+"use client"
 
-export const TooltipProvider = TooltipPrimitive.Provider;
+import * as React from "react"
+import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
-export function Tip({
+import { cn } from "@/lib/utils"
+
+const TooltipProvider = TooltipPrimitive.Provider
+const Tooltip = TooltipPrimitive.Root
+const TooltipTrigger = TooltipPrimitive.Trigger
+
+const TooltipContent = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+>(({ className, sideOffset = 6, ...props }, ref) => (
+  <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-[60] rounded-md border border-border bg-popover px-2 py-1 text-[11px] text-popover-foreground shadow-md",
+        className
+      )}
+      {...props}
+    />
+  </TooltipPrimitive.Portal>
+))
+TooltipContent.displayName = TooltipPrimitive.Content.displayName
+
+function Tip({
   label,
   children,
   side = "bottom",
 }: {
-  label: string;
-  children: React.ReactNode;
-  side?: "top" | "bottom" | "left" | "right";
+  label: string
+  children: React.ReactNode
+  side?: "top" | "bottom" | "left" | "right"
 }) {
   return (
-    <TooltipPrimitive.Root delayDuration={250}>
-      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content
-          side={side}
-          sideOffset={6}
-          className={cn(
-            "z-[60] rounded-md border border-border bg-popover px-2 py-1 text-[11px] text-popover-foreground shadow-md",
-          )}
-        >
-          {label}
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
-    </TooltipPrimitive.Root>
-  );
+    <Tooltip delayDuration={250}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side}>{label}</TooltipContent>
+    </Tooltip>
+  )
 }
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip }
