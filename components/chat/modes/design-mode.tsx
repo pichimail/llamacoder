@@ -4,10 +4,9 @@ import { useState, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Palette, Type, Grid2x2, Radius, Eye, RotateCcw, Check } from 'lucide-react'
+import { Eye, RotateCcw, Check } from 'lucide-react'
 
 interface DesignModeProps {
   chatId: string
@@ -101,7 +100,7 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
               <Button variant="ghost" size="sm" onClick={handlePreview} className="h-8">
                 <Eye className="w-4 h-4" />
               </Button>
-              <Button size="sm" onClick={handleApply} className="h-8 bg-blue-600 hover:bg-blue-700 text-white">
+              <Button size="sm" onClick={handleApply} className="h-8">
                 <Check className="w-4 h-4 mr-1" />
                 Apply
               </Button>
@@ -154,7 +153,7 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold">Element Path</Label>
                       <div className="text-xs font-mono bg-background p-2 rounded border border-border overflow-x-auto">
-                        {selectedElement.path.join(' > ')} > {selectedElement.tagName}
+                        {[...selectedElement.path, selectedElement.tagName].join(' / ')}
                       </div>
                     </div>
                     <div className="space-y-2">
