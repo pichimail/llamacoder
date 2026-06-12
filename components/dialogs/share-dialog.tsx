@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check, Link as LinkIcon, Mail } from 'lucide-react';
+import { Copy, Check, Mail } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ShareDialogProps {

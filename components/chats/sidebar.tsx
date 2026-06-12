@@ -40,8 +40,6 @@ export function Sidebar({
   const [searchQuery, setSearchQuery] = useState('')
 
   const pinnedChats = chats.filter((c) => c.isPinned)
-  const recentChats = chats.filter((c) => !c.isPinned)
-
   const filteredChats = chats.filter((c) =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
   )

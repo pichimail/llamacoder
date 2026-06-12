@@ -3,8 +3,10 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ChatsPage() {
-  const { pinned, recent, all } = await getChatsList()
+  const { pinned, recent } = await getChatsList()
   const chats = [...pinned, ...recent.filter((chat) => !pinned.some((p) => p.id === chat.id))]
 
   return (

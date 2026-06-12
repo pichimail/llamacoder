@@ -20,10 +20,10 @@ export function SettingsDialog({
   onClose,
 }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'env' | 'domains' | 'github'>('general');
-  const [envVars, setEnvVars] = useState<EnvVar[]>([
+  const [envVars] = useState<EnvVar[]>([
     { key: 'DATABASE_URL', value: '***', isHidden: true },
   ]);
-  const [showValues, setShowValues] = useState(false);
+  const [showValues] = useState(false);
 
   const tabs = [
     { id: 'general', label: 'General' },

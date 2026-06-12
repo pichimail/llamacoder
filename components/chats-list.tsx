@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  MoreVertical,
   Pin,
   PinOff,
   Trash2,
@@ -17,8 +16,6 @@ import {
   pinChat,
   duplicateChat,
 } from '@/app/actions/chat';
-import clsx from 'clsx';
-
 interface Chat {
   id: string;
   title: string;
@@ -85,7 +82,7 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
 
   const handleDuplicate = async (chatId: string) => {
     try {
-      const newChat = await duplicateChat(chatId);
+      await duplicateChat(chatId);
       toast({
         title: 'Success',
         description: 'Chat duplicated',

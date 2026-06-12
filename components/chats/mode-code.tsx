@@ -107,7 +107,7 @@ export function ModeCode({
   selectedPath = '/src/app.tsx',
 }: ModeCodeProps) {
   const [selectedFile, setSelectedFile] = useState(selectedPath)
-  const [code, setCode] = useState(sampleCode)
+  const [code] = useState(sampleCode)
 
   const handleSelectFile = (path: string) => {
     setSelectedFile(path)

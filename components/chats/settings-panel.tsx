@@ -15,7 +15,7 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ chatId, onClose }: SettingsPanelProps) {
-  const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([])
+  const [envVars] = useState<Array<{ key: string; value: string }>>([])
 
   return (
     <div className="w-full h-full flex flex-col bg-muted overflow-hidden">

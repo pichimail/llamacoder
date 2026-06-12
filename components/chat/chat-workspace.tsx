@@ -83,7 +83,7 @@ export function ChatWorkspace({
         }}
       />
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup orientation="horizontal" className="flex-1">
         <ResizablePanel defaultSize={rightPanelOpen ? 75 : 100} minSize={30}>
           {renderModeView()}
         </ResizablePanel>

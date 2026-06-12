@@ -22,7 +22,6 @@ import {
   Copy,
   GitBranch,
   Check,
-  ChevronDown,
   Pencil,
 } from 'lucide-react'
 

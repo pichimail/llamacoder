@@ -21,37 +21,6 @@ interface SelectedElement {
   styles: Record<string, string>
 }
 
-const designTokens = {
-  colors: {
-    primary: '#000000',
-    secondary: '#666666',
-    accent: '#0066cc',
-    background: '#ffffff',
-    foreground: '#000000',
-    muted: '#f5f5f5',
-    border: '#e0e0e0',
-  },
-  typography: {
-    heading: 'Inter, sans-serif',
-    body: 'Inter, sans-serif',
-    mono: 'Fira Code, monospace',
-  },
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-  },
-  radius: {
-    none: '0px',
-    sm: '4px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-  },
-}
-
 const aiPromptChips = [
   '/modern', '/contrast', '/spacious', '/simplify', '/readable', 
   '/shadows', '/pop', '/hierarchy'
@@ -60,7 +29,6 @@ const aiPromptChips = [
 export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps) {
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null)
   const [aiInstructions, setAiInstructions] = useState('')
-  const [previewActive, setPreviewActive] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const handleElementPick = () => {
     if (iframeRef.current) {
@@ -69,7 +37,6 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
     }
   }
 
-  const handlePreview = () => setPreviewActive(true)
   const handleReset = () => {
     setAiInstructions('')
     setSelectedElement(null)
@@ -97,7 +64,7 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
               <Button variant="ghost" size="sm" onClick={handleReset} className="h-8">
                 <RotateCcw className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={handlePreview} className="h-8">
+              <Button variant="ghost" size="sm" className="h-8">
                 <Eye className="w-4 h-4" />
               </Button>
               <Button size="sm" onClick={handleApply} className="h-8">
