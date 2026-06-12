@@ -99,7 +99,7 @@ export async function duplicateChat(chatId: string) {
         create: messages.map((msg, index) => ({
           role: msg.role,
           content: msg.content,
-          files: msg.files,
+          files: msg.files ?? null,
           position: index,
         })),
       },

@@ -43,7 +43,9 @@ export default async function Page({
 
   if (!chat) notFound();
 
-  return <PageClient chat={chat} />;
+  // Use new workspace UI
+  const { default: PageClientV2 } = await import('./page-v2.client');
+  return <PageClientV2 chat={chat} />;
 }
 
 const getChatById = cache(async (id: string) => {
