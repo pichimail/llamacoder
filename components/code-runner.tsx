@@ -5,6 +5,7 @@ export default function CodeRunner({
   language,
   code,
   files,
+  extraDependencies,
   onRequestFix,
   onPreviewError,
   onPreviewReady,
@@ -14,6 +15,7 @@ export default function CodeRunner({
   language?: string;
   code?: string;
   files?: Array<{ path: string; content?: string; code?: string }>;
+  extraDependencies?: Record<string, string>;
   onRequestFix?: (e: string) => void;
   onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
@@ -34,6 +36,7 @@ export default function CodeRunner({
   return (
     <CodeRunnerReact
       files={actualFiles}
+      extraDependencies={extraDependencies}
       onRequestFix={onRequestFix}
       onPreviewError={onPreviewError}
       onPreviewReady={onPreviewReady}

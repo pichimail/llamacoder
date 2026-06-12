@@ -104,6 +104,7 @@ function isLikelyRenderableReactFile(path: string, content: string) {
 
 export function getSandpackConfig(
   inputFiles: Array<{ path: string; content?: string; code?: string }>,
+  extraDependencies: Record<string, string> = {},
 ) {
   // Defensive normalization: accept both { content } and legacy { code } shapes.
   const files: Array<{ path: string; content: string }> = (inputFiles || [])
@@ -187,7 +188,7 @@ export default function App() {
       ],
     },
     customSetup: {
-      dependencies,
+      dependencies: { ...dependencies, ...extraDependencies },
     },
   };
 }

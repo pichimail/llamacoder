@@ -26,7 +26,8 @@ import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { toast } from "@/hooks/use-toast";
-import { Download, ExternalLink, Loader2 } from "lucide-react";
+import { Download, ExternalLink, Loader2, MessageSquare, Code2, Eye } from "lucide-react";
+import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), {
   ssr: false,
@@ -48,11 +49,26 @@ export default function PageClient({ chat }: { chat: Chat }) {
   >(context.streamPromise);
   const [streamText, setStreamText] = useState("");
   const [activeTab, setActiveTab] = useState<"code" | "preview">("preview");
+  const [mobileView, setMobileView] = useState<"chat" | "builder">("chat");
   const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<
     "idle" | "watching" | "fixing" | "fallback" | "ready"
   >("idle");
+
+  // Admin-controlled default for the self-correcting repair loop
+  useEffect(() => {
+    fetch("/api/public-settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.autoFixDefault) {
+          setAutoFixEnabled(true);
+          setAutoFixStatus("watching");
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const router = useRouter();
   const isHandlingStreamRef = useRef(false);
   const autoFixAttemptRef = useRef(0);
@@ -559,6 +575,31 @@ ${error.trimStart()}`;
     f();
   }, [chat.id, router, streamPromise, context, autoFixEnabled]);
 
+  // Manual editor saves -> persist as a new version and refresh
+  const handleSaveFiles = useCallback(
+    (files: { path: string; code: string; language: string }[]) => {
+      startTransition(async () => {
+        const content =
+          "Manual edit saved from the code editor.\n\n" +
+          files
+            .map(
+              (f) =>
+                "```" + f.language + "{path=" + f.path + "}\n" + f.code + "\n```",
+            )
+            .join("\n\n");
+        const newMessage = await createMessage(
+          chat.id,
+          content,
+          "assistant",
+          files,
+        );
+        setActiveMessage(newMessage);
+        router.refresh();
+      });
+    },
+    [chat.id, router],
+  );
+
   const handleDownloadZip = useCallback(() => {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
     void downloadFilesAsZip(files, chat.title || "app");
@@ -610,6 +651,7 @@ ${error.trimStart()}`;
   }
 
   return (
+    <TooltipProvider>
     <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       {/* Top bar */}
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm">
@@ -635,32 +677,65 @@ ${error.trimStart()}`;
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleDownloadZip}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Download generated code as a zip file"
-          >
-            <Download className="size-3.5" aria-hidden="true" />
-            <span className="hidden md:inline">Download zip</span>
-          </button>
-          <button
-            onClick={handlePublish}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Publish and open shareable link"
-          >
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-            Publish
-          </button>
+        <div className="flex items-center gap-1">
+          {/* Mobile: switch between chat and builder */}
+          <div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view">
+            <button
+              role="tab"
+              aria-selected={mobileView === "chat"}
+              onClick={() => setMobileView("chat")}
+              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              aria-label="Chat view"
+            >
+              <MessageSquare className="size-3.5" aria-hidden="true" />
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobileView === "builder" && activeTab === "code"}
+              onClick={() => { setMobileView("builder"); setActiveTab("code"); }}
+              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" && activeTab === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              aria-label="Code view"
+            >
+              <Code2 className="size-3.5" aria-hidden="true" />
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobileView === "builder" && activeTab === "preview"}
+              onClick={() => { setMobileView("builder"); setActiveTab("preview"); }}
+              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" && activeTab === "preview" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              aria-label="Preview view"
+            >
+              <Eye className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+          <Tip label="Download zip">
+            <button
+              onClick={handleDownloadZip}
+              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              aria-label="Download generated code as a zip file"
+            >
+              <Download className="size-4" aria-hidden="true" />
+            </button>
+          </Tip>
+          <Tip label="Publish — share a live link">
+            <button
+              onClick={handlePublish}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              aria-label="Publish and open shareable link"
+            >
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Publish</span>
+            </button>
+          </Tip>
           <ThemeToggle />
         </div>
       </header>
 
       {/* Two-pane layout with resizable splitter */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
           style={{ ["--chat-w" as any]: chatPanelWidth + "px" }}
-          className="order-2 flex h-[45dvh] w-full flex-col overflow-hidden border-t border-border bg-card md:order-none md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[520px] md:border-r md:border-t-0"
+          className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[520px] md:border-r md:border-border`}
           aria-label="Chat panel"
         >
           {activeMessage && activeVersion && (
@@ -727,14 +802,13 @@ ${error.trimStart()}`;
         </div>
 
         <section
-          className="order-1 flex min-h-0 flex-1 flex-col overflow-hidden bg-background md:order-none md:min-w-[360px]"
+          className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`}
           aria-label="Code and preview panel"
         >
           <CodeViewer
             streamText={streamText}
             chat={chat}
             message={activeMessage}
-            onMessageChange={setActiveMessage}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             onRequestFix={(error: string) => {
@@ -749,6 +823,7 @@ ${error.trimStart()}`;
             }}
             onPreviewError={handlePreviewError}
             onPreviewReady={handlePreviewReady}
+            onSaveFiles={handleSaveFiles}
             autoFixEnabled={autoFixEnabled}
             onAutoFixEnabledChange={handleAutoFixEnabledChange}
             autoFixAttempt={autoFixAttempt}
@@ -757,5 +832,6 @@ ${error.trimStart()}`;
         </section>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

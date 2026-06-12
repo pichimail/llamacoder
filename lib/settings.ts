@@ -1,0 +1,40 @@
+import "server-only";
+import { getPrisma } from "@/lib/prisma";
+
+export const SETTING_KEYS = {
+  saasMode: "saasMode", // "on" | "off" — gates auth + SaaS features
+  googleAuth: "googleAuth", // "on" | "off" — show Google sign-in when SaaS mode on
+  gallery: "gallery", // "on" | "off" — public gallery enabled
+  autoFixDefault: "autoFixDefault", // "on" | "off" — auto-fix enabled by default in builder
+} as const;
+
+export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
+
+const DEFAULTS: Record<string, string> = {
+  saasMode: "off",
+  googleAuth: "on",
+  gallery: "on",
+  autoFixDefault: "off",
+};
+
+export async function getSettings(): Promise<Record<string, string>> {
+  const prisma = getPrisma();
+  try {
+    const rows = await prisma.setting.findMany();
+    const map: Record<string, string> = { ...DEFAULTS };
+    for (const r of rows) map[r.key] = r.value;
+    return map;
+  } catch {
+    // Table may not exist yet (run `prisma db push`) — fall back to defaults
+    return { ...DEFAULTS };
+  }
+}
+
+export async function setSetting(key: string, value: string) {
+  const prisma = getPrisma();
+  return prisma.setting.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
+  });
+}

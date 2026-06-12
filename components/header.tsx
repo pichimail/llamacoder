@@ -2,6 +2,7 @@ import { memo } from "react";
 
 import Link from "next/link";
 import ThemeToggle from "@/components/theme-toggle";
+import AuthButton from "@/components/auth-button";
 
 function Header() {
   return (
@@ -18,7 +19,10 @@ function Header() {
           className="hidden h-9 w-auto object-contain sm:h-10 dark:block"
         />
       </Link>
-      <ThemeToggle />
+      <div className="flex items-center gap-2">
+        <AuthButton />
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

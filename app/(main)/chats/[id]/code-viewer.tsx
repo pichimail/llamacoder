@@ -1,31 +1,45 @@
 "use client";
 
 import {
-  RefreshCw as RefreshIcon,
-  Download as DownloadIcon,
-  Share2 as ShareIcon,
-  FileCode2,
+  RefreshCw,
   Wand2,
   CheckCircle2,
   Loader2,
   Eye,
+  FileCode2,
+  Folder,
+  FolderOpen,
+  FilePlus2,
+  FolderPlus,
+  Save,
+  Undo2,
+  Redo2,
+  TerminalSquare,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks } from "@/lib/utils";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  Fragment,
+} from "react";
 import type { Chat, Message } from "./page";
 import dynamic from "next/dynamic";
-import type { PreviewMode } from "@/components/code-runner-react";
 import { Switch } from "@/components/ui/switch";
+import { Tip, TooltipProvider } from "@/components/ui/tooltip";
+import BuilderTerminal from "@/components/builder-terminal";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), {
   ssr: false,
 });
-
-const SyntaxHighlighter = dynamic(
-  () => import("@/components/syntax-highlighter"),
-  { ssr: false },
-);
+const CodeEditor = dynamic(() => import("@/components/code-editor"), {
+  ssr: false,
+});
 
 type ViewerFile = { path: string; code: string; language: string };
 
@@ -52,8 +66,7 @@ export async function downloadFilesAsZip(
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     for (const file of files) {
-      const safePath = file.path.replace(/^\/+/, "") || "App.tsx";
-      zip.file(safePath, file.code ?? "");
+      zip.file(file.path.replace(/^\/+/, "") || "App.tsx", file.code ?? "");
     }
     const blob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(blob);
@@ -64,12 +77,8 @@ export async function downloadFilesAsZip(
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast({
-      title: "Download started",
-      description: `${files.length} file${files.length === 1 ? "" : "s"} zipped.`,
-    });
+    toast({ title: "Download started" });
   } catch (err) {
-    console.error("Zip download failed:", err);
     toast({
       title: "Download failed",
       description: err instanceof Error ? err.message : "Could not build zip",
@@ -78,58 +87,132 @@ export async function downloadFilesAsZip(
   }
 }
 
-function AutoFixStatusBadge({
-  status,
-  attempt,
+/* ---------------- file tree ---------------- */
+
+type TreeNode = {
+  name: string;
+  path: string;
+  children?: Map<string, TreeNode>;
+  isFile?: boolean;
+};
+
+function buildTree(paths: string[]): TreeNode {
+  const root: TreeNode = { name: "", path: "", children: new Map() };
+  for (const full of paths) {
+    const parts = full.split("/").filter(Boolean);
+    let node = root;
+    let acc = "";
+    parts.forEach((part, i) => {
+      acc = acc ? `${acc}/${part}` : part;
+      if (!node.children) node.children = new Map();
+      if (!node.children.has(part)) {
+        node.children.set(part, {
+          name: part,
+          path: acc,
+          isFile: i === parts.length - 1,
+          children: i === parts.length - 1 ? undefined : new Map(),
+        });
+      }
+      node = node.children.get(part)!;
+    });
+  }
+  return root;
+}
+
+function Tree({
+  node,
+  depth,
+  selected,
+  dirty,
+  collapsed,
+  onToggle,
+  onSelect,
 }: {
-  status: AutoFixStatus;
-  attempt: number;
+  node: TreeNode;
+  depth: number;
+  selected: string | null;
+  dirty: Set<string>;
+  collapsed: Set<string>;
+  onToggle: (p: string) => void;
+  onSelect: (p: string) => void;
 }) {
-  if (status === "idle") return null;
-
-  const config: Record<
-    Exclude<AutoFixStatus, "idle">,
-    { label: string; className: string; spinning?: boolean }
-  > = {
-    watching: {
-      label: "Watching preview",
-      className: "text-muted-foreground",
-    },
-    fixing: {
-      label: `Auto-fixing (attempt ${Math.min(attempt, 3)}/3)`,
-      className: "text-amber-500",
-      spinning: true,
-    },
-    fallback: {
-      label: "Rebuilding from scratch",
-      className: "text-orange-500",
-      spinning: true,
-    },
-    ready: {
-      label: "Preview healthy",
-      className: "text-emerald-500",
-    },
-  };
-
-  const c = config[status];
-
+  const entries = node.children
+    ? Array.from(node.children.values()).sort((a, b) =>
+        a.isFile === b.isFile ? a.name.localeCompare(b.name) : a.isFile ? 1 : -1,
+      )
+    : [];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 text-[11px] font-medium ${c.className}`}
-      role="status"
-      aria-live="polite"
-    >
-      {c.spinning ? (
-        <Loader2 className="size-3 animate-spin" aria-hidden="true" />
-      ) : status === "ready" ? (
-        <CheckCircle2 className="size-3" aria-hidden="true" />
-      ) : (
-        <Eye className="size-3" aria-hidden="true" />
+    <>
+      {entries.map((child) =>
+        child.isFile ? (
+          child.name === ".gitkeep" ? null : (
+            <button
+              key={child.path}
+              onClick={() => onSelect(child.path)}
+              aria-current={selected === child.path ? "true" : undefined}
+              style={{ paddingLeft: 10 + depth * 12 }}
+              className={`flex w-full items-center gap-1.5 py-1 pr-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
+                selected === child.path
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+              }`}
+            >
+              <FileCode2
+                className="size-3.5 shrink-0 text-emerald-500"
+                aria-hidden="true"
+              />
+              <span className="truncate font-mono text-[11px]">
+                {child.name}
+              </span>
+              {dirty.has(child.path) && (
+                <span
+                  className="ml-auto size-1.5 shrink-0 rounded-full bg-amber-400"
+                  aria-label="Unsaved changes"
+                />
+              )}
+            </button>
+          )
+        ) : (
+          <Fragment key={child.path}>
+            <button
+              onClick={() => onToggle(child.path)}
+              aria-expanded={!collapsed.has(child.path)}
+              style={{ paddingLeft: 10 + depth * 12 }}
+              className="flex w-full items-center gap-1.5 py-1 pr-2 text-left text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
+            >
+              {collapsed.has(child.path) ? (
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="size-3 shrink-0" aria-hidden="true" />
+              )}
+              {collapsed.has(child.path) ? (
+                <Folder className="size-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />
+              )}
+              <span className="truncate text-[11px] font-medium">
+                {child.name}
+              </span>
+            </button>
+            {!collapsed.has(child.path) && (
+              <Tree
+                node={child}
+                depth={depth + 1}
+                selected={selected}
+                dirty={dirty}
+                collapsed={collapsed}
+                onToggle={onToggle}
+                onSelect={onSelect}
+              />
+            )}
+          </Fragment>
+        ),
       )}
-      {c.label}
-    </span>
+    </>
   );
 }
+
+/* ---------------- main viewer ---------------- */
 
 export default function CodeViewer({
   chat,
@@ -140,6 +223,7 @@ export default function CodeViewer({
   onRequestFix,
   onPreviewError,
   onPreviewReady,
+  onSaveFiles,
   autoFixEnabled,
   onAutoFixEnabledChange,
   autoFixAttempt,
@@ -148,303 +232,538 @@ export default function CodeViewer({
   chat: Chat;
   streamText: string;
   message?: Message;
-  onMessageChange?: (v: Message) => void;
   activeTab: string;
   onTabChange: (v: "code" | "preview") => void;
-  onClose?: () => void;
   onRequestFix: (e: string) => void;
   onPreviewError: (e: string) => void;
   onPreviewReady: () => void;
+  onSaveFiles: (files: ViewerFile[]) => void;
   autoFixEnabled: boolean;
   onAutoFixEnabledChange: (enabled: boolean) => void;
   autoFixAttempt: number;
   autoFixStatus: AutoFixStatus;
-  onRestore?: (
-    message: Message | undefined,
-    oldVersion: number,
-    newVersion: number,
-  ) => void;
 }) {
   const streamAllFiles = useMemo(
     () => extractAllCodeBlocks(streamText),
     [streamText],
   );
 
-  const currentFiles: ViewerFile[] = useMemo(() => {
+  const baseFiles: ViewerFile[] = useMemo(() => {
     if (!message) return streamAllFiles;
     const stored = message.files as ViewerFile[] | null;
     if (stored && Array.isArray(stored) && stored.length > 0) return stored;
     return extractAllCodeBlocks(message.content);
   }, [message, streamAllFiles]);
 
-  // CRITICAL: the Sandpack pipeline expects { path, content } — our files carry { path, code }.
-  const runnerFiles = useMemo(
-    () =>
-      currentFiles.map((f) => ({
-        path: f.path,
-        content: f.code ?? (f as any).content ?? "",
-      })),
-    [currentFiles],
+  // Draft workspace: edits, terminal file-ops and installs apply here live.
+  const [draft, setDraft] = useState<ViewerFile[]>(baseFiles);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [extraDeps, setExtraDeps] = useState<Record<string, string>>({});
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [refresh, setRefresh] = useState(0);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(180);
+  const [treeWidth, setTreeWidth] = useState(190);
+  const [creating, setCreating] = useState<null | "file" | "folder">(null);
+  const [newName, setNewName] = useState("");
+  const editorApiRef = useRef<{ undo: () => void; redo: () => void } | null>(
+    null,
+  );
+  const baseKey = useMemo(
+    () => baseFiles.map((f) => f.path).join("|") + (message?.id ?? "stream"),
+    [baseFiles, message?.id],
   );
 
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [refresh, setRefresh] = useState(0);
-  const previewMode: PreviewMode = "web";
-
-  // Reset / clamp file selection whenever the active version's file set changes
+  // Reset draft whenever the active version changes
   useEffect(() => {
-    if (currentFiles.length === 0) {
-      setSelectedFilePath(null);
-      return;
-    }
-    setSelectedFilePath((prev) =>
-      prev && currentFiles.some((f) => f.path === prev)
+    setDraft(baseFiles);
+    setDirty(new Set());
+    setSelectedPath((prev) =>
+      prev && baseFiles.some((f) => f.path === prev)
         ? prev
-        : currentFiles[0].path,
+        : (baseFiles[0]?.path ?? null),
     );
-  }, [currentFiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseKey]);
 
   const selectedFile =
-    currentFiles.find((f) => f.path === selectedFilePath) || currentFiles[0];
+    draft.find((f) => f.path === selectedPath) || draft[0] || null;
 
-  const handleDownload = useCallback(() => {
-    void downloadFilesAsZip(currentFiles, chat.title || "app");
-  }, [currentFiles, chat.title]);
+  const runnerFiles = useMemo(
+    () => draft.map((f) => ({ path: f.path, content: f.code ?? "" })),
+    [draft],
+  );
 
-  const handleShare = useCallback(async () => {
-    if (!message) {
-      toast({
-        title: "Nothing to share yet",
-        description: "Generate a version first, then share it.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const url = `${window.location.origin}/share/v2/${message.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast({
-        title: "Share link copied",
-        description: "Anyone with the link can view this version.",
-      });
-    } catch {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  }, [message]);
+  const updateFile = useCallback((path: string, code: string) => {
+    setDraft((d) => d.map((f) => (f.path === path ? { ...f, code } : f)));
+    setDirty((s) => new Set(s).add(path));
+  }, []);
+
+  const createFile = useCallback((path: string, code = "") => {
+    const clean = path.replace(/^\/+/, "");
+    if (!clean) return;
+    setDraft((d) =>
+      d.some((f) => f.path === clean)
+        ? d.map((f) => (f.path === clean ? { ...f, code } : f))
+        : [
+            ...d,
+            {
+              path: clean,
+              code,
+              language: clean.split(".").pop() || "tsx",
+            },
+          ],
+    );
+    setDirty((s) => new Set(s).add(clean));
+    if (!clean.endsWith(".gitkeep")) setSelectedPath(clean);
+  }, []);
+
+  const deleteFile = useCallback((path: string) => {
+    setDraft((d) => d.filter((f) => f.path !== path));
+    setDirty((s) => new Set(s).add(path));
+    setSelectedPath((p) => (p === path ? null : p));
+  }, []);
+
+  const hasUnsaved = dirty.size > 0;
+
+  const saveAll = useCallback(() => {
+    if (!hasUnsaved) return;
+    onSaveFiles(draft.filter((f) => !f.path.endsWith(".gitkeep")));
+    setDirty(new Set());
+    toast({ title: "Saved", description: "Changes stored as a new version." });
+  }, [draft, hasUnsaved, onSaveFiles]);
+
+  // Keyboard: Cmd/Ctrl+S save (undo/redo are native in Monaco)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveAll();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [saveAll]);
+
+  // Splitter drags
+  const dragState = useRef<
+    | { type: "tree"; startX: number; start: number }
+    | { type: "term"; startY: number; start: number }
+    | null
+  >(null);
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const d = dragState.current;
+      if (!d) return;
+      if (d.type === "tree") {
+        setTreeWidth(
+          Math.max(130, Math.min(340, d.start + (e.clientX - d.startX))),
+        );
+      } else {
+        setTerminalHeight(
+          Math.max(90, Math.min(420, d.start - (e.clientY - d.startY))),
+        );
+      }
+    };
+    const up = () => {
+      dragState.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, []);
+
+  const tree = useMemo(
+    () => buildTree(draft.map((f) => f.path)),
+    [draft],
+  );
 
   const isStreaming = !!streamText;
 
+  const iconBtn =
+    "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40";
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
-      {/* Top bar: Code / Preview tabs + controls */}
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm">
-        <div
-          className="flex items-center gap-1"
-          role="tablist"
-          aria-label="Output view"
-        >
-          <button
-            role="tab"
-            id="tab-code"
-            aria-selected={activeTab === "code"}
-            aria-controls="panel-code"
-            onClick={() => onTabChange("code")}
-            className={`rounded-md px-4 py-1 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-              activeTab === "code"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-            }`}
+    <TooltipProvider>
+      <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+        {/* Toolbar — icon-only, deduplicated (Download/Share live in the page header) */}
+        <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-2 text-sm">
+          <div
+            className="flex items-center gap-0.5"
+            role="tablist"
+            aria-label="Output view"
           >
-            Code
-          </button>
-          <button
-            role="tab"
-            id="tab-preview"
-            aria-selected={activeTab === "preview"}
-            aria-controls="panel-preview"
-            onClick={() => onTabChange("preview")}
-            className={`rounded-md px-4 py-1 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-              activeTab === "preview"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-            }`}
-          >
-            Preview
-          </button>
-        </div>
+            {(["code", "preview"] as const).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => onTabChange(tab)}
+                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+                  activeTab === tab
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          {/* Auto-fix toggle: enables the self-healing loop wired in page.client */}
-          <label
-            className="flex cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition hover:text-foreground"
-            title="Automatically send preview errors back to the AI until the preview works"
-          >
-            <Wand2 className="size-3.5" aria-hidden="true" />
-            <span className="hidden md:inline">Auto-fix</span>
-            <Switch
-              checked={autoFixEnabled}
-              onCheckedChange={onAutoFixEnabledChange}
-              aria-label="Toggle automatic error fixing"
+          <div className="flex items-center gap-1">
+            <AutoFixStatusBadge
+              status={autoFixStatus}
+              attempt={autoFixAttempt}
             />
-          </label>
-
-          <AutoFixStatusBadge status={autoFixStatus} attempt={autoFixAttempt} />
-
-          <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
-
-          <button
-            onClick={() => setRefresh((r) => r + 1)}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Refresh preview"
-          >
-            <RefreshIcon className="size-3.5" aria-hidden="true" />
-            <span className="hidden lg:inline">Refresh</span>
-          </button>
-          <button
-            onClick={handleDownload}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Download all files as a zip"
-          >
-            <DownloadIcon className="size-3.5" aria-hidden="true" />
-            <span className="hidden lg:inline">Download</span>
-          </button>
-          <button
-            onClick={handleShare}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            aria-label="Copy share link for this version"
-          >
-            <ShareIcon className="size-3.5" aria-hidden="true" />
-            <span className="hidden lg:inline">Share</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Body: files sidebar (code tab) + main panel */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {activeTab === "code" && currentFiles.length > 0 && (
-          <nav
-            className="w-52 flex-shrink-0 overflow-auto border-r border-border bg-card/50 py-2 text-xs"
-            aria-label="Generated files"
-          >
-            <div className="px-3 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-              Files ({currentFiles.length})
-            </div>
-            <ul>
-              {currentFiles.map((file) => (
-                <li key={file.path}>
-                  <button
-                    onClick={() => setSelectedFilePath(file.path)}
-                    aria-current={
-                      selectedFilePath === file.path ? "true" : undefined
-                    }
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
-                      selectedFilePath === file.path
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                    }`}
-                  >
-                    <FileCode2
-                      className="size-3.5 shrink-0 text-emerald-500"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate font-mono text-[11px]">
-                      {file.path}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {activeTab === "preview" ? (
-            <div
-              id="panel-preview"
-              role="tabpanel"
-              aria-labelledby="tab-preview"
-              className="flex-1 overflow-hidden bg-background"
-            >
-              {runnerFiles.length > 0 ? (
-                <CodeRunner
-                  key={refresh}
-                  files={runnerFiles}
-                  onRequestFix={onRequestFix}
-                  onPreviewError={onPreviewError}
-                  onPreviewReady={onPreviewReady}
-                  previewMode={previewMode}
+            <Tip label="Auto-fix preview errors">
+              <span className="inline-flex items-center gap-1.5 px-1.5">
+                <Wand2
+                  className="size-3.5 text-muted-foreground"
+                  aria-hidden="true"
                 />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-                  {isStreaming ? (
-                    <>
-                      <Loader2
-                        className="size-5 animate-spin"
-                        aria-hidden="true"
-                      />
-                      <p aria-live="polite">Generating your app…</p>
-                    </>
-                  ) : (
-                    <p>No preview yet. Send a prompt to generate an app.</p>
-                  )}
+                <Switch
+                  checked={autoFixEnabled}
+                  onCheckedChange={onAutoFixEnabledChange}
+                  aria-label="Toggle automatic error fixing"
+                />
+              </span>
+            </Tip>
+
+            <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+
+            {activeTab === "code" && (
+              <>
+                {hasUnsaved && (
+                  <Tip label="Save changes as new version (⌘S)">
+                    <button
+                      onClick={saveAll}
+                      className="inline-flex h-7 items-center gap-1 rounded-md bg-emerald-600 px-2 text-xs font-medium text-white transition hover:bg-emerald-500"
+                      aria-label="Save changes"
+                    >
+                      <Save className="size-3.5" aria-hidden="true" /> Save
+                    </button>
+                  </Tip>
+                )}
+                <Tip label="Undo (⌘Z)">
+                  <button
+                    className={iconBtn}
+                    onClick={() => editorApiRef.current?.undo()}
+                    aria-label="Undo"
+                  >
+                    <Undo2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Tip>
+                <Tip label="Redo (⇧⌘Z)">
+                  <button
+                    className={iconBtn}
+                    onClick={() => editorApiRef.current?.redo()}
+                    aria-label="Redo"
+                  >
+                    <Redo2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Tip>
+                <Tip label="Toggle terminal">
+                  <button
+                    className={`${iconBtn} ${showTerminal ? "bg-accent text-foreground" : ""}`}
+                    onClick={() => setShowTerminal((v) => !v)}
+                    aria-pressed={showTerminal}
+                    aria-label="Toggle terminal"
+                  >
+                    <TerminalSquare className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Tip>
+              </>
+            )}
+            <Tip label="Refresh preview">
+              <button
+                className={iconBtn}
+                onClick={() => setRefresh((r) => r + 1)}
+                aria-label="Refresh preview"
+              >
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+              </button>
+            </Tip>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {activeTab === "code" && (
+            <>
+              {/* Single file tree explorer */}
+              <nav
+                style={{ width: treeWidth }}
+                className="hidden shrink-0 flex-col overflow-hidden border-r border-border sm:flex"
+                aria-label="Project files"
+              >
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Files ({draft.filter((f) => !f.path.endsWith(".gitkeep")).length})
+                  </span>
+                  <span className="flex items-center">
+                    <Tip label="New file">
+                      <button
+                        className={iconBtn}
+                        onClick={() => {
+                          setCreating("file");
+                          setNewName("");
+                        }}
+                        aria-label="New file"
+                      >
+                        <FilePlus2 className="size-3.5" aria-hidden="true" />
+                      </button>
+                    </Tip>
+                    <Tip label="New folder">
+                      <button
+                        className={iconBtn}
+                        onClick={() => {
+                          setCreating("folder");
+                          setNewName("");
+                        }}
+                        aria-label="New folder"
+                      >
+                        <FolderPlus className="size-3.5" aria-hidden="true" />
+                      </button>
+                    </Tip>
+                  </span>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div
-              id="panel-code"
-              role="tabpanel"
-              aria-labelledby="tab-code"
-              className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background"
-            >
-              {selectedFile ? (
-                <>
-                  <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
-                    <span className="font-mono">{selectedFile.path}</span>
-                    <span className="text-emerald-500">
-                      ({selectedFile.language})
-                    </span>
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <SyntaxHighlighter
-                      files={currentFiles.map((f) => ({
-                        path: f.path,
-                        content: f.code ?? "",
-                        language: f.language,
-                      }))}
-                      activePath={selectedFile.path}
-                      isStreaming={isStreaming}
+                {creating && (
+                  <form
+                    className="px-2 pb-1"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const n = newName.trim();
+                      if (!n) return setCreating(null);
+                      if (creating === "file") createFile(n, "");
+                      else createFile(`${n.replace(/\/+$/, "")}/.gitkeep`, "");
+                      setCreating(null);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onBlur={() => setCreating(null)}
+                      onKeyDown={(e) => e.key === "Escape" && setCreating(null)}
+                      placeholder={
+                        creating === "file" ? "path/name.tsx" : "folder/name"
+                      }
+                      aria-label={`New ${creating} name`}
+                      className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[11px] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  No files generated yet.
+                  </form>
+                )}
+                <div className="min-h-0 flex-1 overflow-y-auto pb-2 text-xs">
+                  <Tree
+                    node={tree}
+                    depth={0}
+                    selected={selectedPath}
+                    dirty={dirty}
+                    collapsed={collapsed}
+                    onToggle={(p) =>
+                      setCollapsed((s) => {
+                        const n = new Set(s);
+                        n.has(p) ? n.delete(p) : n.add(p);
+                        return n;
+                      })
+                    }
+                    onSelect={setSelectedPath}
+                  />
                 </div>
-              )}
-            </div>
+              </nav>
+
+              {/* Tree <-> editor splitter */}
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize file tree"
+                tabIndex={0}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  dragState.current = {
+                    type: "tree",
+                    startX: e.clientX,
+                    start: treeWidth,
+                  };
+                  document.body.style.cursor = "col-resize";
+                  document.body.style.userSelect = "none";
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft")
+                    setTreeWidth((w) => Math.max(130, w - 12));
+                  if (e.key === "ArrowRight")
+                    setTreeWidth((w) => Math.min(340, w + 12));
+                }}
+                className="hidden w-[3px] shrink-0 cursor-col-resize bg-transparent transition hover:bg-primary/40 focus-visible:bg-primary/50 focus-visible:outline-none sm:block"
+              />
+            </>
           )}
+
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {activeTab === "preview" ? (
+              <div
+                role="tabpanel"
+                aria-label="Live preview"
+                className="min-h-0 flex-1 overflow-hidden"
+              >
+                {runnerFiles.length > 0 ? (
+                  <CodeRunner
+                    key={refresh}
+                    files={runnerFiles}
+                    extraDependencies={extraDeps}
+                    onRequestFix={onRequestFix}
+                    onPreviewError={onPreviewError}
+                    onPreviewReady={onPreviewReady}
+                    previewMode="web"
+                  />
+                ) : (
+                  <EmptyState isStreaming={isStreaming} />
+                )}
+              </div>
+            ) : (
+              <div
+                role="tabpanel"
+                aria-label="Code editor"
+                className="flex min-h-0 flex-1 flex-col overflow-hidden"
+              >
+                {selectedFile ? (
+                  <CodeEditor
+                    path={selectedFile.path}
+                    value={selectedFile.code}
+                    onChange={(v) => updateFile(selectedFile.path, v)}
+                    onEditorReady={(api) => (editorApiRef.current = api)}
+                  />
+                ) : (
+                  <EmptyState isStreaming={isStreaming} />
+                )}
+
+                {showTerminal && (
+                  <>
+                    <div
+                      role="separator"
+                      aria-orientation="horizontal"
+                      aria-label="Resize terminal"
+                      tabIndex={0}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        dragState.current = {
+                          type: "term",
+                          startY: e.clientY,
+                          start: terminalHeight,
+                        };
+                        document.body.style.cursor = "row-resize";
+                        document.body.style.userSelect = "none";
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp")
+                          setTerminalHeight((h) => Math.min(420, h + 16));
+                        if (e.key === "ArrowDown")
+                          setTerminalHeight((h) => Math.max(90, h - 16));
+                      }}
+                      className="h-[3px] shrink-0 cursor-row-resize border-t border-border bg-transparent transition hover:bg-primary/40 focus-visible:bg-primary/50 focus-visible:outline-none"
+                    />
+                    <div style={{ height: terminalHeight }} className="shrink-0">
+                      <BuilderTerminal
+                        files={draft}
+                        deps={extraDeps}
+                        onCreateFile={createFile}
+                        onDeleteFile={deleteFile}
+                        onInstall={(pkg, ver) =>
+                          setExtraDeps((d) => ({ ...d, [pkg]: ver || "latest" }))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Status bar */}
+        <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border px-3 text-[11px] text-muted-foreground">
+          <span>
+            {draft.filter((f) => !f.path.endsWith(".gitkeep")).length} files
+          </span>
+          {hasUnsaved && <span className="text-amber-500">● unsaved</span>}
+          {Object.keys(extraDeps).length > 0 && (
+            <span>+{Object.keys(extraDeps).length} deps</span>
+          )}
+          <div className="flex-1" />
+          <span
+            className={
+              isStreaming ? "text-amber-500" : "text-emerald-500"
+            }
+            aria-live="polite"
+          >
+            ● {isStreaming ? "Generating" : "Live"}
+          </span>
         </div>
       </div>
+    </TooltipProvider>
+  );
+}
 
-      {/* Status bar */}
-      <div className="flex h-8 shrink-0 items-center gap-4 border-t border-border bg-card px-3 text-[11px] text-muted-foreground">
-        <span>
-          {currentFiles.length} file{currentFiles.length === 1 ? "" : "s"}
-        </span>
-        <div className="flex-1" />
-        <span
-          className={
-            isStreaming
-              ? "inline-flex items-center gap-1 text-amber-500"
-              : "inline-flex items-center gap-1 text-emerald-500"
-          }
-          aria-live="polite"
-        >
-          <span aria-hidden="true">●</span>
-          {isStreaming ? "Generating" : "Live"}
-        </span>
-      </div>
+function EmptyState({ isStreaming }: { isStreaming: boolean }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+      {isStreaming ? (
+        <>
+          <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+          <p aria-live="polite">Generating your app…</p>
+        </>
+      ) : (
+        <p>No files yet. Send a prompt to generate an app.</p>
+      )}
     </div>
+  );
+}
+
+function AutoFixStatusBadge({
+  status,
+  attempt,
+}: {
+  status: AutoFixStatus;
+  attempt: number;
+}) {
+  if (status === "idle") return null;
+  const map = {
+    watching: {
+      label: "Watching",
+      cls: "text-muted-foreground",
+      icon: <Eye className="size-3" aria-hidden="true" />,
+    },
+    fixing: {
+      label: `Fixing ${Math.min(attempt, 3)}/3`,
+      cls: "text-amber-500",
+      icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" />,
+    },
+    fallback: {
+      label: "Rebuilding",
+      cls: "text-orange-500",
+      icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" />,
+    },
+    ready: {
+      label: "Healthy",
+      cls: "text-emerald-500",
+      icon: <CheckCircle2 className="size-3" aria-hidden="true" />,
+    },
+  } as const;
+  const c = map[status];
+  return (
+    <span
+      className={`hidden items-center gap-1 text-[11px] font-medium md:inline-flex ${c.cls}`}
+      role="status"
+      aria-live="polite"
+    >
+      {c.icon}
+      {c.label}
+    </span>
   );
 }

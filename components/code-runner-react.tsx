@@ -40,6 +40,7 @@ const previewModes: Array<{
 
 export default function ReactCodeRunner({
   files,
+  extraDependencies,
   onRequestFix,
   onPreviewError,
   onPreviewReady,
@@ -47,13 +48,16 @@ export default function ReactCodeRunner({
   onPreviewModeChange,
 }: {
   files: Array<{ path: string; content: string }>;
+  extraDependencies?: Record<string, string>;
   onRequestFix?: (e: string) => void;
   onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
-  const filesKey = files.map((f) => f.path + f.content).join("");
+  const filesKey =
+    files.map((f) => f.path + f.content).join("") +
+    JSON.stringify(extraDependencies || {});
   const [internalPreviewMode, setInternalPreviewMode] =
     useState<PreviewMode>("web");
   const activePreviewMode = previewMode ?? internalPreviewMode;
@@ -75,7 +79,7 @@ export default function ReactCodeRunner({
         } as CSSProperties
       }
       className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background [&_.sp-preview-iframe]:shadow-sm"
-      {...getSandpackConfig(files)}
+      {...getSandpackConfig(files, extraDependencies)}
     >
       <SandpackPreview
         showNavigator={false}

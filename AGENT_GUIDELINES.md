@@ -6,7 +6,7 @@
 - Always provide clean, production-ready **app theme UI** only.
 - When user selects **Ask** → Give direct, helpful answers.
 - When user selects **Plan** → Provide clear step-by-step plan with architecture, components, and routing.
-- When user selects **Agent (Full Stack)** → Dynamically generate the full application (pages, components, API routes, styling) based on the prompt + attachments.
+- When user selects **Agent  ** → Dynamically generate the full application (pages, components, API routes, styling) based on the prompt + attachments.
 
 ## Attachment Handling
 

@@ -13,7 +13,7 @@ import BorderGlow from "@/components/BorderGlow";
 import BlurText from "@/components/BlurText";
 import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   use,
   useState,
@@ -42,6 +42,7 @@ const staggeredMenuItems = [
   { label: "Home", ariaLabel: "Go to home section", link: "/" },
   { label: "Build", ariaLabel: "Go to the prompt composer", link: "#prompt-composer" },
   { label: "Examples", ariaLabel: "Go to prompt examples", link: "#examples" },
+  { label: "Gallery", ariaLabel: "Browse the community gallery", link: "/gallery" },
 ];
 
 const staggeredSocialItems = [
@@ -54,6 +55,12 @@ const staggeredSocialItems = [
 export default function Home() {
   const router = useRouter();
   const context = use(Context);
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const t = searchParams.get("prompt");
+    if (t) setPrompt(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(
@@ -114,7 +121,7 @@ export default function Home() {
   const modes = [
     { value: "ask" as const, label: "Ask", icon: "?" },
     { value: "plan" as const, label: "Plan", icon: "≡" },
-    { value: "agent" as const, label: "Agent (Full Stack)", icon: "◇" },
+    { value: "agent" as const, label: "Agent  ", icon: "◇" },
   ];
   const currentMode = modes.find(m => m.value === mode)!;
 
@@ -169,7 +176,7 @@ export default function Home() {
       )}
 
       <StaggeredMenu
-        className="[&_.staggered-menu-header]:top-16 [&_.staggered-menu-header]:justify-start [&_.sm-logo]:hidden"
+        className="[&_.staggered-menu-header]:top-20 [&_.staggered-menu-header]:justify-start [&_.sm-logo]:hidden [&_.sm-panel]:pt-32"
         position="left"
         isFixed={true}
         logoUrl="/chinna-coder-logo-dark.svg"
@@ -201,7 +208,7 @@ export default function Home() {
             />
           </h1>
 
-          <form id="prompt-composer" className="relative mt-8 w-full max-w-[820px]" onSubmit={async (e) => {
+          <form id="prompt-composer" className="relative mt-7 w-full max-w-[580px]" onSubmit={async (e) => {
             e.preventDefault();
             if (!prompt.trim()) return;
             startTransition(async () => {

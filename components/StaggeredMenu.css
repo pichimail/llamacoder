@@ -18,7 +18,7 @@
 
 .staggered-menu-header {
   position: absolute;
-  top: 0;
+  top: 12px;
   left: 0;
   width: 100%;
   display: flex;
@@ -319,10 +319,10 @@
 .sm-panel-list[data-numbering] .sm-panel-item::after {
   counter-increment: smItem;
   content: counter(smItem, decimal-leading-zero);
-  position: absolute;
-  top: 0.1em;
-  right: 2.8em;
-  font-size: 18px;
+  position: static;
+  margin-left: 0.35em;
+  vertical-align: super;
+  font-size: 14px;
   font-weight: 400;
   color: var(--sm-accent, #5227ff);
   letter-spacing: 0;

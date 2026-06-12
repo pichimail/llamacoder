@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `App: ${chat.title}`,
       description: `Building an app for ${chat.title} with ${chat.model}`,
       type: "website",
+      images: [`/api/og?prompt=${encodeURIComponent(chat.title)}`],
     },
   };
 }

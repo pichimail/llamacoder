@@ -32,7 +32,7 @@ export default function ChatLog({
 
   return (
     <StickToBottom
-      className="relative flex-1 min-h-0 overflow-hidden bg-background"
+      className="relative h-full overflow-y-auto overscroll-contain bg-transparent"
       resize="smooth"
       initial="smooth"
     >
