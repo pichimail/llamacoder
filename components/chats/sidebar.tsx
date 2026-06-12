@@ -1,204 +1,170 @@
 'use client'
 
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Home, MessageSquare, Plus, Search } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Home,
-  MessageSquare,
-  Palette,
-  Database,
-  Plus,
-  Search,
-  Star,
-  Clock,
-  Settings,
-  LogOut,
-} from 'lucide-react'
-import { useState } from 'react'
 
-interface Chat {
+export interface SidebarChat {
   id: string
   title: string
   isPinned: boolean
   createdAt: string
+  projectName?: string
 }
 
 interface SidebarProps {
   currentChatId?: string
-  chats?: Chat[]
+  chats?: SidebarChat[]
   onSelectChat?: (chatId: string) => void
   onNewChat?: () => void
 }
 
-export function Sidebar({
-  currentChatId,
-  chats = [],
-  onSelectChat,
-  onNewChat,
-}: SidebarProps) {
+export function Sidebar({ currentChatId, chats = [], onSelectChat, onNewChat }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [collapsed, setCollapsed] = useState(false)
 
-  const pinnedChats = chats.filter((c) => c.isPinned)
-  const filteredChats = chats.filter((c) =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredChats = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return chats.filter((chat) => !query || chat.title.toLowerCase().includes(query))
+  }, [chats, searchQuery])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, SidebarChat[]>()
+    for (const chat of filteredChats) {
+      const key = chat.projectName || 'Personal'
+      const list = map.get(key) ?? []
+      list.push(chat)
+      map.set(key, list)
+    }
+    return Array.from(map.entries())
+  }, [filteredChats])
 
   return (
-    <div className="w-64 bg-muted border-r border-border flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="p-3 border-b border-border space-y-3">
-        <h1 className="text-sm font-bold">llamacoder</h1>
+    <aside
+      className={`${collapsed ? 'w-14' : 'w-64'} h-full shrink-0 border-r border-border bg-muted transition-[width] duration-200 flex flex-col overflow-hidden`}
+    >
+      <div className="h-12 border-b border-border px-2 flex items-center gap-2">
         <Button
-          onClick={onNewChat}
+          variant="ghost"
           size="sm"
-          className="w-full h-8 text-xs"
-          variant="default"
+          className="h-8 w-8 p-0 shrink-0"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <Plus className="w-3 h-3 mr-2" />
-          New Chat
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </Button>
+        {!collapsed && <span className="text-sm font-semibold truncate">Hyperspeed</span>}
       </div>
 
-      {/* Navigation */}
-      <div className="px-2 py-3 space-y-1 border-b border-border">
-        <NavItem
-          icon={<Home className="w-4 h-4" />}
-          label="Home"
-          onClick={() => {}}
-        />
-        <NavItem
-          icon={<MessageSquare className="w-4 h-4" />}
-          label="Chats"
-          onClick={() => {}}
-          active
-        />
-        <NavItem icon={<Palette className="w-4 h-4" />} label="Design Systems" />
-        <NavItem icon={<Database className="w-4 h-4" />} label="Templates" />
+      <div className="p-2 border-b border-border space-y-2">
+        <Button onClick={onNewChat} size="sm" className="h-8 w-full justify-start gap-2">
+          <Plus className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>New Chat</span>}
+        </Button>
+
+        <nav className="space-y-1" aria-label="Primary">
+          <SidebarButton collapsed={collapsed} active={false} icon={<Home className="w-4 h-4" />} label="Home" onClick={onNewChat} />
+          <SidebarButton collapsed={collapsed} active icon={<MessageSquare className="w-4 h-4" />} label="Chats" />
+        </nav>
       </div>
 
-      {/* Search */}
-      <div className="px-2 py-2 border-b border-border">
-        <div className="relative">
-          <Search className="absolute left-2 top-2 w-3 h-3 text-muted-foreground" />
-          <Input
-            placeholder="Search chats..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-7 pl-7 text-xs"
-          />
+      {!collapsed && (
+        <div className="p-2 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-2 top-2 w-3 h-3 text-muted-foreground" />
+            <Input
+              placeholder="Search chats..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="h-7 pl-7 text-xs"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Chats List */}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-4">
-          {/* Pinned Chats */}
-          {pinnedChats.length > 0 && (
-            <div className="space-y-1">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground px-2">
-                Pinned
-              </h3>
-              {pinnedChats
-                .filter((c) =>
-                  c.title.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map((chat) => (
-                  <ChatItem
-                    key={chat.id}
-                    chat={chat}
-                    active={currentChatId === chat.id}
-                    onClick={() => onSelectChat?.(chat.id)}
-                  />
-                ))}
+          {grouped.map(([projectName, projectChats]) => (
+            <div key={projectName} className="space-y-1">
+              {!collapsed && (
+                <div className="px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {projectName}
+                </div>
+              )}
+              {projectChats.map((chat) => (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  collapsed={collapsed}
+                  active={currentChatId === chat.id}
+                  onClick={() => onSelectChat?.(chat.id)}
+                />
+              ))}
             </div>
-          )}
+          ))}
 
-          {/* Recent Chats */}
-          {filteredChats.length > 0 && (
-            <div className="space-y-1">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground px-2">
-                Recent
-              </h3>
-              {filteredChats
-                .filter((c) => !c.isPinned)
-                .slice(0, 20)
-                .map((chat) => (
-                  <ChatItem
-                    key={chat.id}
-                    chat={chat}
-                    active={currentChatId === chat.id}
-                    onClick={() => onSelectChat?.(chat.id)}
-                  />
-                ))}
-            </div>
-          )}
-
-          {filteredChats.length === 0 && searchQuery && (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              No chats found
-            </p>
+          {filteredChats.length === 0 && !collapsed && (
+            <p className="px-2 py-4 text-xs text-muted-foreground">No chats found.</p>
           )}
         </div>
       </ScrollArea>
-
-      {/* Footer */}
-      <div className="p-2 border-t border-border space-y-1">
-        <NavItem icon={<Settings className="w-4 h-4" />} label="Settings" />
-        <NavItem icon={<LogOut className="w-4 h-4" />} label="Sign Out" />
-      </div>
-    </div>
+    </aside>
   )
 }
 
-interface NavItemProps {
+function SidebarButton({
+  icon,
+  label,
+  active,
+  collapsed,
+  onClick,
+}: {
   icon: React.ReactNode
   label: string
   active?: boolean
+  collapsed: boolean
   onClick?: () => void
-}
-
-function NavItem({ icon, label, active, onClick }: NavItemProps) {
+}) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-        active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-background'
-      }`}
+        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-background hover:text-foreground'
+      } ${collapsed ? 'justify-center' : ''}`}
+      aria-label={label}
     >
       {icon}
-      <span>{label}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
     </button>
   )
 }
 
-interface ChatItemProps {
-  chat: Chat
+function ChatItem({
+  chat,
+  active,
+  collapsed,
+  onClick,
+}: {
+  chat: SidebarChat
   active?: boolean
+  collapsed: boolean
   onClick?: () => void
-}
-
-function ChatItem({ chat, active, onClick }: ChatItemProps) {
-  const [isHovered, setIsHovered] = useState(false)
-
+}) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs truncate group transition-colors ${
-        active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-background'
-      }`}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-background hover:text-foreground'
+      } ${collapsed ? 'justify-center' : ''}`}
+      title={chat.title}
     >
-      <Clock className="w-3 h-3 flex-shrink-0" />
-      <span className="flex-1 truncate">{chat.title}</span>
-      {(isHovered || chat.isPinned) && (
-        <Star className="w-3 h-3 flex-shrink-0" fill="currentColor" />
-      )}
+      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+      {!collapsed && <span className="flex-1 truncate text-left">{chat.title}</span>}
     </button>
   )
 }
