@@ -1,5 +1,6 @@
 'use server'
 
+import type { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
 import { getCurrentUser } from '@/app/auth'
@@ -140,6 +141,15 @@ export async function duplicateChat(chatId: string) {
     orderBy: { position: 'asc' },
   })
 
+  const duplicatedMessages: Prisma.MessageCreateWithoutChatInput[] = messages.map(
+    (msg, index) => ({
+      role: msg.role,
+      content: msg.content,
+      position: index,
+      ...(msg.files === null ? {} : { files: msg.files as Prisma.InputJsonValue }),
+    })
+  )
+
   const newChat = await prisma.chat.create({
     data: {
       title: `${originalChat.title} (Copy)`,
@@ -150,12 +160,7 @@ export async function duplicateChat(chatId: string) {
       llamaCoderVersion: originalChat.llamaCoderVersion,
       projectId: originalChat.projectId,
       messages: {
-        create: messages.map((msg, index) => ({
-          role: msg.role,
-          content: msg.content,
-          files: msg.files ?? null,
-          position: index,
-        })),
+        create: duplicatedMessages,
       },
     },
   })
