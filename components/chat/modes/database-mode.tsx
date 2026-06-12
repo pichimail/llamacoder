@@ -1,20 +1,46 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Database, Table, AlertCircle } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ChevronDown, ChevronRight, Database, Table as TableIcon } from 'lucide-react'
+
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface DatabaseModeProps {
   chatId: string
   projectId?: string
 }
 
-// Real Prisma schema models from the project
-const prismaSchema = {
+type SchemaColumn = {
+  name: string
+  type: string
+  nullable: boolean
+  pk?: boolean
+  unique?: boolean
+  fk?: string
+}
+
+type SchemaTable = {
+  name: string
+  columns: SchemaColumn[]
+  relations: string[]
+  rowCount: number
+}
+
+const prismaSchema: { tables: SchemaTable[] } = {
   tables: [
     {
       name: 'User',
+      rowCount: 0,
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'email', type: 'String', nullable: true, unique: true },
@@ -29,6 +55,7 @@ const prismaSchema = {
     },
     {
       name: 'Chat',
+      rowCount: 0,
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'title', type: 'String', nullable: false },
@@ -44,6 +71,7 @@ const prismaSchema = {
     },
     {
       name: 'Message',
+      rowCount: 0,
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'role', type: 'String', nullable: false },
@@ -57,6 +85,7 @@ const prismaSchema = {
     },
     {
       name: 'Project',
+      rowCount: 0,
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'name', type: 'String', nullable: false },
@@ -69,6 +98,7 @@ const prismaSchema = {
     },
     {
       name: 'ProjectFile',
+      rowCount: 0,
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'path', type: 'String', nullable: false },
@@ -79,6 +109,7 @@ const prismaSchema = {
     },
     {
       name: 'EnvironmentVariable',
+      rowCount: 0,
       columns: [
         { name: 'key', type: 'String', nullable: false, pk: true },
         { name: 'value', type: 'String', nullable: false },
@@ -90,27 +121,24 @@ const prismaSchema = {
   ],
 }
 
-
-
 export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set(['User']))
   const [selectedTable, setSelectedTable] = useState<string>('User')
 
   const toggleTable = (name: string) => {
-    const newExpanded = new Set(expandedTables)
-    if (newExpanded.has(name)) {
-      newExpanded.delete(name)
+    const nextExpanded = new Set(expandedTables)
+    if (nextExpanded.has(name)) {
+      nextExpanded.delete(name)
     } else {
-      newExpanded.add(name)
+      nextExpanded.add(name)
     }
-    setExpandedTables(newExpanded)
+    setExpandedTables(nextExpanded)
   }
 
-  const table = mockDatabaseSchema.tables.find((t) => t.name === selectedTable)
+  const table = prismaSchema.tables.find((item) => item.name === selectedTable)
 
   return (
     <div className="w-full h-full flex bg-background">
-      {/* Schema Navigator */}
       <div className="w-72 border-r border-border flex flex-col bg-muted">
         <div className="h-10 border-b border-border px-4 flex items-center">
           <Database className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -121,42 +149,50 @@ export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
 
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {mockDatabaseSchema.tables.map((table) => (
-              <div key={table.name}>
+            {prismaSchema.tables.map((item) => (
+              <div key={item.name}>
                 <button
-                  onClick={() => setSelectedTable(table.name)}
+                  type="button"
+                  onClick={() => setSelectedTable(item.name)}
                   className={`w-full flex items-center gap-2 px-2 py-2 text-sm rounded transition-colors ${
-                    selectedTable === table.name
-                      ? 'bg-accent'
-                      : 'hover:bg-accent/50'
+                    selectedTable === item.name ? 'bg-accent' : 'hover:bg-accent/50'
                   }`}
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleTable(table.name)
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleTable(item.name)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        toggleTable(item.name)
+                      }
                     }}
                     className="p-0"
                   >
-                    {expandedTables.has(table.name) ? (
+                    {expandedTables.has(item.name) ? (
                       <ChevronDown className="w-4 h-4" />
                     ) : (
                       <ChevronRight className="w-4 h-4" />
                     )}
-                  </button>
-                  <Table className="w-4 h-4 opacity-70" />
-                  <span className="flex-1 font-medium">{table.name}</span>
+                  </span>
+                  <TableIcon className="w-4 h-4 opacity-70" />
+                  <span className="flex-1 font-medium text-left">{item.name}</span>
                 </button>
 
-                {expandedTables.has(table.name) && (
+                {expandedTables.has(item.name) && (
                   <div className="ml-4 space-y-1 py-1">
-                    {table.columns.map((col) => (
+                    {item.columns.map((column) => (
                       <div
-                        key={col.name}
+                        key={column.name}
                         className="flex items-center gap-2 px-2 py-1 text-xs rounded text-muted-foreground"
                       >
-                        <span className="font-mono text-foreground">{col.name}</span>
-                        <span className="text-xs">{col.type}</span>
+                        <span className="font-mono text-foreground">{column.name}</span>
+                        <span className="text-xs">{column.type}</span>
                       </div>
                     ))}
                   </div>
@@ -167,28 +203,22 @@ export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
         </ScrollArea>
       </div>
 
-      {/* Table Inspector */}
       <div className="flex-1 flex flex-col">
-        {table && (
+        {table ? (
           <>
             <div className="h-10 border-b border-border px-4 flex items-center justify-between bg-muted">
               <span className="text-sm font-semibold">{table.name}</span>
-              <TooltipProvider>
-                <Tip label="Options">
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </Tip>
-              </TooltipProvider>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled>
+                Inspect
+              </Button>
             </div>
 
-            {/* Schema Details */}
             <div className="flex-1 overflow-auto">
               <div className="space-y-4 p-4">
                 <div>
                   <h3 className="text-sm font-semibold mb-3">Columns</h3>
                   <div className="border border-border rounded overflow-hidden">
-                    <UITable>
+                    <Table>
                       <TableHeader>
                         <TableRow className="bg-muted">
                           <TableHead className="text-xs">Name</TableHead>
@@ -197,46 +227,28 @@ export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {table.columns.map((col) => (
-                          <TableRow key={col.name}>
-                            <TableCell className="text-sm font-mono">
-                              {col.name}
-                            </TableCell>
+                        {table.columns.map((column) => (
+                          <TableRow key={column.name}>
+                            <TableCell className="text-sm font-mono">{column.name}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {col.type}
+                              {column.type}
                             </TableCell>
                             <TableCell className="text-sm">
-                              <div className="flex gap-1">
-                                {col.pk && (
-                                  <span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-                                    PK
-                                  </span>
-                                )}
-                                {col.unique && (
-                                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-medium">
-                                    UNIQUE
-                                  </span>
-                                )}
-                                {col.fk && (
-                                  <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-medium">
-                                    {col.fk}
-                                  </span>
-                                )}
-                                {!col.nullable && (
-                                  <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs font-medium">
-                                    NOT NULL
-                                  </span>
-                                )}
+                              <div className="flex gap-1 flex-wrap">
+                                {column.pk && <Badge variant="outline">PK</Badge>}
+                                {column.unique && <Badge variant="outline">UNIQUE</Badge>}
+                                {column.fk && <Badge variant="outline">{column.fk}</Badge>}
+                                {!column.nullable && <Badge variant="outline">NOT NULL</Badge>}
                               </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
-                    </UITable>
+                    </Table>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded">
+                <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Total Rows</p>
                     <p className="text-2xl font-bold">{table.rowCount.toLocaleString()}</p>
@@ -249,9 +261,7 @@ export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
               </div>
             </div>
           </>
-        )}
-
-        {!table && (
+        ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <Database className="w-12 h-12 mx-auto mb-2 opacity-30" />
