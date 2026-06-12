@@ -11,7 +11,6 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  // Await the params before accessing its properties
   const resolvedParams = await params;
   const chat = await getChatById(resolvedParams.id);
 
@@ -42,16 +41,40 @@ export default async function Page({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const id = (await params).id;
-  const chat = await getChatById(id);
+  const [chat, sidebarChats] = await Promise.all([getChatById(id), getSidebarChats()]);
 
   if (!chat) notFound();
 
   return (
-    <EnhancedPage chatId={id} chatTitle={chat.title}>
+    <EnhancedPage chatId={id} chatTitle={chat.title} chats={sidebarChats}>
       <PageClient chat={chat} />
     </EnhancedPage>
   );
 }
+
+const getSidebarChats = cache(async () => {
+  const prisma = getPrisma();
+  const chats = await prisma.chat.findMany({
+    where: { isArchived: false },
+    orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    take: 40,
+    select: {
+      id: true,
+      title: true,
+      isPinned: true,
+      createdAt: true,
+      project: { select: { id: true, name: true } },
+    },
+  });
+
+  return chats.map((chat) => ({
+    id: chat.id,
+    title: chat.title,
+    isPinned: chat.isPinned,
+    createdAt: chat.createdAt.toISOString(),
+    projectName: chat.project?.name ?? "Personal",
+  }));
+});
 
 const getChatById = cache(async (id: string) => {
   const prisma = getPrisma();
@@ -61,12 +84,10 @@ const getChatById = cache(async (id: string) => {
 
   if (!chat) return null;
 
-  // Get total message count
   const totalMessages = await prisma.message.count({
     where: { chatId: id },
   });
 
-  // Always fetch system message (position 0) and initial user message (position 1)
   const initialMessages = await prisma.message.findMany({
     where: {
       chatId: id,
@@ -75,7 +96,6 @@ const getChatById = cache(async (id: string) => {
     orderBy: { position: "asc" },
   });
 
-  // Fetch the last 100 messages from position 2 onwards
   const recentMessages = await prisma.message.findMany({
     where: {
       chatId: id,
@@ -85,12 +105,10 @@ const getChatById = cache(async (id: string) => {
     take: 100,
   });
 
-  // Combine and sort all messages
   const allMessages = [...initialMessages, ...recentMessages].sort(
     (a, b) => a.position - b.position,
   );
 
-  // Calculate assistant messages count before the loaded range for correct versioning
   const assistantMessagesInLoaded = allMessages.filter(
     (m) => m.role === "assistant",
   );
