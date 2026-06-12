@@ -19,7 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { extractAllCodeBlocks } from "@/lib/utils";
+import { extractAllCodeBlocks, parseReplySegments } from "@/lib/utils";
 import {
   useState,
   useEffect,
@@ -41,7 +41,12 @@ const CodeEditor = dynamic(() => import("@/components/code-editor"), {
   ssr: false,
 });
 
-type ViewerFile = { path: string; code: string; language: string };
+type ViewerFile = {
+  path: string;
+  code: string;
+  language: string;
+  isPartial?: boolean;
+};
 
 export type AutoFixStatus =
   | "idle"
@@ -124,6 +129,7 @@ function Tree({
   depth,
   selected,
   dirty,
+  streamingPath,
   collapsed,
   onToggle,
   onSelect,
@@ -132,6 +138,7 @@ function Tree({
   depth: number;
   selected: string | null;
   dirty: Set<string>;
+  streamingPath?: string | null;
   collapsed: Set<string>;
   onToggle: (p: string) => void;
   onSelect: (p: string) => void;
@@ -170,6 +177,12 @@ function Tree({
                   aria-label="Unsaved changes"
                 />
               )}
+              {streamingPath === child.path && (
+                <Loader2
+                  className="ml-auto size-3 shrink-0 animate-spin text-amber-500"
+                  aria-label="Writing file"
+                />
+              )}
             </button>
           )
         ) : (
@@ -200,6 +213,7 @@ function Tree({
                 depth={depth + 1}
                 selected={selected}
                 dirty={dirty}
+                streamingPath={streamingPath}
                 collapsed={collapsed}
                 onToggle={onToggle}
                 onSelect={onSelect}
@@ -243,16 +257,34 @@ export default function CodeViewer({
   autoFixAttempt: number;
   autoFixStatus: AutoFixStatus;
 }) {
-  const streamAllFiles = useMemo(
-    () => extractAllCodeBlocks(streamText),
+  const streamAllFiles: ViewerFile[] = useMemo(
+    () =>
+      parseReplySegments(streamText)
+        .filter((segment) => segment.type === "file")
+        .map((segment) => ({
+          path: segment.path,
+          code: segment.code,
+          language: segment.language,
+          isPartial: segment.isPartial,
+        })),
     [streamText],
   );
 
   const baseFiles: ViewerFile[] = useMemo(() => {
-    if (!message) return streamAllFiles;
+    const streamed = streamAllFiles;
+    if (!message) return streamed;
     const stored = message.files as ViewerFile[] | null;
-    if (stored && Array.isArray(stored) && stored.length > 0) return stored;
-    return extractAllCodeBlocks(message.content);
+    const existing =
+      stored && Array.isArray(stored) && stored.length > 0
+        ? stored
+        : extractAllCodeBlocks(message.content);
+
+    if (streamed.length === 0) return existing;
+
+    const byPath = new Map<string, ViewerFile>();
+    existing.forEach((file) => byPath.set(file.path, file));
+    streamed.forEach((file) => byPath.set(file.path, file));
+    return Array.from(byPath.values());
   }, [message, streamAllFiles]);
 
   // Draft workspace: edits, terminal file-ops and installs apply here live.
@@ -270,20 +302,27 @@ export default function CodeViewer({
   const editorApiRef = useRef<{ undo: () => void; redo: () => void } | null>(
     null,
   );
-  const baseKey = useMemo(
-    () => baseFiles.map((f) => f.path).join("|") + (message?.id ?? "stream"),
-    [baseFiles, message?.id],
-  );
+  const baseKey = useMemo(() => {
+    const fileKey = baseFiles
+      .map((f) => `${f.path}:${streamText ? f.code.length : 0}:${f.isPartial ? 1 : 0}`)
+      .join("|");
+    return `${message?.id ?? "stream"}:${fileKey}`;
+  }, [baseFiles, message?.id, streamText]);
 
   // Reset draft whenever the active version changes
   useEffect(() => {
     setDraft(baseFiles);
     setDirty(new Set());
-    setSelectedPath((prev) =>
-      prev && baseFiles.some((f) => f.path === prev)
+    setSelectedPath((prev) => {
+      const writingPath =
+        streamText && baseFiles.length > 0
+          ? (baseFiles.find((f) => f.isPartial)?.path ?? baseFiles.at(-1)?.path)
+          : null;
+      if (writingPath) return writingPath;
+      return prev && baseFiles.some((f) => f.path === prev)
         ? prev
-        : (baseFiles[0]?.path ?? null),
-    );
+        : (baseFiles[0]?.path ?? null);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseKey]);
 
@@ -385,6 +424,8 @@ export default function CodeViewer({
   );
 
   const isStreaming = !!streamText;
+  const streamingPath =
+    draft.find((file) => file.isPartial)?.path ?? streamAllFiles.at(-1)?.path;
 
   const iconBtn =
     "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40";
@@ -565,6 +606,7 @@ export default function CodeViewer({
                     depth={0}
                     selected={selectedPath}
                     dirty={dirty}
+                    streamingPath={streamingPath}
                     collapsed={collapsed}
                     onToggle={(p) =>
                       setCollapsed((s) => {
@@ -600,8 +642,17 @@ export default function CodeViewer({
                   if (e.key === "ArrowRight")
                     setTreeWidth((w) => Math.min(340, w + 12));
                 }}
-                className="hidden w-[3px] shrink-0 cursor-col-resize bg-transparent transition hover:bg-primary/40 focus-visible:bg-primary/50 focus-visible:outline-none sm:block"
-              />
+                className="group relative hidden w-[7px] shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none sm:block"
+              >
+                <div
+                  className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60"
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40"
+                  aria-hidden="true"
+                />
+              </div>
             </>
           )}
 
@@ -666,8 +717,17 @@ export default function CodeViewer({
                         if (e.key === "ArrowDown")
                           setTerminalHeight((h) => Math.max(90, h - 16));
                       }}
-                      className="h-[3px] shrink-0 cursor-row-resize border-t border-border bg-transparent transition hover:bg-primary/40 focus-visible:bg-primary/50 focus-visible:outline-none"
-                    />
+                      className="group relative h-[7px] shrink-0 cursor-row-resize bg-transparent transition focus-visible:outline-none"
+                    >
+                      <div
+                        className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60"
+                        aria-hidden="true"
+                      />
+                      <div
+                        className="absolute left-1/2 top-1/2 h-[3px] w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40"
+                        aria-hidden="true"
+                      />
+                    </div>
                     <div style={{ height: terminalHeight }} className="shrink-0">
                       <BuilderTerminal
                         files={draft}
@@ -691,6 +751,11 @@ export default function CodeViewer({
           <span>
             {draft.filter((f) => !f.path.endsWith(".gitkeep")).length} files
           </span>
+          {isStreaming && streamingPath && (
+            <span className="truncate font-mono text-amber-500">
+              writing {streamingPath}
+            </span>
+          )}
           {hasUnsaved && <span className="text-amber-500">● unsaved</span>}
           {Object.keys(extraDeps).length > 0 && (
             <span>+{Object.keys(extraDeps).length} deps</span>

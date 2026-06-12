@@ -33,7 +33,7 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), {
 });
 
 const MIN_CHAT_WIDTH = 260;
-const MAX_CHAT_WIDTH = 520;
+const MAX_CHAT_WIDTH = 720;
 
 function getMessageFiles(message: Message) {
   const stored = message.files as any[] | null;
@@ -47,8 +47,8 @@ export default function PageClient({ chat }: { chat: Chat }) {
     Promise<ReadableStream> | undefined
   >(context.streamPromise);
   const [streamText, setStreamText] = useState("");
-  const [activeTab, setActiveTab] = useState<"code" | "preview">("preview");
-  const [mobileView, setMobileView] = useState<"chat" | "builder">("chat");
+  const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
+  const [mobileView, setMobileView] = useState<"chat" | "builder">("builder");
   const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<
@@ -87,7 +87,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
 
   // Resizable left chat pane
-  const [chatPanelWidth, setChatPanelWidth] = useState(320);
+  const [chatPanelWidth, setChatPanelWidth] = useState(420);
 
   const dragRef = useRef<{ startX: number; startChat: number } | null>(null);
 
@@ -117,6 +117,14 @@ export default function PageClient({ chat }: { chat: Chat }) {
   };
 
   useEffect(() => {
+    setChatPanelWidth((width) => {
+      const target = Math.round(window.innerWidth * 0.3);
+      return Math.max(
+        MIN_CHAT_WIDTH,
+        Math.min(MAX_CHAT_WIDTH, target || width),
+      );
+    });
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
       const { startX, startChat } = dragRef.current;
@@ -201,7 +209,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === prev.id);
       if (msg) {
         setActiveMessage(msg);
-        setActiveTab("preview");
+        setActiveTab("code");
       }
     }
   }, [activeMessage, assistantVersions, chat.messages]);
@@ -211,7 +219,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const msg = chat.messages.find((m) => m.id === messageId);
       if (msg) {
         setActiveMessage(msg);
-        setActiveTab("preview");
+        setActiveTab("code");
       }
     },
     [chat.messages],
@@ -233,7 +241,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       );
       if (target) {
         setActiveMessage(target);
-        setActiveTab("preview");
+        setActiveTab("code");
       }
     }
   }, [targetMessageId, chat.messages]);
@@ -555,7 +563,7 @@ ${error.trimStart()}`;
                   setAutoFixStatus("watching");
                 }
                 setActiveMessage(message);
-                setActiveTab("preview");
+                setActiveTab("code");
                 router.refresh();
               });
             });
@@ -726,7 +734,7 @@ ${error.trimStart()}`;
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
           style={{ ["--chat-w" as any]: chatPanelWidth + "px" }}
-          className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[520px] md:border-r md:border-border`}
+          className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border`}
           aria-label="Chat panel"
         >
           {activeMessage && activeVersion && (
@@ -750,7 +758,7 @@ ${error.trimStart()}`;
               onMessageClick={(message) => {
                 if (message !== activeMessage) {
                   setActiveMessage(message);
-                  setActiveTab("preview");
+                  setActiveTab("code");
                 }
               }}
             />
@@ -784,10 +792,14 @@ ${error.trimStart()}`;
           aria-valuenow={chatPanelWidth}
           onMouseDown={onSplitterMouseDown}
           onKeyDown={onSplitterKeyDown}
-          className="group relative z-10 hidden w-[6px] flex-shrink-0 cursor-col-resize bg-border transition hover:bg-primary/50 focus-visible:bg-primary/60 focus-visible:outline-none md:block"
+          className="group relative z-10 hidden w-[7px] flex-shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none md:block"
         >
           <div
-            className="absolute inset-y-0 left-1/2 w-[2px] bg-current opacity-0 transition group-hover:opacity-100"
+            className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40"
             aria-hidden="true"
           />
         </div>

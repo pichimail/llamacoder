@@ -176,7 +176,7 @@ export default function Home() {
       )}
 
       <StaggeredMenu
-        className="[&_.sm-logo]:hidden [&_.sm-toggle-textWrap]:hidden [&_.staggered-menu-panel]:pt-24"
+        className="[&_.sm-logo]:hidden [&_.sm-toggle-textWrap]:hidden [&_.staggered-menu-header]:top-8 [&_.staggered-menu-panel]:pt-24"
         position="left"
         isFixed={true}
         logoUrl="/chinna-coder-logo-dark.svg"
@@ -184,7 +184,7 @@ export default function Home() {
         socialItems={staggeredSocialItems}
         displaySocials={true}
         displayItemNumbering={true}
-        menuButtonColor="#0f172a"
+        menuButtonColor={mounted && resolvedTheme === "dark" ? "#f8fafc" : "#0f172a"}
         openMenuButtonColor="#fff"
         changeMenuColorOnOpen={true}
         colors={["#0f172a", "#111827", "#1f2937"]}
