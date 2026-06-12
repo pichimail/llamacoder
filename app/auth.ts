@@ -1,12 +1,23 @@
-import { cookies } from 'next/headers'
+export type AppUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  image?: string | null
+  role?: string | null
+}
 
-export async function auth() {
-  // TODO: Implement proper auth (Auth.js, Clerk, etc.)
-  // For now, return null for public access
+export type AppSession = {
+  user: AppUser
+} | null
+
+export async function auth(): Promise<AppSession> {
+  // Auth provider is not fully wired in this branch yet.
+  // Keep this typed so server actions can add ownership checks safely now
+  // and become strict automatically when a real session provider is connected.
   return null
 }
 
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<AppUser | null> {
   const session = await auth()
   return session?.user ?? null
 }
