@@ -6,7 +6,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model GeneratedApp {
@@ -28,9 +27,17 @@ model Chat {
   llamaCoderVersion String    @default("v2")
   shadcn            Boolean
   messages          Message[]
+  projectId         String?
+  project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  isPinned          Boolean   @default(false)
+  isArchived        Boolean   @default(false)
   createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([createdAt])
+  @@index([projectId])
+  @@index([isPinned, createdAt])
+  @@index([isArchived])
 }
 
 model Message {
@@ -45,6 +52,117 @@ model Message {
 
   @@index([chatId])
   @@index([chatId, createdAt])
+}
+
+// ===== New Models for Project/Workspace =====
+model Project {
+  id              String       @id @default(nanoid(12))
+  name            String
+  description     String?
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats           Chat[]
+  deployments     Deployment[]
+  integrations    Integration[]
+  domains         Domain[]
+  envVars         EnvironmentVariable[]
+  files           ProjectFile[]
+  shareLinks      ShareLink[]
+  members         ProjectMember[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Deployment {
+  id            String   @id @default(nanoid(12))
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  previewUrl    String?
+  productionUrl String?
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model Integration {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      String
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@unique([projectId, type])
+}
+
+model Domain {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  domain    String
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@unique([projectId, domain])
+}
+
+model EnvironmentVariable {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@unique([projectId, key])
+}
+
+model ProjectFile {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  path      String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@unique([projectId, path])
+}
+
+model ShareLink {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model ProjectMember {
+  id        String   @id @default(nanoid(12))
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("editor")
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@unique([projectId, userId])
 }
 
 // ===== App settings / feature flags (admin-controlled) =====
@@ -65,6 +183,8 @@ model User {
   role          String    @default("user")
   accounts      Account[]
   sessions      Session[]
+  projects      Project[]
+  projectMembers ProjectMember[]
   createdAt     DateTime  @default(now())
 }
 
