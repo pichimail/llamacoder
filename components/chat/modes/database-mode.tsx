@@ -1,35 +1,31 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Database, Table, MoreHorizontal } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ChevronDown, ChevronRight, Database, Table, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Table as UITable,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { TooltipProvider, Tip } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 
 interface DatabaseModeProps {
   chatId: string
   projectId?: string
 }
 
-const mockDatabaseSchema = {
+// Real Prisma schema models from the project
+const prismaSchema = {
   tables: [
     {
       name: 'User',
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
-        { name: 'email', type: 'String', nullable: false, unique: true },
+        { name: 'email', type: 'String', nullable: true, unique: true },
+        { name: 'emailVerified', type: 'DateTime', nullable: true },
         { name: 'name', type: 'String', nullable: true },
+        { name: 'image', type: 'String', nullable: true },
+        { name: 'plan', type: 'String', nullable: false },
+        { name: 'role', type: 'String', nullable: false },
         { name: 'createdAt', type: 'DateTime', nullable: false },
       ],
-      rowCount: 1245,
+      relations: ['accounts', 'sessions', 'projects', 'projectMembers'],
     },
     {
       name: 'Chat',
@@ -37,82 +33,64 @@ const mockDatabaseSchema = {
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'title', type: 'String', nullable: false },
         { name: 'prompt', type: 'String', nullable: false },
-        { name: 'userId', type: 'String', nullable: false, fk: 'User.id' },
+        { name: 'model', type: 'String', nullable: false },
+        { name: 'quality', type: 'String', nullable: false },
+        { name: 'projectId', type: 'String', nullable: true, fk: 'Project' },
+        { name: 'isPinned', type: 'Boolean', nullable: false },
+        { name: 'isArchived', type: 'Boolean', nullable: false },
         { name: 'createdAt', type: 'DateTime', nullable: false },
       ],
-      rowCount: 5823,
+      relations: ['messages', 'project'],
     },
     {
       name: 'Message',
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
-        { name: 'content', type: 'String', nullable: false },
         { name: 'role', type: 'String', nullable: false },
-        { name: 'chatId', type: 'String', nullable: false, fk: 'Chat.id' },
+        { name: 'content', type: 'String', nullable: false },
+        { name: 'files', type: 'Json', nullable: true },
+        { name: 'position', type: 'Int', nullable: false },
+        { name: 'chatId', type: 'String', nullable: false, fk: 'Chat' },
         { name: 'createdAt', type: 'DateTime', nullable: false },
       ],
-      rowCount: 28934,
+      relations: ['chat'],
     },
     {
       name: 'Project',
       columns: [
         { name: 'id', type: 'String', nullable: false, pk: true },
         { name: 'name', type: 'String', nullable: false },
-        { name: 'userId', type: 'String', nullable: false, fk: 'User.id' },
+        { name: 'description', type: 'String', nullable: true },
+        { name: 'userId', type: 'String', nullable: false, fk: 'User' },
         { name: 'createdAt', type: 'DateTime', nullable: false },
+        { name: 'updatedAt', type: 'DateTime', nullable: false },
       ],
-      rowCount: 342,
+      relations: ['user', 'chats', 'files', 'envVars', 'integrations', 'domains', 'members'],
+    },
+    {
+      name: 'ProjectFile',
+      columns: [
+        { name: 'id', type: 'String', nullable: false, pk: true },
+        { name: 'path', type: 'String', nullable: false },
+        { name: 'content', type: 'String', nullable: false },
+        { name: 'projectId', type: 'String', nullable: false, fk: 'Project' },
+      ],
+      relations: ['project'],
+    },
+    {
+      name: 'EnvironmentVariable',
+      columns: [
+        { name: 'key', type: 'String', nullable: false, pk: true },
+        { name: 'value', type: 'String', nullable: false },
+        { name: 'projectId', type: 'String', nullable: false, pk: true, fk: 'Project' },
+        { name: 'updatedAt', type: 'DateTime', nullable: false },
+      ],
+      relations: ['project'],
     },
   ],
 }
 
-interface TableNodeProps {
-  table: (typeof mockDatabaseSchema.tables)[0]
-  isExpanded: boolean
-  onToggle: () => void
-}
 
-function TableNode({ table, isExpanded, onToggle }: TableNodeProps) {
-  return (
-    <div>
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-2 py-2 text-sm hover:bg-accent rounded transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4" />
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-        <Table className="w-4 h-4 opacity-70" />
-        <span className="font-medium flex-1">{table.name}</span>
-        <span className="text-xs text-muted-foreground">{table.rowCount}</span>
-      </button>
-
-      {isExpanded && (
-        <div className="ml-4 space-y-1 py-1">
-          {table.columns.map((col) => (
-            <div
-              key={col.name}
-              className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-accent/50 rounded"
-            >
-              <span
-                className={`px-2 py-0.5 rounded text-xs font-mono ${
-                  col.pk ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                }`}
-              >
-                {col.pk ? 'PK' : col.fk ? 'FK' : 'FLD'}
-              </span>
-              <span className="font-mono">{col.name}</span>
-              <span className="text-muted-foreground">{col.type}</span>
-              {col.nullable && <span className="text-muted-foreground">?</span>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function DatabaseMode({ chatId, projectId }: DatabaseModeProps) {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set(['User']))
