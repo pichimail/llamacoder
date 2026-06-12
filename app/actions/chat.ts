@@ -208,6 +208,7 @@ export async function getChat(id: string) {
           envVars: true,
           integrations: true,
           domains: true,
+          members: true,
         },
       },
     },
@@ -217,9 +218,11 @@ export async function getChat(id: string) {
 
   if (chat.project) {
     const user = await getCurrentUser()
-    const isOwner = user?.id && chat.project.userId === user.id
-    const isMember = user?.id && chat.project.members?.some?.((member: { userId: string }) => member.userId === user.id)
-    if (!isOwner && !isMember) throw new Error('Unauthorized')
+    if (!user?.id) throw new Error('Unauthorized')
+
+    const isOwner = chat.project.userId === user.id
+    const isMember = chat.project.members.some((member) => member.userId === user.id)
+    if (!isOwner && !isMember) throw new Error('Forbidden')
   }
 
   return chat
