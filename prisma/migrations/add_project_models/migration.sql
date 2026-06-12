@@ -4,10 +4,6 @@ ADD COLUMN "isPinned" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "isArchived" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
--- AlterTable
-ALTER TABLE "User" ADD COLUMN "projects" TEXT[],
-ADD COLUMN "projectMembers" TEXT[];
-
 -- CreateTable
 CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
