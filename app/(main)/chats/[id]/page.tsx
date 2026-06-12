@@ -2,6 +2,7 @@ import { getPrisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import PageClient from "./page.client";
+import { EnhancedPage } from "@/components/chats/enhanced-page";
 import { Metadata } from "next";
 
 type Props = {
@@ -35,17 +36,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const id = (await params).id;
   const chat = await getChatById(id);
 
   if (!chat) notFound();
 
-  // Use new workspace UI
-  const { default: PageClientV2 } = await import('./page-v2.client');
-  return <PageClientV2 chat={chat} />;
+  return (
+    <EnhancedPage chatId={id} chatTitle={chat.title}>
+      <PageClient chat={chat} />
+    </EnhancedPage>
+  );
 }
 
 const getChatById = cache(async (id: string) => {
