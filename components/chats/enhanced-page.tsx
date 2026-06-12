@@ -8,6 +8,7 @@ import { ModeDesign } from './mode-design'
 import { ModeDatabase } from './mode-database'
 import { SharePanel } from './share-panel'
 import { SettingsPanel } from './settings-panel'
+import { Sidebar } from './sidebar'
 import { Button } from '@/components/ui/button'
 import { Share2, MoreHorizontal } from 'lucide-react'
 
@@ -39,8 +40,15 @@ export function EnhancedPage({ chatId, chatTitle, children }: EnhancedPageProps)
 
   return (
     <div className="w-full h-screen flex flex-col bg-background">
-      {/* Top Navigation Bar */}
-      <div className="h-12 border-b border-border bg-card flex items-center px-4 justify-between">
+      {/* Sidebar + Main */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        <Sidebar currentChatId={chatId} chats={[]} />
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Navigation Bar */}
+          <div className="h-12 border-b border-border bg-card flex items-center px-4 justify-between">
         {/* Left: Title */}
         <div className="flex items-center gap-3 flex-1">
           <span className="text-sm font-semibold">llamacoder</span>
@@ -87,6 +95,7 @@ export function EnhancedPage({ chatId, chatTitle, children }: EnhancedPageProps)
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   )
