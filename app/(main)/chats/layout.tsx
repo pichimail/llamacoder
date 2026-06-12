@@ -1,12 +1,12 @@
 export const metadata = {
-  title: 'Chats | LlamaCoder',
+  title: 'Chats | Hyperspeed',
   description: 'Manage your code generation chats',
-};
+}
 
 export default function ChatsLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  return children;
+  return children
 }
