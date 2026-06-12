@@ -45,7 +45,7 @@ export function EnhancedPage({ chatId, chatTitle, children }: EnhancedPageProps)
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="h-12 border-b border-border bg-card flex items-center px-4 justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="text-sm font-semibold">llamacoder</span>
+              <span className="text-sm font-semibold">Hyperspeed</span>
               <span className="text-xs text-muted-foreground">/</span>
               <h1 className="text-sm font-medium truncate">{chatTitle}</h1>
             </div>
