@@ -6,6 +6,8 @@ import { ModeSwitcher, type ChatMode } from './mode-switcher'
 import { ModeCode } from './mode-code'
 import { ModeDesign } from './mode-design'
 import { ModeDatabase } from './mode-database'
+import { SharePanel } from './share-panel'
+import { SettingsPanel } from './settings-panel'
 import { Button } from '@/components/ui/button'
 import { Share2, MoreHorizontal } from 'lucide-react'
 
@@ -17,6 +19,7 @@ interface EnhancedPageProps {
 
 export function EnhancedPage({ chatId, chatTitle, children }: EnhancedPageProps) {
   const [currentMode, setCurrentMode] = useState<ChatMode>('preview')
+  const [rightPanel, setRightPanel] = useState<'share' | 'settings' | null>(null)
 
   const renderModeContent = () => {
     switch (currentMode) {
@@ -50,17 +53,41 @@ export function EnhancedPage({ chatId, chatTitle, children }: EnhancedPageProps)
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 ml-4">
-          <Button variant="ghost" size="sm" className="h-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={() => setRightPanel(rightPanel === 'share' ? null : 'share')}
+          >
             <Share2 className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={() => setRightPanel(rightPanel === 'settings' ? null : 'settings')}
+          >
             <MoreHorizontal className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">{renderModeContent()}</div>
+      {/* Main + Right Panel */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-hidden">{renderModeContent()}</div>
+
+        {/* Right Panel */}
+        {rightPanel && (
+          <div className="w-80 border-l border-border overflow-hidden">
+            {rightPanel === 'share' ? (
+              <SharePanel chatId={chatId} onClose={() => setRightPanel(null)} />
+            ) : (
+              <SettingsPanel chatId={chatId} onClose={() => setRightPanel(null)} />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
