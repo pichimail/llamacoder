@@ -154,7 +154,7 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold">Element Path</Label>
                       <div className="text-xs font-mono bg-background p-2 rounded border border-border overflow-x-auto">
-                        {selectedElement.path.join(' > ')} > {selectedElement.tagName}
+                        {selectedElement.path.join(' > ')} {'>'} {selectedElement.tagName}
                       </div>
                     </div>
                     <div className="space-y-2">
