@@ -8,11 +8,10 @@ export default function Layout({
 }>) {
   return (
     <Providers>
-      <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
+      <div className="flex min-h-full flex-col">
         {children}
-
         <Toaster />
-      </body>
+      </div>
     </Providers>
   );
 }

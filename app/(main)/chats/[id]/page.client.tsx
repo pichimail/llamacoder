@@ -34,6 +34,7 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), {
 
 const MIN_CHAT_WIDTH = 260;
 const MAX_CHAT_WIDTH = 720;
+type MobilePanel = "chat" | "code" | "preview";
 
 function getMessageFiles(message: Message) {
   const stored = message.files as any[] | null;
@@ -47,8 +48,8 @@ export default function PageClient({ chat }: { chat: Chat }) {
     Promise<ReadableStream> | undefined
   >(context.streamPromise);
   const [streamText, setStreamText] = useState("");
-  const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
-  const [mobileView, setMobileView] = useState<"chat" | "builder">("builder");
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code");
+  const [mobileView, setMobileView] = useState<MobilePanel>("code");
   const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<
@@ -210,6 +211,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       if (msg) {
         setActiveMessage(msg);
         setActiveTab("code");
+        setMobileView("code");
       }
     }
   }, [activeMessage, assistantVersions, chat.messages]);
@@ -220,6 +222,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       if (msg) {
         setActiveMessage(msg);
         setActiveTab("code");
+        setMobileView("code");
       }
     },
     [chat.messages],
@@ -242,6 +245,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       if (target) {
         setActiveMessage(target);
         setActiveTab("code");
+        setMobileView("code");
       }
     }
   }, [targetMessageId, chat.messages]);
@@ -524,6 +528,7 @@ ${error.trimStart()}`;
             ) {
               didPushToCode = true;
               setActiveTab("code");
+              setMobileView("code");
             }
           })
           .on("finalContent", async (finalText) => {
@@ -564,6 +569,7 @@ ${error.trimStart()}`;
                 }
                 setActiveMessage(message);
                 setActiveTab("code");
+                setMobileView("code");
                 router.refresh();
               });
             });
@@ -661,7 +667,38 @@ ${error.trimStart()}`;
     <TooltipProvider>
     <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       {/* Top bar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm md:hidden">
+        <div className="mx-auto grid w-full max-w-[19rem] grid-cols-3 rounded-xl border border-border bg-muted/70 p-1 md:hidden" role="tablist" aria-label="Mobile workspace view">
+          {[
+            { value: "chat" as const, label: "Chat", icon: MessageSquare },
+            { value: "code" as const, label: "Code", icon: Code2 },
+            { value: "preview" as const, label: "Preview", icon: Eye },
+          ].map((item) => {
+            const Icon = item.icon;
+            const selected = mobileView === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`${item.value}-mobile-panel`}
+                onClick={() => {
+                  setMobileView(item.value);
+                  if (item.value !== "chat") setActiveTab(item.value);
+                }}
+                className={`inline-flex h-9 items-center justify-center rounded-lg transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${selected ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
+                aria-label={`${item.label} view`}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                <span className="sr-only">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      <header className="hidden h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm md:flex">
         <div className="flex min-w-0 items-center gap-3">
           <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
           <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
@@ -677,36 +714,6 @@ ${error.trimStart()}`;
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {/* Mobile: switch between chat and builder */}
-          <div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view">
-            <button
-              role="tab"
-              aria-selected={mobileView === "chat"}
-              onClick={() => setMobileView("chat")}
-              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-              aria-label="Chat view"
-            >
-              <MessageSquare className="size-3.5" aria-hidden="true" />
-            </button>
-            <button
-              role="tab"
-              aria-selected={mobileView === "builder" && activeTab === "code"}
-              onClick={() => { setMobileView("builder"); setActiveTab("code"); }}
-              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" && activeTab === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-              aria-label="Code view"
-            >
-              <Code2 className="size-3.5" aria-hidden="true" />
-            </button>
-            <button
-              role="tab"
-              aria-selected={mobileView === "builder" && activeTab === "preview"}
-              onClick={() => { setMobileView("builder"); setActiveTab("preview"); }}
-              className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" && activeTab === "preview" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-              aria-label="Preview view"
-            >
-              <Eye className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
           <Tip label="Download zip">
             <button
               onClick={handleDownloadZip}
@@ -734,7 +741,8 @@ ${error.trimStart()}`;
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
           style={{ ["--chat-w" as any]: chatPanelWidth + "px" }}
-          className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border`}
+          id="chat-mobile-panel"
+          className={`${mobileView === "chat" ? "flex animate-in fade-in-0 slide-in-from-left-1 duration-200" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border md:animate-none`}
           aria-label="Chat panel"
         >
           {activeMessage && activeVersion && (
@@ -759,6 +767,7 @@ ${error.trimStart()}`;
                 if (message !== activeMessage) {
                   setActiveMessage(message);
                   setActiveTab("code");
+                  setMobileView("code");
                 }
               }}
             />
@@ -805,7 +814,8 @@ ${error.trimStart()}`;
         </div>
 
         <section
-          className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`}
+          id={`${activeTab}-mobile-panel`}
+          className={`${mobileView !== "chat" ? "flex animate-in fade-in-0 slide-in-from-right-1 duration-200" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px] md:animate-none`}
           aria-label="Code and preview panel"
         >
           <CodeViewer
@@ -813,7 +823,11 @@ ${error.trimStart()}`;
             chat={chat}
             message={activeMessage}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={(nextTab) => {
+              setActiveTab(nextTab);
+              if (nextTab === "code" || nextTab === "preview") setMobileView(nextTab);
+            }}
+            hideHeaderOnMobile
             onRequestFix={(error: string) => {
               startTransition(async () => {
                 await requestFix({

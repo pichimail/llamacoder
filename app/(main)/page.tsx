@@ -25,7 +25,7 @@ import { Context } from "./providers";
 import { useTheme } from "@/components/theme-provider";
 
 import Header from "@/components/header";
-import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
+import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 
 type Mode = "ask" | "plan" | "agent";
@@ -49,6 +49,105 @@ const staggeredSocialItems = [
   {
     label: "GitHub",
     link: "https://github.com/pichimail/llamacoder",
+  },
+];
+
+const PROMPT_CHIP_GROUPS = [
+  {
+    title: "SaaS landing",
+    prompts: [
+      "Build a premium SaaS landing page for a future-ready B2B product with a cinematic hero, GSAP-style scroll reveals, shadcn/ui pricing, animated feature cards, testimonials, waitlist capture, and a fully responsive dark visual system.",
+      "Create a conversion-focused SaaS landing page for a productivity platform using Three.js-inspired background depth, magnetic hover cards, sticky nav, pricing tiers, FAQ accordion, lead form, and polished mobile-first layout.",
+      "Generate a launch-ready SaaS homepage for an existing company product with carousel-style feature storytelling, glass panels, shadcn/ui components, animated stats placeholders, customer logo placeholders, and backend-ready signup form wiring.",
+    ],
+  },
+  {
+    title: "GSAP / Three.js",
+    prompts: [
+      "Create a highly interactive landing page with GSAP-style section transitions, Three.js-inspired particle background, hover-reactive cards, scroll progress, responsive animation fallbacks, and a clean shadcn/ui component system.",
+      "Build a futuristic product microsite with 3D orbital visuals, animated carousel panels, pointer-reactive gradients, kinetic typography, sticky feature navigation, and performant responsive behavior across mobile, tablet, and desktop.",
+      "Generate an immersive launch page with ReactBits-style free background effects, reveal-on-scroll modules, animated comparison cards, a pricing carousel, and production-safe animation fallbacks when motion is reduced.",
+    ],
+  },
+  {
+    title: "SMM marketing",
+    prompts: [
+      "Build a social media marketing agency site with campaign packages, content calendar preview, creator workflow cards, lead-generation form, animated case-study carousel, shadcn/ui dialogs, and responsive dark editorial styling.",
+      "Create an SMM dashboard landing page for brands with post scheduling, analytics previews, team approval flows, inbox automation, pricing, testimonials, and backend-ready contact capture.",
+      "Generate a marketing campaign builder app with brand kit setup, AI caption generator UI, asset upload modal, campaign calendar, approval statuses, analytics cards, and admin-ready full-stack structure.",
+    ],
+  },
+  {
+    title: "Home automation",
+    prompts: [
+      "Build a full-stack smart home automation dashboard with room controls, device cards, scene builder, energy usage charts, user auth screens, admin settings, and responsive touch-friendly controls.",
+      "Create an IoT home control app with lighting, thermostat, security cameras, schedules, automations, live status indicators, protected routes, and a polished shadcn/ui dashboard layout.",
+      "Generate a home automation SaaS portal for installers with customer sites, device provisioning, alerts, service tickets, billing status, team roles, and a super-admin overview.",
+    ],
+  },
+  {
+    title: "Electric cars",
+    prompts: [
+      "Build an electric vehicle brand landing page with a cinematic hero, range and charging feature sections, model comparison carousel, reservation form, dealer locator UI, and responsive Three.js-inspired visuals.",
+      "Create an EV ownership dashboard with vehicle status, charging history, trip analytics, service reminders, subscription billing, authentication, and admin tools for fleet managers.",
+      "Generate an electric car e-commerce configurator with model selection, color and wheel options, financing calculator, checkout flow, inventory dashboard, and mobile-first interaction design.",
+    ],
+  },
+  {
+    title: "E-commerce",
+    prompts: [
+      "Build a full-stack online shopping app with product grid, filters, product detail pages, cart, checkout flow, order history, user authentication, admin inventory dashboard, and shadcn/ui components.",
+      "Create a premium marketplace dashboard with seller onboarding, product upload modal, order management, analytics cards, customer messaging, refunds, and super-admin moderation tools.",
+      "Generate a modern e-commerce storefront with animated product carousel, wishlist, search, variant picker, responsive checkout, promotional landing sections, and backend-ready Prisma data models.",
+    ],
+  },
+  {
+    title: "Full-stack apps",
+    prompts: [
+      "Build a production-style full-stack application with authentication, Prisma schema, protected routes, CRUD workflows, file upload modal, activity feed, admin dashboard, and polished loading and empty states.",
+      "Create a collaborative workspace app with projects, tasks, comments, members, role permissions, search, notifications, settings pages, and responsive dashboard navigation.",
+      "Generate a multi-tenant SaaS app with workspace switching, billing placeholders, team invitations, audit logs, admin and super-admin dashboards, and clean shadcn/ui data tables.",
+    ],
+  },
+  {
+    title: "Dashboards",
+    prompts: [
+      "Build a responsive analytics dashboard with KPI cards, charts, date range filters, data table, command palette, export buttons, settings drawer, and polished loading skeletons.",
+      "Create an operations dashboard with live status panels, incident timeline, team workload, searchable resources, alerts, sidebar navigation, and admin controls.",
+      "Generate a finance dashboard with revenue charts, expense categories, transaction table, account cards, budget goals, export modal, and responsive mobile summary cards.",
+    ],
+  },
+  {
+    title: "Auth screens",
+    prompts: [
+      "Build a complete authentication flow with sign in, sign up, forgot password, reset password, 2FA verification, profile setup, protected dashboard, validation states, and responsive shadcn/ui forms.",
+      "Create premium onboarding and authentication screens for a SaaS app with role selection, workspace creation, invite acceptance, email verification UI, and animated success states.",
+      "Generate an enterprise auth portal with SSO buttons, passwordless login, admin approval state, audit-friendly session list, account security settings, and mobile-safe layouts.",
+    ],
+  },
+  {
+    title: "Admin panels",
+    prompts: [
+      "Build an admin dashboard with users, roles, permissions, audit logs, system health, content moderation, settings, search, filters, bulk actions, and two-way links back to the app.",
+      "Create a super-admin console for a multi-tenant SaaS with tenant management, impersonation UI, billing status, feature flags, usage analytics, incident controls, and responsive data tables.",
+      "Generate a back-office CRM admin panel with contacts, deals, pipelines, tasks, team permissions, reports, import modal, and polished empty/error/loading states.",
+    ],
+  },
+  {
+    title: "AI apps",
+    prompts: [
+      "Build an AI application with prompt input, model selector, file attachment modal, generation history, result cards, saved outputs, settings, billing placeholders, and a full-stack backend-ready architecture.",
+      "Create an AI content studio with document upload, prompt templates, brand voice settings, generation queue, preview editor, export actions, admin dashboard, and responsive controls.",
+      "Generate an AI research assistant app with source upload, chat panel, citation cards, saved threads, project folders, search, user auth, and polished shadcn/ui layout.",
+    ],
+  },
+  {
+    title: "AI chat UI",
+    prompts: [
+      "Build an AI agent chat dashboard inspired by Claude, Perplexity, OpenAI, and Mistral patterns with a hero prompt input, attachment controls, model selection, tools menu, chat history, and responsive split-pane workspace.",
+      "Create a full-stack AI agent workspace with prompt composer, file attachments, tool calling activity panel, sources sidebar, conversation folders, settings, admin controls, and polished streaming states.",
+      "Generate an AI assistant landing-to-app flow with public hero prompt box, advanced controls, dashboard chat threads, agent presets, knowledge upload modal, and production-style auth screens.",
+    ],
   },
 ];
 
@@ -78,6 +177,7 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [headlineIndex, setHeadlineIndex] = useState(0);
+  const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
 
   const [, startTransition] = useTransition();
 
@@ -124,6 +224,14 @@ export default function Home() {
     { value: "agent" as const, label: "Agent  ", icon: "◇" },
   ];
   const currentMode = modes.find(m => m.value === mode)!;
+
+  const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
+    const currentIndex = promptChipIndexes[group.title] ?? -1;
+    const nextIndex = (currentIndex + 1) % group.prompts.length;
+    setPromptChipIndexes((current) => ({ ...current, [group.title]: nextIndex }));
+    setPrompt(group.prompts[nextIndex]);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -341,12 +449,31 @@ export default function Home() {
               </SpotlightCard>
             </BorderGlow>
 
-              <div id="examples" className="mt-3 flex flex-wrap gap-2 scroll-mt-24">
-                {SUGGESTED_PROMPTS.map(v => (
-                  <button key={v.title} type="button" onClick={() => { setPrompt(v.description); setTimeout(() => textareaRef.current?.focus(), 0); }} className="rounded-md bg-muted px-3 py-1 text-xs text-foreground hover:bg-zinc-800 hover:text-[#8b7cf0] hover:scale-[1.03] active:scale-[0.975] transition-all duration-150">
-                    {v.title}
+              <div id="examples" className="mt-3 scroll-mt-24">
+                <div className="mb-2 flex items-center justify-between gap-3 px-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <span>Dynamic build prompts</span>
+                  <span className="hidden sm:inline">Click any chip again to rotate</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {PROMPT_CHIP_GROUPS.map((group) => {
+                  const activeIndex = promptChipIndexes[group.title];
+                  const hasRotated = typeof activeIndex === "number";
+                  return (
+                  <button
+                    key={group.title}
+                    type="button"
+                    onClick={() => handlePromptChipClick(group)}
+                    aria-label={`Generate ${group.title} prompt variation`}
+                    className={`group min-h-10 rounded-xl border px-3 py-2 text-left text-[11px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/70 hover:bg-zinc-900/85 hover:text-cyan-200 hover:shadow-[0_0_24px_rgba(34,211,238,0.16)] active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 ${hasRotated ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-border bg-muted/85 text-foreground"}`}
+                  >
+                    <span className="block truncate">{group.title}</span>
+                    <span className="mt-1 block text-[9px] font-normal text-muted-foreground group-hover:text-cyan-100/70">
+                      v{(activeIndex ?? -1) + 2 > group.prompts.length ? 1 : (activeIndex ?? -1) + 2}/{group.prompts.length}
+                    </span>
                   </button>
-                ))}
+                  );
+                })}
+                </div>
               </div>
             </Fieldset>
           </form>
