@@ -123,8 +123,8 @@ importers:
         specifier: ^1.0.11
         version: 1.0.11
       postprocessing:
-        specifier: ^6.36.0
-        version: 6.39.1(three@0.167.1)
+        specifier: 6.36.0
+        version: 6.36.0(three@0.167.1)
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -3651,10 +3651,10 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
-  postprocessing@6.39.1:
-    resolution: {integrity: sha512-R2dG2zy+BAx3USl5EHw+PvnrlbT5PKnZVp3se0HCR0pWH8WQdh742yNG4YWOsq6c0bFpffk0Gd2RqPeoP/wKng==}
+  postprocessing@6.36.0:
+    resolution: {integrity: sha512-7V2t8Yi+Edh0FybErMdBV3CCJ/tTeNeLh6z+i0VczwZ6HGV3XyRfC8v4Ps9a6tjawcTvatLptQzX8QnDlU8BXw==}
     peerDependencies:
-      three: '>= 0.168.0 < 0.185.0'
+      three: '>= 0.157.0 < 0.168.0'
 
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
@@ -7939,7 +7939,7 @@ snapshots:
 
   postgres-range@1.1.4: {}
 
-  postprocessing@6.39.1(three@0.167.1):
+  postprocessing@6.36.0(three@0.167.1):
     dependencies:
       three: 0.167.1
 
