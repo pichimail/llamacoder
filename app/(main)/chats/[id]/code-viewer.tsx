@@ -1162,7 +1162,6 @@ function PreviewInspectorTab({
             onRequestFix={onRequestFix}
             onPreviewError={onPreviewError}
             onPreviewReady={onPreviewReady}
-            previewMode="web"
           />
         ) : (
           <EmptyState isStreaming={Boolean(streamText)} />
