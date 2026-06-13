@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import {
   getMainCodingPrompt,
@@ -16,7 +17,37 @@ const createChatSchema = z.object({
   quality: z.enum(["low", "high"]).optional().default("low"),
   screenshotUrl: z.string().url().optional(),
   mode: z.enum(["ask", "plan", "agent"]).optional().default("agent"),
+  attachments: z
+    .array(
+      z.object({
+        kind: z.enum(["image", "file"]),
+        filename: z.string().min(1),
+        url: z.string().url().optional(),
+        size: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .optional()
+    .default([]),
 });
+
+function attachmentContext(attachments: {
+  kind: "image" | "file";
+  filename: string;
+  url?: string;
+  size?: number;
+}[]) {
+  if (attachments.length === 0) return "";
+  return `\n\nAttachments:\n${attachments
+    .map((attachment, index) => {
+      const parts = [
+        `${index + 1}. [${attachment.kind}] ${attachment.filename}`,
+      ];
+      if (attachment.size) parts.push(`${Math.round(attachment.size / 1024)} KB`);
+      if (attachment.url) parts.push(attachment.url);
+      return parts.join(" - ");
+    })
+    .join("\n")}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,8 +62,9 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { prompt, model, quality, screenshotUrl, mode } = parsed.data;
+    const { prompt, model, quality, screenshotUrl, mode, attachments } = parsed.data;
     const resolvedModel = resolveModel(model);
+    const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
 
     // Fail fast with clear messages if required secrets are missing
     if (!process.env.DATABASE_URL) {
@@ -75,7 +107,7 @@ export async function POST(request: NextRequest) {
     const together = new Together(options);
 
     // Title generation is non-critical — always provide a fallback so we don't 500 the whole creation
-    let title = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
+    let title = promptWithAttachments.trim().split(/\s+/).slice(0, 6).join(" ");
     if (title.length > 60) title = title.slice(0, 57) + "...";
     try {
       const responseForChatTitle = await together.chat.completions.create({
@@ -88,7 +120,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: prompt,
+            content: promptWithAttachments,
           },
         ],
       });
@@ -146,8 +178,8 @@ export async function POST(request: NextRequest) {
             {
               role: "user",
               content: fullScreenshotDescription
-                ? fullScreenshotDescription + prompt
-                : prompt,
+                ? fullScreenshotDescription + promptWithAttachments
+                : promptWithAttachments,
             },
           ],
           temperature: 0.4,
@@ -161,14 +193,14 @@ export async function POST(request: NextRequest) {
       } catch (planErr) {
         console.warn("High quality plan generation failed, falling back to raw prompt:", planErr);
       }
-      userMessage = planContent ?? prompt;
+      userMessage = planContent ?? promptWithAttachments;
     } else if (fullScreenshotDescription) {
       userMessage =
-        prompt +
+        promptWithAttachments +
         "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " +
         fullScreenshotDescription;
     } else {
-      userMessage = prompt;
+      userMessage = promptWithAttachments;
     }
 
     let newChat = await prisma.chat.update({
@@ -178,16 +210,23 @@ export async function POST(request: NextRequest) {
       data: {
         title,
         messages: {
-          createMany: {
-            data: [
-              {
-                role: "system",
-                content: getMainCodingPrompt(mode, !!fullScreenshotDescription),
-                position: 0,
-              },
-              { role: "user", content: userMessage, position: 1 },
-            ],
-          },
+          create: [
+            {
+              role: "system",
+              content: getMainCodingPrompt(mode, !!fullScreenshotDescription),
+              position: 0,
+            },
+            {
+              role: "user",
+              content: userMessage,
+              position: 1,
+              ...(attachments.length > 0
+                ? {
+                    files: attachments as Prisma.InputJsonValue,
+                  }
+                : {}),
+            },
+          ],
         },
       },
       include: {

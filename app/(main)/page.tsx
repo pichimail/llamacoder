@@ -1,18 +1,14 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import Fieldset from "@/components/fieldset";
-import ArrowRightIcon from "@/components/icons/arrow-right";
 import Hyperspeed from "@/components/Hyperspeed";
 import { hyperspeedPresets } from "@/components/HyperSpeedPresets";
 import LiquidEther from "@/components/LiquidEther";
-import LoadingButton from "@/components/loading-button";
 import StaggeredMenu from "@/components/StaggeredMenu";
-import SpotlightCard from "@/components/SpotlightCard";
-import BorderGlow from "@/components/BorderGlow";
 import BlurText from "@/components/BlurText";
+import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
+import type { QuestionAnswer } from "@/components/agent-elements/question/question-prompt";
 import * as Select from "@radix-ui/react-select";
-import { CheckIcon, ChevronDownIcon, Plus } from "lucide-react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   use,
@@ -29,6 +25,12 @@ import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 
 type Mode = "ask" | "plan" | "agent";
+type ComposerAttachment = {
+  kind: "image" | "file";
+  filename: string;
+  url?: string;
+  size?: number;
+};
 
 const HEADLINES = [
   "Build apps at hyperspeed",
@@ -151,6 +153,10 @@ const PROMPT_CHIP_GROUPS = [
   },
 ];
 
+const PROMPT_GROUP_BY_TITLE = new Map(
+  PROMPT_CHIP_GROUPS.map((group) => [group.title, group] as const),
+);
+
 export default function Home() {
   const router = useRouter();
   const context = use(Context);
@@ -173,17 +179,15 @@ export default function Home() {
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
 
   const [, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (textareaRef.current) textareaRef.current.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,8 +234,54 @@ export default function Home() {
     const nextIndex = (currentIndex + 1) % group.prompts.length;
     setPromptChipIndexes((current) => ({ ...current, [group.title]: nextIndex }));
     setPrompt(group.prompts[nextIndex]);
-    setTimeout(() => textareaRef.current?.focus(), 0);
   };
+
+  const homeInfoBar =
+    mode === "plan"
+      ? {
+          title: "Plan mode",
+          description: "Use the helper question to capture scope before generation.",
+          position: "bottom" as const,
+        }
+      : mode === "ask"
+        ? {
+            title: "Ask mode",
+            description: "Best for questions, refinements, and targeted changes.",
+            position: "bottom" as const,
+          }
+        : {
+            title: "Agent mode",
+            description: "Best for full-stack builds with model and attachment controls.",
+            position: "bottom" as const,
+          };
+
+  const homeQuestionBar =
+    mode === "plan"
+      ? {
+          id: "home-plan-helper",
+          questions: [
+            {
+              kind: "text" as const,
+              title: "Plan the build",
+              description: "Add one extra constraint or must-have before sending.",
+              placeholder: "e.g. include auth, billing, and an admin dashboard",
+            },
+          ],
+          submitLabel: "Add to prompt",
+          allowSkip: true,
+          onSubmit: (answer: QuestionAnswer) => {
+            if (answer.kind !== "text") return;
+            const planText = answer.text?.trim();
+            if (!planText) return;
+            setPrompt((current) => {
+              const next = current.trim();
+              return next
+                ? `${next}\n\nPlan note: ${planText}`
+                : planText;
+            });
+          },
+        }
+      : undefined;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -242,10 +292,111 @@ export default function Home() {
       const res = await fetch("/api/blob-upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setScreenshotUrl(data.url);
+      if (file.type.startsWith("image/")) {
+        const nextImage: AttachedImage = {
+          id: crypto.randomUUID(),
+          filename: file.name || "attachment.png",
+          url: data.url,
+          size: file.size,
+        };
+        setAttachedImages([nextImage]);
+        setAttachedFiles([]);
+        setScreenshotUrl(data.url);
+      } else {
+        const nextFile: AttachedFile = {
+          id: crypto.randomUUID(),
+          filename: file.name || "attachment",
+          size: file.size,
+        };
+        setAttachedFiles([nextFile]);
+        setAttachedImages([]);
+        setScreenshotUrl(data.url);
+      }
       if (!prompt.trim()) setPrompt("Build this from the attached file");
     } catch { toast({ title: "Upload failed", variant: "destructive" }); }
     finally { setScreenshotLoading(false); }
+  };
+
+  const handleImagePaste = async (event: React.ClipboardEvent) => {
+    if (!isUploadAvailable) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (!item.type.startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      event.preventDefault();
+      await handleFileUpload({
+        target: { files: [file] },
+      } as unknown as React.ChangeEvent<HTMLInputElement>);
+      break;
+    }
+  };
+
+  const handleAttachClick = () => fileInputRef.current?.click();
+
+  const handleSend = async ({ content }: { role: "user"; content: string }) => {
+    if (!content.trim()) return;
+    setIsSubmitting(true);
+    startTransition(async () => {
+      try {
+        const attachments: ComposerAttachment[] = [
+          ...attachedImages.map((image) => ({
+            kind: "image" as const,
+            filename: image.filename,
+            url: image.url,
+            size: image.size,
+          })),
+          ...attachedFiles.map((file) => ({
+            kind: "file" as const,
+            filename: file.filename,
+            url: screenshotUrl,
+            size: file.size,
+          })),
+        ];
+        const res = await fetch("/api/create-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: content,
+            model,
+            mode,
+            screenshotUrl,
+            attachments,
+          }),
+        });
+        if (!res.ok) {
+          let description = "Failed to create chat";
+          try {
+            const data = await res.json();
+            if (data?.error) description = data.error;
+          } catch {}
+          toast({ title: "Error", description, variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+        const { chatId, lastMessageId } = await res.json();
+
+        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+          method: "POST",
+          body: JSON.stringify({ messageId: lastMessageId, model }),
+        }).then(async (r) => {
+          if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
+          if (!r.body) throw new Error("No body on response");
+          return r.body;
+        });
+
+        context.setStreamPromise(streamPromise);
+        setPrompt("");
+        setAttachedImages([]);
+        setAttachedFiles([]);
+        setScreenshotUrl(undefined);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        router.push(`/chats/${chatId}`);
+      } finally {
+        setIsSubmitting(false);
+      }
+    });
   };
 
   return (
@@ -316,167 +467,116 @@ export default function Home() {
             />
           </h1>
 
-          <form id="prompt-composer" className="relative mt-7 w-full max-w-[580px]" onSubmit={async (e) => {
-            e.preventDefault();
-            if (!prompt.trim()) return;
-            startTransition(async () => {
-              const res = await fetch("/api/create-chat", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, model, mode, screenshotUrl }),
-              });
-              if (!res.ok) {
-                let description = "Failed to create chat";
-                try {
-                  const data = await res.json();
-                  if (data?.error) description = data.error;
-                } catch {}
-                toast({ title: "Error", description, variant: "destructive" });
-                return;
+          <div
+            id="prompt-composer"
+            className="relative mt-7 w-full max-w-[760px]"
+            style={{ ["--an-max-width" as any]: "760px" }}
+          >
+            <InputBar
+              value={prompt}
+              onChange={setPrompt}
+              onSend={handleSend}
+              onStop={() => {}}
+              status={isSubmitting ? "submitted" : "ready"}
+              placeholder="Describe what to build"
+              autoFocus
+              disabled={isSubmitting || screenshotLoading}
+              onAttach={handleAttachClick}
+              onPaste={handleImagePaste}
+              attachedImages={attachedImages}
+              attachedFiles={attachedFiles}
+              onRemoveImage={() => {
+                setAttachedImages([]);
+                setScreenshotUrl(undefined);
+              }}
+              onRemoveFile={() => {
+                setAttachedFiles([]);
+                setScreenshotUrl(undefined);
+              }}
+              infoBar={homeInfoBar}
+              questionBar={homeQuestionBar}
+              suggestions={PROMPT_CHIP_GROUPS.map((group) => ({
+                id: group.title,
+                label: group.title,
+                className:
+                  typeof promptChipIndexes[group.title] === "number"
+                    ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
+                    : undefined,
+              }))}
+              onSuggestionSelect={(item) => {
+                const group = PROMPT_GROUP_BY_TITLE.get(item.id);
+                if (group) handlePromptChipClick(group);
+              }}
+              leftActions={
+                <Select.Root value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                  <Select.Trigger className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-zinc-800 hover:text-foreground">
+                    <span>{currentMode.icon} {currentMode.label}</span>
+                    <ChevronDownIcon className="h-3 w-3 opacity-60" />
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Content
+                      className="z-[999] overflow-hidden rounded-lg border border-border bg-popover text-sm shadow-xl"
+                      position="popper"
+                      sideOffset={4}
+                    >
+                      <Select.Viewport className="p-1">
+                        {modes.map((m) => (
+                          <Select.Item
+                            key={m.value}
+                            value={m.value}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent"
+                          >
+                            <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
+                            {mode === m.value && (
+                              <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />
+                            )}
+                          </Select.Item>
+                        ))}
+                      </Select.Viewport>
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
               }
-              const { chatId, lastMessageId } = await res.json();
-
-              // CRITICAL: start the first generation immediately so the chat
-              // page begins streaming the app instead of sitting empty.
-              const streamPromise = fetch("/api/get-next-completion-stream-promise", {
-                method: "POST",
-                body: JSON.stringify({ messageId: lastMessageId, model }),
-              }).then(async (r) => {
-                if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
-                if (!r.body) throw new Error("No body on response");
-                return r.body;
-              });
-              context.setStreamPromise(streamPromise);
-              router.push(`/chats/${chatId}`);
-            });
-          }}>
-            <Fieldset>
-              <BorderGlow
-                className="w-full"
-                edgeSensitivity={28}
-                glowColor="195 85 70"
-                backgroundColor="#0a0a0c"
-                borderRadius={20}
-                glowRadius={30}
-                glowIntensity={1.15}
-                coneSpread={22}
-                animated={false}
-                colors={["#ff3366", "#33ff99", "#3366ff"]}
-                fillOpacity={0.55}
-              >
-                <SpotlightCard
-                  className="!bg-transparent !border-transparent !shadow-none !rounded-[20px] !p-4"
-                  spotlightColor="rgba(0, 229, 255, 0.22)"
-                >
-                  {screenshotUrl && (
-                    <div className="mb-3 flex items-center gap-2 text-sm">
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1">
-                        <span>📎</span>
-                        <span className="font-mono text-xs truncate max-w-[160px]">{screenshotUrl.split("/").pop()}</span>
-                        <button type="button" onClick={() => setScreenshotUrl(undefined)} className="text-muted-foreground hover:text-red-500">×</button>
-                      </div>
-                    </div>
-                  )}
-
-                  <textarea
-                    ref={textareaRef}
-                    placeholder="Describe what to build"
-                    required
-                    rows={4}
-                    className="w-full resize-y bg-transparent text-[15px] leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[92px]"
-                    value={prompt}
-                    onChange={e => setPrompt(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
-                  />
-
-                <div className="mt-3 flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="file" className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-zinc-800 hover:text-foreground transition-colors">
-                      <Plus className="h-4 w-4" />
-                    </label>
-                    <input id="file" type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.tsx,.jsx,.html" disabled={!isUploadAvailable} />
-
-                    <Select.Root value={mode} onValueChange={v => setMode(v as Mode)}>
-                      <Select.Trigger className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
-                        <span>{currentMode.icon} {currentMode.label}</span>
-                        <ChevronDownIcon className="h-3 w-3 opacity-60" />
-                      </Select.Trigger>
-                      <Select.Portal>
-                        <Select.Content
-                          className="z-[999] overflow-hidden rounded-lg border border-border bg-popover shadow-xl text-sm"
-                          position="popper"
-                          sideOffset={4}
-                        >
-                          <Select.Viewport className="p-1">
-                            {modes.map(m => (
-                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent">
-                                <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
-                                {mode === m.value && <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />}
-                              </Select.Item>
-                            ))}
-                          </Select.Viewport>
-                        </Select.Content>
-                      </Select.Portal>
-                    </Select.Root>
-
-                    <Select.Root value={model} onValueChange={setModel}>
-                      <Select.Trigger className="flex h-8 min-w-[180px] items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800 transition-colors">
-                        <Select.Value>{getModelLabel(model)}</Select.Value>
-                        <ChevronDownIcon className="h-3 w-3 opacity-60" />
-                      </Select.Trigger>
-                      <Select.Portal>
-                        <Select.Content
-                          className="z-[999] max-h-[320px] overflow-hidden rounded-lg border border-border bg-popover shadow-xl text-sm"
-                          position="popper"
-                          sideOffset={4}
-                        >
-                          <Select.Viewport className="p-1">
-                            {MODELS.filter(m => !m.hidden).map(m => (
-                              <Select.Item key={m.value} value={m.value} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent">
-                                <Select.ItemText>{m.label}</Select.ItemText>
-                                {model === m.value && <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />}
-                              </Select.Item>
-                            ))}
-                          </Select.Viewport>
-                        </Select.Content>
-                      </Select.Portal>
-                    </Select.Root>
-                  </div>
-
-                  <LoadingButton type="submit" disabled={screenshotLoading || !prompt.trim()} className="flex h-8 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 transition-colors">
-                    <ArrowRightIcon className="h-4 w-4" />
-                  </LoadingButton>
-                </div>
-              </SpotlightCard>
-            </BorderGlow>
-
-              <div id="examples" className="mt-3 scroll-mt-24">
-                <div className="mb-2 flex items-center justify-between gap-3 px-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  <span>Dynamic build prompts</span>
-                  <span className="hidden sm:inline">Click any chip again to rotate</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {PROMPT_CHIP_GROUPS.map((group) => {
-                  const activeIndex = promptChipIndexes[group.title];
-                  const hasRotated = typeof activeIndex === "number";
-                  return (
-                  <button
-                    key={group.title}
-                    type="button"
-                    onClick={() => handlePromptChipClick(group)}
-                    aria-label={`Generate ${group.title} prompt variation`}
-                    className={`group min-h-10 rounded-xl border px-3 py-2 text-left text-[11px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/70 hover:bg-zinc-900/85 hover:text-cyan-200 hover:shadow-[0_0_24px_rgba(34,211,238,0.16)] active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 ${hasRotated ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-border bg-muted/85 text-foreground"}`}
-                  >
-                    <span className="block truncate">{group.title}</span>
-                    <span className="mt-1 block text-[9px] font-normal text-muted-foreground group-hover:text-cyan-100/70">
-                      v{(activeIndex ?? -1) + 2 > group.prompts.length ? 1 : (activeIndex ?? -1) + 2}/{group.prompts.length}
-                    </span>
-                  </button>
-                  );
-                })}
-                </div>
-              </div>
-            </Fieldset>
-          </form>
+              rightActions={
+                <Select.Root value={model} onValueChange={setModel}>
+                  <Select.Trigger className="flex h-8 min-w-[180px] items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-zinc-800 hover:text-foreground">
+                    <Select.Value>{getModelLabel(model)}</Select.Value>
+                    <ChevronDownIcon className="h-3 w-3 opacity-60" />
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Content
+                      className="z-[999] max-h-[320px] overflow-hidden rounded-lg border border-border bg-popover text-sm shadow-xl"
+                      position="popper"
+                      sideOffset={4}
+                    >
+                      <Select.Viewport className="p-1">
+                        {MODELS.filter((m) => !m.hidden).map((m) => (
+                          <Select.Item
+                            key={m.value}
+                            value={m.value}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent"
+                          >
+                            <Select.ItemText>{m.label}</Select.ItemText>
+                            {model === m.value && (
+                              <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />
+                            )}
+                          </Select.Item>
+                        ))}
+                      </Select.Viewport>
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
+              }
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={!isUploadAvailable || isSubmitting || screenshotLoading}
+            />
+          </div>
         </div>
 
         <footer className="mt-auto flex w-full justify-center pb-6 text-xs text-muted-foreground">Chinna-Coder — Build production apps from a prompt</footer>

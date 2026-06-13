@@ -1,16 +1,8 @@
 "use client";
 
-import Spinner from "@/components/spinner";
+import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
 import * as Select from "@radix-ui/react-select";
-import {
-  ChevronDown,
-  Plus,
-  Undo2,
-  X,
-  ArrowUp,
-  Square,
-  Zap,
-} from "lucide-react";
+import { ChevronDown, Undo2, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
@@ -18,6 +10,7 @@ import { type Chat } from "./page";
 import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
+import { askModePrompt, planModePrompt } from "@/lib/prompts";
 
 const selectItemCls =
   "flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs text-popover-foreground outline-none data-[highlighted]:bg-accent";
@@ -25,6 +18,13 @@ const selectContentCls =
   "z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-xl";
 const ghostTrigger =
   "inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+type ComposerMode = "ask" | "plan" | "agent";
+type ComposerAttachment = {
+  kind: "image" | "file";
+  filename: string;
+  url?: string;
+  size?: number;
+};
 
 export default function ChatBox({
   chat,
@@ -54,15 +54,16 @@ export default function ChatBox({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const disabled = isPending || isStreaming;
-  const didFocusOnce = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(chat.model);
   const [quality, setQuality] = useState("low");
+  const [mode, setMode] = useState<ComposerMode>("agent");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>();
   const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
@@ -80,7 +81,9 @@ export default function ChatBox({
     };
   }, []);
 
-  const handleScreenshotUpload = async (event: any) => {
+  const handleScreenshotUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     if (!isScreenshotUploadAvailable) {
       toast({
         title: "Attachments unavailable",
@@ -92,7 +95,8 @@ export default function ChatBox({
     if (prompt.length === 0) setPrompt("Update the app to match this");
     setScreenshotLoading(true);
     try {
-      const file = event.target.files[0];
+      const file = event.target.files?.[0];
+      if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
       const response = await fetch("/api/blob-upload", {
@@ -102,6 +106,26 @@ export default function ChatBox({
       if (!response.ok) throw new Error("Blob upload failed");
       const blob = (await response.json()) as { url?: string };
       if (!blob.url) throw new Error("No URL returned");
+      if (file.type.startsWith("image/")) {
+        setAttachedImages([
+          {
+            id: crypto.randomUUID(),
+            filename: file.name || "attachment.png",
+            url: blob.url,
+            size: file.size,
+          },
+        ]);
+        setAttachedFiles([]);
+      } else {
+        setAttachedFiles([
+          {
+            id: crypto.randomUUID(),
+            filename: file.name || "attachment",
+            size: file.size,
+          },
+        ]);
+        setAttachedImages([]);
+      }
       setScreenshotUrl(blob.url);
     } catch (error) {
       setScreenshotUrl(undefined);
@@ -115,39 +139,85 @@ export default function ChatBox({
     }
   };
 
-  useEffect(() => {
-    if (!textareaRef.current) return;
-    if (!disabled && !didFocusOnce.current) {
-      textareaRef.current.focus();
-      didFocusOnce.current = true;
-    } else {
-      didFocusOnce.current = false;
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    if (!isScreenshotUploadAvailable) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (!item.type.startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      e.preventDefault();
+      await handleScreenshotUpload({
+        target: { files: [file] },
+      } as unknown as React.ChangeEvent<HTMLInputElement>);
+      break;
     }
-  }, [disabled]);
+  };
 
   useEffect(() => {
-    if (shouldFocusInput && textareaRef.current) {
-      textareaRef.current.focus();
+    if (shouldFocusInput) {
       onInputFocused?.();
     }
   }, [shouldFocusInput, onInputFocused]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const buildModePrefix = () => {
+    if (mode === "ask") return askModePrompt.trim();
+    if (mode === "plan") return planModePrompt.trim();
+    return "Apply the following change as a precise, minimal patch to the existing app (only output files that actually need to change):";
+  };
+
+  const handleSend = async ({ content }: { role: "user"; content: string }) => {
     if (isStreaming) return;
-    if (!prompt.trim() && !screenshotUrl) return;
+    const trimmed = content.trim();
+    if (!trimmed && !screenshotUrl) return;
 
     startTransition(async () => {
-      let finalPrompt =
-        prompt.trim() || (screenshotUrl ? "Update the app to match this" : "");
+      const modePrefix = buildModePrefix();
+      let finalPrompt = trimmed || (screenshotUrl ? "Update the app to match this" : "");
       if (!finalPrompt) return;
-      if (versions.length > 0) {
-        finalPrompt = `Apply the following change as a precise, minimal patch to the existing app (only output files that actually need to change):\n\n${finalPrompt}`;
+      finalPrompt = `${modePrefix}\n\n${finalPrompt}`;
+
+      const attachments: ComposerAttachment[] = [
+        ...attachedImages.map((image) => ({
+          kind: "image" as const,
+          filename: image.filename,
+          url: image.url,
+          size: image.size,
+        })),
+        ...attachedFiles.map((file) => ({
+          kind: "file" as const,
+          filename: file.filename,
+          url: screenshotUrl,
+          size: file.size,
+        })),
+      ];
+
+      if (attachments.length > 0) {
+        finalPrompt += `\n\nAttachments:\n${attachments
+          .map((attachment, index) => {
+            const parts = [
+              `${index + 1}. [${attachment.kind}] ${attachment.filename}`,
+            ];
+            if (attachment.size) parts.push(`${Math.round(attachment.size / 1024)} KB`);
+            if (attachment.url) parts.push(attachment.url);
+            return parts.join(" - ");
+          })
+          .join("\n")}`;
       }
 
       const controller = new AbortController();
       onAbortController?.(controller);
-      const message = await createMessage(chat.id, finalPrompt, "user");
+      const message = await createMessage(
+        chat.id,
+        finalPrompt,
+        "user",
+        attachments.length > 0 ? (attachments as any[]) : undefined,
+      );
 
       const streamPromise = fetch("/api/get-next-completion-stream-promise", {
         method: "POST",
@@ -179,6 +249,8 @@ export default function ChatBox({
         router.refresh();
         setPrompt("");
         setScreenshotUrl(undefined);
+        setAttachedImages([]);
+        setAttachedFiles([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
       });
     });
@@ -188,157 +260,85 @@ export default function ChatBox({
 
   return (
     <TooltipProvider>
-      <form onSubmit={handleSubmit} className="relative w-full">
-        <div
-          className="flex w-full flex-col rounded-2xl border border-border/70 bg-card/60 backdrop-blur transition focus-within:border-ring/50"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files?.[0];
-            if (file?.type.startsWith("image/"))
-              handleScreenshotUpload({ target: { files: [file] } });
+      <div className="relative w-full">
+        <input
+          id="screenshot"
+          type="file"
+          accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+          onChange={handleScreenshotUpload}
+          className="hidden"
+          ref={fileInputRef}
+          disabled={!isScreenshotUploadAvailable}
+        />
+
+        <InputBar
+          value={prompt}
+          onChange={setPrompt}
+          onSend={handleSend}
+          onStop={onStop ?? (() => {})}
+          status={
+            isStreaming
+              ? "streaming"
+              : isPending || screenshotLoading
+                ? "submitted"
+                : "ready"
+          }
+          placeholder="Describe a change…"
+          disabled={disabled}
+          autoFocus
+          onAttach={handleAttachClick}
+          onPaste={handlePaste}
+          attachedImages={attachedImages}
+          attachedFiles={attachedFiles}
+          onRemoveImage={() => {
+            setAttachedImages([]);
+            setScreenshotUrl(undefined);
           }}
-        >
-          {screenshotUrl && (
-            <div className="flex items-center gap-2 px-3 pt-2.5">
-              <div className="relative">
-                <img
-                  src={screenshotUrl}
-                  alt="Attached screenshot"
-                  className="h-10 w-10 rounded-lg object-cover ring-1 ring-border"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScreenshotUrl(undefined);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="absolute -right-1.5 -top-1.5 flex size-4.5 items-center justify-center rounded-full bg-background text-muted-foreground ring-1 ring-border hover:text-red-400"
-                  aria-label="Remove screenshot"
-                >
-                  <X className="size-3" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          <textarea
-            ref={textareaRef}
-            placeholder="Describe a change…"
-            name="prompt"
-            aria-label="Message to the AI app builder"
-            className="w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/70 focus:outline-none disabled:opacity-60"
-            rows={1}
-            style={{ minHeight: "22px", maxHeight: "120px" }}
-            value={prompt}
-            disabled={disabled}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              const t = textareaRef.current;
-              if (t) {
-                t.style.height = "auto";
-                t.style.height = Math.min(120, t.scrollHeight) + "px";
-              }
-            }}
-            onPaste={async (e) => {
-              const items = e.clipboardData?.items;
-              if (items) {
-                for (const item of Array.from(items)) {
-                  if (item.type.startsWith("image/")) {
-                    const file = item.getAsFile();
-                    if (file) {
-                      e.preventDefault();
-                      handleScreenshotUpload({ target: { files: [file] } });
-                      return;
-                    }
-                  }
-                }
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                (event.target as HTMLTextAreaElement)
-                  .closest("form")
-                  ?.requestSubmit();
-              }
-            }}
-          />
-
-          {/* Toolbar — borderless, icon-first, tooltips */}
-          <div className="flex items-center gap-0.5 px-2 pb-2 pt-0.5">
-            <Tip label={isScreenshotUploadAvailable ? "Attach image" : "Attachments disabled"}>
-              <label
-                htmlFor="screenshot"
-                className={`inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground ${!isScreenshotUploadAvailable ? "cursor-not-allowed opacity-40" : ""}`}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                <span className="sr-only">Attach image</span>
-              </label>
-            </Tip>
-            <input
-              id="screenshot"
-              type="file"
-              accept="image/png, image/jpeg, image/webp"
-              onChange={handleScreenshotUpload}
-              className="hidden"
-              ref={fileInputRef}
-              disabled={!isScreenshotUploadAvailable}
-            />
-
-            <Select.Root value={model} onValueChange={setModel}>
-              <Tip label="Model">
-                <Select.Trigger aria-label="Select AI model" className={ghostTrigger}>
-                  <Select.Value />
+          onRemoveFile={() => {
+            setAttachedFiles([]);
+            setScreenshotUrl(undefined);
+          }}
+          infoBar={{
+            title:
+              mode === "agent"
+                ? "Agent mode"
+                : mode === "plan"
+                  ? "Plan mode"
+                  : "Ask mode",
+            description:
+              mode === "agent"
+                ? "Full-stack builds with model, quality, and version controls."
+                : mode === "plan"
+                  ? "Collect a focused brief before sending the patch."
+                  : "Use this for targeted answers and smaller edits.",
+            position: "bottom",
+          }}
+          leftActions={
+            <Select.Root value={mode} onValueChange={(value) => setMode(value as ComposerMode)}>
+              <Tip label="Mode">
+                <Select.Trigger aria-label="Select mode" className={ghostTrigger}>
+                  <span className="capitalize">{mode}</span>
                   <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
                 </Select.Trigger>
               </Tip>
               <Select.Portal>
                 <Select.Content className={selectContentCls}>
                   <Select.Viewport className="p-1">
-                    {MODELS.filter((m) => !m.hidden).map((m) => (
-                      <Select.Item key={m.value} value={m.value} className={selectItemCls}>
-                        <Select.ItemText>{m.label}</Select.ItemText>
+                    {["ask", "plan", "agent"].map((value) => (
+                      <Select.Item key={value} value={value} className={selectItemCls}>
+                        <Select.ItemText className="capitalize">{value}</Select.ItemText>
                       </Select.Item>
                     ))}
                   </Select.Viewport>
                 </Select.Content>
               </Select.Portal>
             </Select.Root>
-
-            <Select.Root value={quality} onValueChange={setQuality}>
-              <Tip label={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}>
-                <Select.Trigger aria-label="Select generation quality" className={ghostTrigger}>
-                  <Zap
-                    className={`size-3.5 ${quality === "high" ? "text-amber-400" : ""}`}
-                    aria-hidden="true"
-                  />
-                </Select.Trigger>
-              </Tip>
-              <Select.Portal>
-                <Select.Content className={selectContentCls}>
-                  <Select.Viewport className="p-1">
-                    <Select.Item value="low" className={selectItemCls}>
-                      <Select.ItemText>Fast</Select.ItemText>
-                    </Select.Item>
-                    <Select.Item value="high" className={selectItemCls}>
-                      <Select.ItemText>High quality</Select.ItemText>
-                    </Select.Item>
-                  </Select.Viewport>
-                </Select.Content>
-              </Select.Portal>
-            </Select.Root>
-
-            <div className="flex-1" />
-
-            {versions.length > 0 && onSwitchVersion && (
-              <Select.Root
-                value={currentVersionId || ""}
-                onValueChange={onSwitchVersion}
-                disabled={disabled}
-              >
-                <Tip label="Switch version">
-                  <Select.Trigger aria-label="Switch app version" className={ghostTrigger}>
+          }
+          rightActions={
+            <div className="flex items-center gap-1">
+              <Select.Root value={model} onValueChange={setModel}>
+                <Tip label="Model">
+                  <Select.Trigger aria-label="Select AI model" className={ghostTrigger}>
                     <Select.Value />
                     <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
                   </Select.Trigger>
@@ -346,60 +346,85 @@ export default function ChatBox({
                 <Select.Portal>
                   <Select.Content className={selectContentCls}>
                     <Select.Viewport className="p-1">
-                      {versions
-                        .slice()
-                        .reverse()
-                        .map((v) => (
-                          <Select.Item key={v.id} value={v.id} className={selectItemCls}>
-                            <Select.ItemText>{v.label}</Select.ItemText>
-                          </Select.Item>
-                        ))}
+                      {MODELS.filter((m) => !m.hidden).map((m) => (
+                        <Select.Item key={m.value} value={m.value} className={selectItemCls}>
+                          <Select.ItemText>{m.label}</Select.ItemText>
+                        </Select.Item>
+                      ))}
                     </Select.Viewport>
                   </Select.Content>
                 </Select.Portal>
               </Select.Root>
-            )}
 
-            {onUndo && (
-              <Tip label="Previous version">
-                <button
-                  type="button"
-                  onClick={onUndo}
-                  disabled={!canUndo || disabled}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground disabled:opacity-40"
-                  aria-label="Undo last version"
+              <Select.Root value={quality} onValueChange={setQuality}>
+                <Tip label={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}>
+                  <Select.Trigger aria-label="Select generation quality" className={ghostTrigger}>
+                    <Zap
+                      className={`size-3.5 ${quality === "high" ? "text-amber-400" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </Select.Trigger>
+                </Tip>
+                <Select.Portal>
+                  <Select.Content className={selectContentCls}>
+                    <Select.Viewport className="p-1">
+                      <Select.Item value="low" className={selectItemCls}>
+                        <Select.ItemText>Fast</Select.ItemText>
+                      </Select.Item>
+                      <Select.Item value="high" className={selectItemCls}>
+                        <Select.ItemText>High quality</Select.ItemText>
+                      </Select.Item>
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+
+              {versions.length > 0 && onSwitchVersion && (
+                <Select.Root
+                  value={currentVersionId || ""}
+                  onValueChange={onSwitchVersion}
+                  disabled={disabled}
                 >
-                  <Undo2 className="size-3.5" aria-hidden="true" />
-                </button>
-              </Tip>
-            )}
+                  <Tip label="Switch version">
+                    <Select.Trigger aria-label="Switch app version" className={ghostTrigger}>
+                      <Select.Value />
+                      <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
+                    </Select.Trigger>
+                  </Tip>
+                  <Select.Portal>
+                    <Select.Content className={selectContentCls}>
+                      <Select.Viewport className="p-1">
+                        {versions
+                          .slice()
+                          .reverse()
+                          .map((v) => (
+                            <Select.Item key={v.id} value={v.id} className={selectItemCls}>
+                              <Select.ItemText>{v.label}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                      </Select.Viewport>
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
+              )}
 
-            <Tip label={isStreaming ? "Stop (Esc)" : "Send (Enter)"}>
-              <button
-                type={isStreaming && onStop ? "button" : "submit"}
-                onClick={isStreaming && onStop ? onStop : undefined}
-                disabled={
-                  isStreaming && onStop
-                    ? isPending
-                    : disabled ||
-                      screenshotLoading ||
-                      (!prompt.trim() && !screenshotUrl)
-                }
-                className="ml-1 inline-flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:bg-primary/90 active:scale-95 disabled:opacity-40"
-                aria-label={isStreaming && onStop ? "Stop generation" : "Send message"}
-              >
-                <Spinner loading={isPending || screenshotLoading}>
-                  {isStreaming && onStop ? (
-                    <Square className="size-3 fill-current" aria-hidden="true" />
-                  ) : (
-                    <ArrowUp className="size-4" aria-hidden="true" />
-                  )}
-                </Spinner>
-              </button>
-            </Tip>
-          </div>
-        </div>
-      </form>
+              {onUndo && (
+                <Tip label="Previous version">
+                  <button
+                    type="button"
+                    onClick={onUndo}
+                    disabled={!canUndo || disabled}
+                    className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+                    aria-label="Undo last version"
+                  >
+                    <Undo2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                </Tip>
+              )}
+            </div>
+          }
+        />
+      </div>
     </TooltipProvider>
   );
 }

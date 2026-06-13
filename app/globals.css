@@ -1,3 +1,4 @@
+@import "../components/agent-elements/agent-ui.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
