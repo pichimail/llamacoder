@@ -11,6 +11,7 @@ export default function CodeRunner({
   onPreviewReady,
   previewMode,
   onPreviewModeChange,
+  showDeviceToggle,
 }: {
   language?: string;
   code?: string;
@@ -21,6 +22,7 @@ export default function CodeRunner({
   onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
+  showDeviceToggle?: boolean;
 }) {
   const actualFiles = (
     files || (code ? [{ path: "App.tsx", content: code }] : [])
@@ -42,6 +44,7 @@ export default function CodeRunner({
       onPreviewReady={onPreviewReady}
       previewMode={previewMode}
       onPreviewModeChange={onPreviewModeChange}
+      showDeviceToggle={showDeviceToggle}
     />
   );
 }
