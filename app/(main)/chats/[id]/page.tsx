@@ -4,6 +4,7 @@ import { cache } from "react";
 import PageClient from "./page.client";
 import { EnhancedPage } from "@/components/chats/enhanced-page";
 import { Metadata } from "next";
+import { getLatestArtifactFiles } from "@/lib/artifact-analysis";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -11,7 +12,6 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  // Await the params before accessing its properties
   const resolvedParams = await params;
   const chat = await getChatById(resolvedParams.id);
 
@@ -46,8 +46,15 @@ export default async function Page({
 
   if (!chat) notFound();
 
+  const artifactFiles = getLatestArtifactFiles(chat.messages);
+
   return (
-    <EnhancedPage chatId={id} chatTitle={chat.title}>
+    <EnhancedPage
+      chatId={id}
+      chatTitle={chat.title}
+      chatModel={chat.model}
+      artifactFiles={artifactFiles}
+    >
       <PageClient chat={chat} />
     </EnhancedPage>
   );
@@ -61,12 +68,10 @@ const getChatById = cache(async (id: string) => {
 
   if (!chat) return null;
 
-  // Get total message count
   const totalMessages = await prisma.message.count({
     where: { chatId: id },
   });
 
-  // Always fetch system message (position 0) and initial user message (position 1)
   const initialMessages = await prisma.message.findMany({
     where: {
       chatId: id,
@@ -75,7 +80,6 @@ const getChatById = cache(async (id: string) => {
     orderBy: { position: "asc" },
   });
 
-  // Fetch the last 100 messages from position 2 onwards
   const recentMessages = await prisma.message.findMany({
     where: {
       chatId: id,
@@ -85,12 +89,10 @@ const getChatById = cache(async (id: string) => {
     take: 100,
   });
 
-  // Combine and sort all messages
   const allMessages = [...initialMessages, ...recentMessages].sort(
     (a, b) => a.position - b.position,
   );
 
-  // Calculate assistant messages count before the loaded range for correct versioning
   const assistantMessagesInLoaded = allMessages.filter(
     (m) => m.role === "assistant",
   );
