@@ -1,32 +1,41 @@
 import * as shadcnComponents from "@/lib/shadcn";
 
+const FILE_EXTENSIONS = "tsx|ts|jsx|js|css|json|mjs|cjs|mdx|md|prisma";
+
+function cleanPath(path: string | undefined | null) {
+  if (!path) return null;
+  const cleaned = path
+    .trim()
+    .replace(/^[`'"<({\[]+/, "")
+    .replace(/[`'">)},;:\]]+$/g, "")
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "")
+    .replace(/^src\//, "");
+
+  if (!cleaned || cleaned.includes("..")) return null;
+  if (!new RegExp(`\\.(?:${FILE_EXTENSIONS})$`, "i").test(cleaned)) return null;
+  return cleaned;
+}
+
 function inferPathFromContent(path: string, content: string) {
   const firstLine = (content ?? "").split("\n", 1)[0]?.trim() || "";
   const commentPathMatch = firstLine.match(
-    /^(?:\/\/|\/\*|#)\s*([A-Za-z0-9_@./()[\]-]+\.(?:tsx|ts|jsx|js|css|json|mjs|cjs|mdx|prisma))/,
+    /^(?:\/\/|\/\*|#)\s*([A-Za-z0-9_@./()[\]-]+\.(?:tsx|ts|jsx|js|css|json|mjs|cjs|mdx|prisma))/, 
   );
 
   if (commentPathMatch) {
-    return commentPathMatch[1].replace(/\*\/$/, "");
+    return cleanPath(commentPathMatch[1].replace(/\*\/$/, "")) || path;
   }
 
   return path;
 }
 
 function normalizePreviewPath(path: string) {
-  let normalizedPath = path.startsWith("/") ? path.slice(1) : path;
-
-  if (normalizedPath.startsWith("src/")) {
-    normalizedPath = normalizedPath.slice(4);
-  }
-
-  return normalizedPath;
+  return cleanPath(path) || path.replace(/^\/+/, "").replace(/^src\//, "");
 }
 
 function isGeneratedConfigFile(path: string, content: string) {
-  const normalizedPath = normalizePreviewPath(
-    inferPathFromContent(path, content),
-  ).toLowerCase();
+  const normalizedPath = normalizePreviewPath(inferPathFromContent(path, content)).toLowerCase();
   const filename = normalizedPath.split("/").pop() || normalizedPath;
 
   if (
@@ -47,19 +56,13 @@ function isGeneratedConfigFile(path: string, content: string) {
 }
 
 function isPreviewRuntimeFile(path: string, content: string) {
-  const normalizedPath = normalizePreviewPath(
-    inferPathFromContent(path, content),
-  ).toLowerCase();
+  const normalizedPath = normalizePreviewPath(inferPathFromContent(path, content)).toLowerCase();
   const filename = normalizedPath.split("/").pop() || normalizedPath;
 
   if (isGeneratedConfigFile(path, content)) return false;
-  if (normalizedPath.includes("/api/")) return false;
-  if (normalizedPath.startsWith("api/")) return false;
-  if (normalizedPath.startsWith("prisma/")) return false;
-  if (normalizedPath.endsWith(".prisma")) return false;
-  if (normalizedPath.endsWith(".md") || normalizedPath.endsWith(".mdx")) {
-    return false;
-  }
+  if (normalizedPath.includes("/api/") || normalizedPath.startsWith("api/")) return false;
+  if (normalizedPath.startsWith("prisma/") || normalizedPath.endsWith(".prisma")) return false;
+  if (normalizedPath.endsWith(".md") || normalizedPath.endsWith(".mdx")) return false;
 
   if (
     filename === "package.json" ||
@@ -81,15 +84,14 @@ function sanitizePreviewContent(content: string) {
     .replace(/plugins\s*:\s*\[[^\]]*tailwindcss-animate[^\]]*\]\s*,?/g, "")
     .replace(/plugins\s*:\s*\[\s*animate\s*\]\s*,?/g, "")
     .replace(/require\(["']tailwindcss-animate["']\)/g, "undefined")
+    .replace(/^import\s+[^;]*from\s+["']next\/font\/google["'];?\n?/gm, "")
     .replace(/from\s+["']next\/navigation["']/g, 'from "@/lib/next-navigation"')
     .replace(/from\s+["']next\/link["']/g, 'from "@/lib/next-link"')
     .replace(/from\s+["']next\/image["']/g, 'from "@/lib/next-image"');
 }
 
 function isLikelyRenderableReactFile(path: string, content: string) {
-  const normalizedPath = normalizePreviewPath(
-    inferPathFromContent(path, content),
-  ).toLowerCase();
+  const normalizedPath = normalizePreviewPath(inferPathFromContent(path, content)).toLowerCase();
 
   if (!/\.(tsx|jsx)$/.test(normalizedPath)) return false;
   if (isGeneratedConfigFile(path, content)) return false;
@@ -102,11 +104,14 @@ function isLikelyRenderableReactFile(path: string, content: string) {
   );
 }
 
+function toImportPath(path: string) {
+  return `./${normalizePreviewPath(path).replace(/\.(tsx|jsx|ts|js|css)$/, "")}`;
+}
+
 export function getSandpackConfig(
   inputFiles: Array<{ path: string; content?: string; code?: string }>,
   extraDependencies: Record<string, string> = {},
 ) {
-  // Defensive normalization: accept both { content } and legacy { code } shapes.
   const files: Array<{ path: string; content: string }> = (inputFiles || [])
     .filter((f) => f && typeof f.path === "string")
     .map((f) => ({
@@ -122,7 +127,6 @@ export function getSandpackConfig(
   const sandpackFiles: Record<string, string> = { ...shadcnFiles };
   const previewUserFiles: Array<{ path: string; content: string }> = [];
 
-  // Add tsconfig
   sandpackFiles["/tsconfig.json"] = `{
     "include": [
       "./**/*"
@@ -130,11 +134,15 @@ export function getSandpackConfig(
     "compilerOptions": {
       "strict": true,
       "esModuleInterop": true,
-      "lib": [ "dom", "es2015" ],
+      "allowSyntheticDefaultImports": true,
+      "moduleResolution": "bundler",
+      "lib": [ "dom", "dom.iterable", "es2015", "es2020" ],
       "jsx": "react-jsx",
       "baseUrl": "./",
       "paths": {
+        "@/app/*": ["app/*"],
         "@/components/*": ["components/*"],
+        "@/hooks/*": ["hooks/*"],
         "@/lib/*": ["lib/*"],
         "@/utils/*": ["utils/*"],
         "@/types/*": ["types/*"]
@@ -142,36 +150,33 @@ export function getSandpackConfig(
     }
   }`;
 
-  // Add user files
   for (const file of files) {
     if (!isPreviewRuntimeFile(file.path, file.content)) continue;
 
-    const normalizedPath = normalizePreviewPath(
-      inferPathFromContent(file.path, file.content),
-    );
+    const normalizedPath = normalizePreviewPath(inferPathFromContent(file.path, file.content));
     const sanitizedContent = sanitizePreviewContent(file.content);
 
     sandpackFiles[normalizedPath] = sanitizedContent;
     previewUserFiles.push({ path: normalizedPath, content: sanitizedContent });
   }
 
-  // Ensure App.tsx is the entry point, or if not present, create one that imports the first file
   if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
     const mainFile =
       previewUserFiles.find((f) => f.path === "app/page.tsx") ||
       previewUserFiles.find((f) => f.path === "pages/index.tsx") ||
       previewUserFiles.find((f) => f.path.endsWith("/App.tsx")) ||
-      previewUserFiles.find((f) =>
-        isLikelyRenderableReactFile(f.path, f.content),
-      );
+      previewUserFiles.find((f) => f.path === "App.tsx") ||
+      previewUserFiles.find((f) => isLikelyRenderableReactFile(f.path, f.content));
 
     if (mainFile) {
-      // Normalize the path for import
-      let importPath = normalizePreviewPath(mainFile.path);
-      importPath = importPath.replace(/\.(tsx|jsx)$/, "");
+      const cssImports = previewUserFiles
+        .filter((f) => f.path.endsWith(".css"))
+        .map((f) => `import './${f.path}';`)
+        .join("\n");
 
       sandpackFiles["App.tsx"] = `import React from 'react';
-import MainComponent from './${importPath}';
+${cssImports}
+import MainComponent from '${toImportPath(mainFile.path)}';
 
 export default function App() {
   return <MainComponent />;
@@ -192,6 +197,55 @@ export default function App() {
     },
   };
 }
+
+const scrollAreaComponent = `import * as React from "react"
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
+import { cn } from "@/lib/utils"
+
+const ScrollArea = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <ScrollAreaPrimitive.Root {...props}>
+    <ScrollAreaPrimitive.Viewport ref={ref} className={cn("h-full w-full rounded-[inherit]", className)}>
+      {children}
+    </ScrollAreaPrimitive.Viewport>
+    <ScrollBar />
+    <ScrollAreaPrimitive.Corner />
+  </ScrollAreaPrimitive.Root>
+))
+ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
+
+const ScrollBar = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
+>(({ className, orientation = "vertical", ...props }, ref) => (
+  <ScrollAreaPrimitive.ScrollAreaScrollbar
+    ref={ref}
+    orientation={orientation}
+    className={cn(
+      "flex touch-none select-none transition-colors",
+      orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent p-[1px]",
+      orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-[1px]",
+      className
+    )}
+    {...props}
+  >
+    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+  </ScrollAreaPrimitive.ScrollAreaScrollbar>
+))
+ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+
+export { ScrollArea, ScrollBar }
+`;
+
+const aspectRatioComponent = `import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
+const AspectRatio = AspectRatioPrimitive.Root
+export { AspectRatio }
+`;
+
+const sonnerComponent = `export { Toaster, toast } from "sonner"
+`;
 
 const shadcnFiles = {
   "/lib/utils.ts": shadcnComponents.utils,
@@ -244,6 +298,7 @@ const shadcnFiles = {
   "/components/ui/accordion.tsx": shadcnComponents.accordian,
   "/components/ui/alert-dialog.tsx": shadcnComponents.alertDialog,
   "/components/ui/alert.tsx": shadcnComponents.alert,
+  "/components/ui/aspect-ratio.tsx": aspectRatioComponent,
   "/components/ui/avatar.tsx": shadcnComponents.avatar,
   "/components/ui/badge.tsx": shadcnComponents.badge,
   "/components/ui/breadcrumb.tsx": shadcnComponents.breadcrumb,
@@ -264,10 +319,12 @@ const shadcnFiles = {
   "/components/ui/popover.tsx": shadcnComponents.popover,
   "/components/ui/progress.tsx": shadcnComponents.progress,
   "/components/ui/radio-group.tsx": shadcnComponents.radioGroup,
+  "/components/ui/scroll-area.tsx": scrollAreaComponent,
   "/components/ui/select.tsx": shadcnComponents.select,
   "/components/ui/separator.tsx": shadcnComponents.separator,
   "/components/ui/skeleton.tsx": shadcnComponents.skeleton,
   "/components/ui/slider.tsx": shadcnComponents.slider,
+  "/components/ui/sonner.tsx": sonnerComponent,
   "/components/ui/switch.tsx": shadcnComponents.switchComponent,
   "/components/ui/table.tsx": shadcnComponents.table,
   "/components/ui/tabs.tsx": shadcnComponents.tabs,
@@ -278,6 +335,7 @@ const shadcnFiles = {
   "/components/ui/toggle.tsx": shadcnComponents.toggle,
   "/components/ui/tooltip.tsx": shadcnComponents.tooltip,
   "/components/ui/use-toast.tsx": shadcnComponents.useToast,
+  "/hooks/use-toast.ts": shadcnComponents.useToast,
   "/components/ui/index.tsx": `
   export * from "./button"
   export * from "./card"
@@ -287,6 +345,9 @@ const shadcnFiles = {
   export * from "./textarea"
   export * from "./avatar"
   export * from "./radio-group"
+  export * from "./scroll-area"
+  export * from "./separator"
+  export * from "./tabs"
   `,
   "/public/index.html": `<!DOCTYPE html>
   <html lang="en">
@@ -322,6 +383,7 @@ const dependencies = {
   "@radix-ui/react-popover": "^1.1.1",
   "@radix-ui/react-progress": "^1.1.0",
   "@radix-ui/react-radio-group": "^1.2.0",
+  "@radix-ui/react-scroll-area": "^1.2.0",
   "@radix-ui/react-select": "^2.1.1",
   "@radix-ui/react-separator": "^1.1.0",
   "@radix-ui/react-slider": "^1.2.0",
@@ -332,12 +394,21 @@ const dependencies = {
   "@radix-ui/react-toggle": "^1.1.0",
   "@radix-ui/react-toggle-group": "^1.1.0",
   "@radix-ui/react-tooltip": "^1.1.2",
+  "@radix-ui/react-visually-hidden": "^1.1.0",
+  "@hookform/resolvers": "latest",
   "class-variance-authority": "^0.7.0",
   clsx: "^2.1.1",
+  cmdk: "latest",
   "date-fns": "^3.6.0",
   "embla-carousel-react": "^8.1.8",
-  "react-day-picker": "^8.10.1",
-  "tailwind-merge": "^2.4.0",
   "framer-motion": "^11.15.0",
+  "next-themes": "latest",
+  "react-day-picker": "^8.10.1",
+  "react-hook-form": "latest",
+  "react-resizable-panels": "latest",
+  sonner: "latest",
+  "tailwind-merge": "^2.4.0",
   vaul: "^0.9.1",
+  zod: "^3.24.1",
+  zustand: "latest",
 };
