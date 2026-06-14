@@ -1,170 +1,150 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { FileExplorer, type FileNode } from './file-explorer'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Copy, Download } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Check, Copy, Download, Save } from 'lucide-react'
+import type { ArtifactFile } from '@/lib/artifact-analysis'
+import { patchFileContent } from '@/lib/artifact-analysis'
+import { createMessage } from '@/app/(main)/actions'
 
 interface ModeCodeProps {
   chatId: string
-  files?: FileNode[]
-  onFileSelect?: (path: string) => void
-  selectedPath?: string
+  files?: ArtifactFile[]
 }
 
-// Mock data for demo
-const defaultFiles: FileNode[] = [
-  {
-    id: '1',
-    name: 'src',
-    type: 'folder',
-    path: '/src',
-    children: [
-      {
-        id: '1.1',
-        name: 'app.tsx',
-        type: 'file',
-        path: '/src/app.tsx',
-      },
-      {
-        id: '1.2',
-        name: 'components',
-        type: 'folder',
-        path: '/src/components',
-        children: [
-          {
-            id: '1.2.1',
-            name: 'Button.tsx',
-            type: 'file',
-            path: '/src/components/Button.tsx',
-          },
-          {
-            id: '1.2.2',
-            name: 'Card.tsx',
-            type: 'file',
-            path: '/src/components/Card.tsx',
-          },
-        ],
-      },
-      {
-        id: '1.3',
-        name: 'styles',
-        type: 'folder',
-        path: '/src/styles',
-        children: [
-          {
-            id: '1.3.1',
-            name: 'globals.css',
-            type: 'file',
-            path: '/src/styles/globals.css',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2',
-    name: 'package.json',
-    type: 'file',
-    path: '/package.json',
-  },
-  {
-    id: '3',
-    name: 'README.md',
-    type: 'file',
-    path: '/README.md',
-  },
-]
+function toTree(files: ArtifactFile[]): FileNode[] {
+  const root: FileNode[] = []
+  const folderMap = new Map<string, FileNode>()
 
-const sampleCode = `'use client'
+  files.forEach((file) => {
+    const parts = file.path.replace(/^\/+/, '').split('/')
+    let current = root
+    let currentPath = ''
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+    parts.forEach((part, index) => {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      const isFile = index === parts.length - 1
 
-export default function App() {
-  const [count, setCount] = useState(0)
+      if (isFile) {
+        current.push({ id: file.path, name: part, type: 'file', path: file.path })
+        return
+      }
 
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-8">Hello World</h1>
-        <p className="text-lg text-muted-foreground mb-8">
-          Count: {count}
-        </p>
-        <Button onClick={() => setCount(count + 1)} size="lg">
-          Increment
-        </Button>
+      let folder = folderMap.get(currentPath)
+      if (!folder) {
+        folder = { id: currentPath, name: part, type: 'folder', path: currentPath, children: [] }
+        folderMap.set(currentPath, folder)
+        current.push(folder)
+      }
+      current = folder.children || []
+    })
+  })
+
+  return root
+}
+
+export function ModeCode({ chatId, files = [] }: ModeCodeProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [workspaceFiles, setWorkspaceFiles] = useState(files)
+  const [selectedFile, setSelectedFile] = useState(files[0]?.path || '')
+  const [copied, setCopied] = useState(false)
+  const [dirty, setDirty] = useState(false)
+
+  const tree = useMemo(() => toTree(workspaceFiles), [workspaceFiles])
+  const activeFile = workspaceFiles.find((file) => file.path === selectedFile) || workspaceFiles[0]
+
+  const updateActiveFile = (nextCode: string) => {
+    if (!activeFile) return
+    setWorkspaceFiles((current) => patchFileContent(current, activeFile.path, nextCode))
+    setDirty(true)
+  }
+
+  const saveFiles = () => {
+    if (!workspaceFiles.length) return
+    startTransition(async () => {
+      const content =
+        'Code edit saved from the artifact workspace.\n\n' +
+        workspaceFiles
+          .map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``)
+          .join('\n\n')
+      await createMessage(chatId, content, 'assistant', workspaceFiles)
+      setDirty(false)
+      router.refresh()
+    })
+  }
+
+  const downloadArtifact = () => {
+    const blob = new Blob([JSON.stringify(workspaceFiles, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'artifact-files.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  if (!workspaceFiles.length) {
+    return (
+      <div className="flex h-full items-center justify-center bg-background p-6 text-center">
+        <div className="max-w-sm space-y-2">
+          <p className="text-sm font-medium">No artifact files yet</p>
+          <p className="text-sm text-muted-foreground">Generate an app from the home prompt first, then Code mode will bind to those files.</p>
+        </div>
       </div>
-    </div>
-  )
-}`
-
-export function ModeCode({
-  chatId,
-  files = defaultFiles,
-  onFileSelect,
-  selectedPath = '/src/app.tsx',
-}: ModeCodeProps) {
-  const [selectedFile, setSelectedFile] = useState(selectedPath)
-  const [code, setCode] = useState(sampleCode)
-
-  const handleSelectFile = (path: string) => {
-    setSelectedFile(path)
-    onFileSelect?.(path)
+    )
   }
 
   return (
-    <div className="w-full h-full flex bg-background overflow-hidden">
-      {/* File Explorer */}
-      <FileExplorer
-        files={files}
-        onSelectFile={handleSelectFile}
-        selectedPath={selectedFile}
-      />
+    <div className="flex h-full w-full overflow-hidden bg-background">
+      <FileExplorer files={tree} onSelectFile={(path) => setSelectedFile(path)} selectedPath={activeFile?.path} />
 
-      {/* Code Editor Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* File Header */}
-        <div className="h-10 border-b border-border bg-card px-4 flex items-center justify-between">
-          <span className="text-sm font-mono text-muted-foreground">{selectedFile}</span>
-          <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-3">
+          <span className="truncate font-mono text-xs text-muted-foreground">{activeFile?.path}</span>
+          <div className="flex items-center gap-1">
+            {dirty && <span className="hidden text-[11px] text-muted-foreground sm:inline">Unsaved</span>}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigator.clipboard.writeText(code)}
-              className="h-7"
+              className="h-8 w-8 p-0"
+              onClick={async () => {
+                if (!activeFile) return
+                await navigator.clipboard.writeText(activeFile.code)
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1200)
+              }}
+              aria-label="Copy file code"
             >
-              <Copy className="w-4 h-4" />
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="sm" className="h-7">
-              <Download className="w-4 h-4" />
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={downloadArtifact} aria-label="Download artifact files">
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button size="sm" className="h-8" onClick={saveFiles} disabled={!dirty || isPending} aria-label="Save code changes">
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              Save
             </Button>
           </div>
         </div>
 
-        {/* Code Editor */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <ScrollArea className="flex-1">
-            <div className="p-4 font-mono text-sm bg-card">
-              <div className="text-muted-foreground select-none">
-                {code.split('\n').map((line, i) => (
-                  <div key={i} className="flex">
-                    <span className="w-12 text-right pr-4 text-xs opacity-50">
-                      {i + 1}
-                    </span>
-                    <span className="flex-1">{line || '\n'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ScrollArea>
-        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <Textarea
+            value={activeFile?.code || ''}
+            onChange={(event) => updateActiveFile(event.target.value)}
+            className="min-h-[calc(100dvh-7rem)] resize-none rounded-none border-0 bg-background p-4 font-mono text-sm shadow-none focus-visible:ring-0"
+            spellCheck={false}
+            aria-label={`Editing ${activeFile?.path}`}
+          />
+        </ScrollArea>
 
-        {/* Status Bar */}
-        <div className="h-7 border-t border-border bg-muted px-4 flex items-center justify-between text-xs text-muted-foreground">
-          <span>{code.split('\n').length} lines</span>
-          <span>UTF-8 • JavaScript • CRLF</span>
+        <div className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-card px-3 text-[11px] text-muted-foreground">
+          <span>{workspaceFiles.length} files</span>
+          <span>{activeFile?.code.split('\n').length || 0} lines</span>
         </div>
       </div>
     </div>
