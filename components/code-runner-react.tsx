@@ -44,7 +44,7 @@ export default function ReactCodeRunner({
   files: Array<{ path: string; content: string }>;
   extraDependencies?: Record<string, string>;
   onRequestFix?: (e: string) => void;
-  onPreviewError?: () => void;
+  onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
