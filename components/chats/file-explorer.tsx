@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import { useState } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,7 @@ export interface FileNode {
 
 interface FileExplorerProps {
   files: FileNode[]
-  onSelectFile?: (path: string, content: string) => void
+  onSelectFile?: (path: string, content?: string) => void
   onCreateFile?: (path: string) => void
   onDeleteFile?: (path: string) => void
   selectedPath?: string
@@ -30,7 +30,7 @@ function FileTreeNode({
 }: {
   node: FileNode
   level?: number
-  onSelect?: (path: string) => void
+  onSelect?: (path: string, content?: string) => void
   selectedPath?: string
   onDelete?: (path: string) => void
 }) {
