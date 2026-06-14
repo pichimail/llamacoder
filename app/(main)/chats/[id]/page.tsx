@@ -4,7 +4,7 @@ import { cache } from "react";
 import PageClient from "./page.client";
 import { EnhancedPage } from "@/components/chats/enhanced-page";
 import { Metadata } from "next";
-import { getLatestArtifactFiles } from "@/lib/artifact-analysis";
+import { getLatestArtifactFiles, normalizeArtifactFiles } from "@/lib/artifact-analysis";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -47,13 +47,18 @@ export default async function Page({
   if (!chat) notFound();
 
   const artifactFiles = getLatestArtifactFiles(chat.messages);
+  const latestArtifactMessage = [...chat.messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && normalizeArtifactFiles(message.files).length > 0);
 
   return (
     <EnhancedPage
       chatId={id}
       chatTitle={chat.title}
+      chatPrompt={chat.prompt}
       chatModel={chat.model}
       artifactFiles={artifactFiles}
+      latestMessageId={latestArtifactMessage?.id}
     >
       <PageClient chat={chat} />
     </EnhancedPage>
