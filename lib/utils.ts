@@ -149,7 +149,10 @@ export function extractFirstCodeBlock(input: string) {
     let language: string | null = null;
     let filename: { name: string; extension: string } | null = null;
 
-    const parsed = parseFenceTag(fenceTag, extractPathHintFromText(input.slice(0, match.index)));
+    const parsed = parseFenceTag(
+      fenceTag,
+      extractPathHintFromText(input.slice(0, match.index ?? 0)),
+    );
     language = parsed.language;
     filename = parseFileName(parsed.path.split("/").pop() || parsed.path);
 
@@ -387,7 +390,7 @@ export function getLanguageOfFile(filePath: string): string {
     jsx: "javascript",
     py: "python",
     html: "html",
-    css: "html",
+    css: "css",
     json: "json",
     md: "markdown",
     sql: "sql",
