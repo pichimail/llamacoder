@@ -10,12 +10,11 @@ import {
   CopyIcon,
   Monitor,
   Smartphone,
-  TabletSmartphone,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSandpackConfig } from "@/lib/sandpack-config";
 
-export type PreviewMode = "web" | "tab" | "mobile";
+export type PreviewMode = "web" | "mobile";
 
 const previewModes: Array<{
   value: PreviewMode;
@@ -24,12 +23,6 @@ const previewModes: Array<{
   viewportWidth: string;
 }> = [
   { value: "web", label: "Web", icon: Monitor, viewportWidth: "100%" },
-  {
-    value: "tab",
-    label: "Tab",
-    icon: TabletSmartphone,
-    viewportWidth: "min(100%, 1024px)",
-  },
   {
     value: "mobile",
     label: "Mobile",
@@ -46,14 +39,16 @@ export default function ReactCodeRunner({
   onPreviewReady,
   previewMode,
   onPreviewModeChange,
+  showDeviceToggle = true,
 }: {
   files: Array<{ path: string; content: string }>;
   extraDependencies?: Record<string, string>;
   onRequestFix?: (e: string) => void;
-  onPreviewError?: (e: string) => void;
+  onPreviewError?: () => void;
   onPreviewReady?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
+  showDeviceToggle?: boolean;
 }) {
   const filesKey =
     files.map((f) => f.path + f.content).join("") +
@@ -88,10 +83,12 @@ export default function ReactCodeRunner({
         showRestartButton={false}
         showOpenNewtab={false}
         actionsChildren={
-          <PreviewModeSwitcher
-            activeMode={activePreviewMode}
-            onChange={handlePreviewModeChange}
-          />
+          showDeviceToggle ? (
+            <PreviewModeSwitcher
+              activeMode={activePreviewMode}
+              onChange={handlePreviewModeChange}
+            />
+          ) : undefined
         }
         className="h-full w-full"
       />
