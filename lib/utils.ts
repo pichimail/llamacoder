@@ -1,57 +1,198 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-// Helper function to parse fence tag for language and path
-function parseFenceTag(tag: string): { language: string; path: string } {
-  const raw = tag || "";
-  const langMatch = raw.match(/^([A-Za-z0-9]+)/);
-  const language = langMatch ? langMatch[1] : "text";
-  const pathMatch = raw.match(/(?:\{\s*)?path\s*=\s*([^}\s]+)(?:\s*\})?/);
-  const filenameMatch = raw.match(
-    /(?:\{\s*)?filename\s*=\s*([^}\s]+)(?:\s*\})?/,
+const FILE_PATH_EXTENSIONS = "tsx|ts|jsx|js|css|json|mjs|cjs|md|mdx|prisma";
+const GENERATED_FILE_RE = /^file\.(?:txt|tsx|ts|jsx|js|css|json|md)$/i;
+
+function cleanGeneratedPath(rawPath: string | undefined | null): string | null {
+  if (!rawPath) return null;
+
+  let path = rawPath
+    .trim()
+    .replace(/^[`'"<({\[]+/, "")
+    .replace(/[`'">)},;:\]]+$/g, "")
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "");
+
+  if (path.startsWith("src/")) path = path.slice(4);
+  if (!path || path.includes("..") || /^https?:\/\//i.test(path)) return null;
+  if (!new RegExp(`\\.(?:${FILE_PATH_EXTENSIONS})$`, "i").test(path)) return null;
+
+  return path;
+}
+
+function extractPathFromLine(line: string): string | null {
+  const trimmed = line
+    .trim()
+    .replace(/^[>\s*\-•]+/, "")
+    .replace(/^(?:path|file|filename|route)\s*[:=\-]\s*/i, "")
+    .trim();
+
+  if (!trimmed || trimmed.length > 180) return null;
+
+  const quoted = trimmed.match(
+    new RegExp("[`'\"]([^`'\"]+\\.(?:" + FILE_PATH_EXTENSIONS + "))[`'\"]", "i"),
   );
-  const path = pathMatch
-    ? pathMatch[1]
-    : filenameMatch
-      ? filenameMatch[1]
-      : `file.${getExtensionForLanguage(language)}`;
-  return { language, path };
+  if (quoted) return cleanGeneratedPath(quoted[1]);
+
+  const direct = trimmed.match(
+    new RegExp(
+      "(^|\\s)(\\/?(?:app|pages|components|lib|hooks|styles|public|utils|types|data|store|server|api|prisma|config|scripts)\\/[A-Za-z0-9_@./()[\\]-]+\\.(?:" +
+        FILE_PATH_EXTENSIONS +
+        ")|\\/?[A-Za-z0-9_@()[\\]-]+\\/[A-Za-z0-9_@./()[\\]-]+\\.(?:" +
+        FILE_PATH_EXTENSIONS +
+        ")|[A-Za-z0-9_@()[\\]-]+\\.(?:" +
+        FILE_PATH_EXTENSIONS +
+        "))($|\\s)",
+      "i",
+    ),
+  );
+
+  const candidate = cleanGeneratedPath(direct?.[2]);
+  if (!candidate || GENERATED_FILE_RE.test(candidate)) return null;
+
+  return candidate;
+}
+
+function extractPathHintFromText(text: string): string | null {
+  const lines = text.split("\n").slice(-8).reverse();
+  for (const line of lines) {
+    const path = extractPathFromLine(line);
+    if (path) return path;
+  }
+  return null;
+}
+
+function consumeTrailingPathHint(lines: string[]): { path: string | null; lines: string[] } {
+  const nextLines = [...lines];
+
+  for (let i = nextLines.length - 1; i >= Math.max(0, nextLines.length - 8); i--) {
+    const path = extractPathFromLine(nextLines[i] ?? "");
+    if (!path) continue;
+
+    const withoutLabel = (nextLines[i] ?? "")
+      .trim()
+      .replace(/^[>\s*\-•]+/, "")
+      .replace(/^(?:path|file|filename|route)\s*[:=\-]\s*/i, "")
+      .trim();
+
+    const isPathOnly = withoutLabel.includes(path) && withoutLabel.length <= path.length + 8;
+    if (isPathOnly) {
+      nextLines.splice(i, 1);
+      while (nextLines.length && nextLines[nextLines.length - 1].trim() === "") {
+        nextLines.pop();
+      }
+    }
+
+    return { path, lines: nextLines };
+  }
+
+  return { path: null, lines };
+}
+
+function inferLanguageFromPath(path: string | null, fallbackLanguage: string): string {
+  if (!path) return fallbackLanguage;
+  const ext = path.split(".").pop()?.toLowerCase();
+  const map: Record<string, string> = {
+    js: "javascript",
+    jsx: "jsx",
+    ts: "ts",
+    tsx: "tsx",
+    css: "css",
+    json: "json",
+    md: "markdown",
+    mdx: "mdx",
+    prisma: "prisma",
+    mjs: "javascript",
+    cjs: "javascript",
+  };
+  return map[ext || ""] || fallbackLanguage;
+}
+
+// Helper function to parse fence tag for language and path.
+// Supports ```tsx{path=app/page.tsx}, ```tsx path="app/page.tsx",
+// ```app/page.tsx, and path labels written immediately above the fence.
+function parseFenceTag(
+  tag: string,
+  fallbackPath?: string | null,
+): { language: string; path: string } {
+  const raw = tag || "";
+  const langMatch = raw.trim().match(/^([A-Za-z0-9]+)/);
+  const explicitPathMatch = raw.match(
+    /(?:path|file|filename)\s*=\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`|([^}\s]+))/i,
+  );
+  const explicitPath = cleanGeneratedPath(
+    explicitPathMatch?.[1] ||
+      explicitPathMatch?.[2] ||
+      explicitPathMatch?.[3] ||
+      explicitPathMatch?.[4],
+  );
+  const directPath = extractPathFromLine(raw);
+  const path = explicitPath || directPath || cleanGeneratedPath(fallbackPath) || null;
+  const rawLanguage = langMatch && !langMatch[1].includes("/") ? langMatch[1] : "text";
+  const language = inferLanguageFromPath(path, rawLanguage);
+
+  return {
+    language,
+    path: path || `file.${getExtensionForLanguage(language)}`,
+  };
 }
 
 export function extractFirstCodeBlock(input: string) {
-  // 1) We use a more general pattern for the code fence:
-  //    - ^```([^\n]*) captures everything after the triple backticks up to the newline.
-  //    - ([\s\S]*?) captures the *body* of the code block (non-greedy).
-  //    - Then we look for a closing backticks on its own line (\n```).
-  // The 'm' (multiline) flag isn't strictly necessary here, but can help if input is multiline.
-  // The '([\s\S]*?)' is a common trick to match across multiple lines non-greedily.
   const match = input.match(/```([^\n]*)\n([\s\S]*?)\n```/);
 
   if (match) {
-    const fenceTag = match[1] || ""; // e.g. "tsx{filename=Calculator.tsx}"
-    const code = match[2]; // The actual code block content
-    const fullMatch = match[0]; // Entire matched string including backticks
+    const fenceTag = match[1] || "";
+    const code = match[2];
+    const fullMatch = match[0];
 
-    // We'll parse the fenceTag to extract optional language and filename
     let language: string | null = null;
     let filename: { name: string; extension: string } | null = null;
 
-    // Attempt to parse out the language, which we assume is the leading alphanumeric part
-    // Example: fenceTag = "tsx{filename=Calculator.tsx}"
-    const langMatch = fenceTag.match(/^([A-Za-z0-9]+)/);
-    if (langMatch) {
-      language = langMatch[1];
-    }
-
-    // Attempt to parse out a filename from braces, e.g. {filename=Calculator.tsx}
-    const fileMatch = fenceTag.match(/{\s*filename\s*=\s*([^}]+)\s*}/);
-    if (fileMatch) {
-      filename = parseFileName(fileMatch[1]);
-    }
+    const parsed = parseFenceTag(fenceTag, extractPathHintFromText(input.slice(0, match.index)));
+    language = parsed.language;
+    filename = parseFileName(parsed.path.split("/").pop() || parsed.path);
 
     return { code, language, filename, fullMatch };
   }
-  return null; // No code block found
+  return null;
+}
+
+function uniquifyPath(path: string, existingPaths: Set<string>): string {
+  if (!existingPaths.has(path)) return path;
+
+  const dot = path.lastIndexOf(".");
+  const base = dot === -1 ? path : path.slice(0, dot);
+  const ext = dot === -1 ? "" : path.slice(dot);
+  let index = 2;
+  let next = `${base}-${index}${ext}`;
+
+  while (existingPaths.has(next)) {
+    index += 1;
+    next = `${base}-${index}${ext}`;
+  }
+
+  return next;
+}
+
+function finalizeGeneratedPath(
+  path: string,
+  language: string,
+  code: string,
+  existingPaths: Set<string>,
+): string {
+  let finalPath = path;
+
+  if (GENERATED_FILE_RE.test(finalPath)) {
+    const filename = generateIntelligentFilename(code, language);
+    finalPath = `${filename.name}.${filename.extension}`;
+  }
+
+  finalPath = cleanGeneratedPath(finalPath) || `file.${getExtensionForLanguage(language)}`;
+  finalPath = uniquifyPath(finalPath, existingPaths);
+  existingPaths.add(finalPath);
+
+  return finalPath;
 }
 
 export function extractAllCodeBlocks(input: string): Array<{
@@ -67,27 +208,28 @@ export function extractAllCodeBlocks(input: string): Array<{
     path: string;
     fullMatch: string;
   }> = [];
+  const existingPaths = new Set<string>();
 
   let match;
+  let lastIndex = 0;
   while ((match = codeBlockRegex.exec(input)) !== null) {
-    const fenceTag = match[1] || ""; // e.g. "tsx{path=src/App.tsx}"
-    const code = match[2]; // The actual code block content
-    const fullMatch = match[0]; // Entire matched string including backticks
+    const fenceTag = match[1] || "";
+    const code = match[2];
+    const fullMatch = match[0];
+    const pathHint = extractPathHintFromText(input.slice(lastIndex, match.index));
+    const { language, path } = parseFenceTag(fenceTag, pathHint);
+    const finalPath = finalizeGeneratedPath(path, language, code, existingPaths);
 
-    // Parse language and path
-    const { language, path } = parseFenceTag(fenceTag);
-
-    files.push({ code, language, path, fullMatch });
+    files.push({ code, language, path: finalPath, fullMatch });
+    lastIndex = match.index + fullMatch.length;
   }
 
   return files;
 }
 
 function parseFileName(fileName: string): { name: string; extension: string } {
-  // Split the string at the last dot
   const lastDotIndex = fileName.lastIndexOf(".");
   if (lastDotIndex === -1) {
-    // No dot found
     return { name: fileName, extension: "" };
   }
   return {
@@ -96,9 +238,9 @@ function parseFileName(fileName: string): { name: string; extension: string } {
   };
 }
 
-// New: Parse an assistant reply into ordered text and file segments.
+// Parse an assistant reply into ordered text and file segments.
 // Supports multiple files per reply and interleaved text. Streaming-safe: returns
-// a partial file segment if the closing fence hasn't arrived yet.
+// a partial file segment if the closing fence has not arrived yet.
 export type ReplySegment =
   | { type: "text"; content: string }
   | {
@@ -112,11 +254,19 @@ export type ReplySegment =
 export function parseReplySegments(markdown: string): ReplySegment[] {
   const segments: ReplySegment[] = [];
   const lines = markdown.split("\n");
-  const fenceRegex = /^```([^\n]*)$/; // opening or closing fence line
+  const fenceRegex = /^```([^\n]*)$/;
 
   let textBuffer: string[] = [];
   let codeBuffer: string[] = [];
-  let openTag: string | null = null; // e.g. tsx{path=src/App.tsx}
+  let openTag: string | null = null;
+  let openPathHint: string | null = null;
+
+  const existingPaths = () =>
+    new Set(
+      segments
+        .filter((segment): segment is Extract<ReplySegment, { type: "file" }> => segment.type === "file")
+        .map((segment) => segment.path),
+    );
 
   const flushText = () => {
     if (textBuffer.length > 0) {
@@ -125,26 +275,27 @@ export function parseReplySegments(markdown: string): ReplySegment[] {
     }
   };
 
-  const parseTag = parseFenceTag;
-
   for (const line of lines) {
     const match = line.match(fenceRegex);
     if (match && !openTag) {
-      // Opening fence
+      const consumed = consumeTrailingPathHint(textBuffer);
+      textBuffer = consumed.lines;
+      openPathHint = consumed.path;
       openTag = match[1] || "";
       flushText();
       codeBuffer = [];
     } else if (match && openTag) {
-      // Closing fence
-      const { language, path } = parseTag(openTag);
+      const { language, path } = parseFenceTag(openTag, openPathHint);
+      const code = codeBuffer.join("\n");
       segments.push({
         type: "file",
-        code: codeBuffer.join("\n"),
+        code,
         language,
-        path,
+        path: finalizeGeneratedPath(path, language, code, existingPaths()),
         isPartial: false,
       });
       openTag = null;
+      openPathHint = null;
       codeBuffer = [];
     } else if (openTag) {
       codeBuffer.push(line);
@@ -153,14 +304,14 @@ export function parseReplySegments(markdown: string): ReplySegment[] {
     }
   }
 
-  // If a code fence remains open, emit a partial file segment
   if (openTag) {
-    const { language, path } = parseTag(openTag);
+    const { language, path } = parseFenceTag(openTag, openPathHint);
+    const code = codeBuffer.join("\n");
     segments.push({
       type: "file",
-      code: codeBuffer.join("\n"),
+      code,
       language,
-      path,
+      path: finalizeGeneratedPath(path, language, code, existingPaths()),
       isPartial: true,
     });
   } else {
@@ -172,12 +323,14 @@ export function parseReplySegments(markdown: string): ReplySegment[] {
   );
 }
 
-// Enhanced filename generation for when models don't provide filenames
+// Enhanced filename generation for when models do not provide filenames.
 export function generateIntelligentFilename(
   content: string,
   language: string,
 ): { name: string; extension: string } {
-  // Try to extract filename from common patterns in the content
+  const pathFromFirstLine = extractPathFromLine((content ?? "").split("\n", 1)[0] || "");
+  if (pathFromFirstLine) return parseFileName(pathFromFirstLine.split("/").pop() || pathFromFirstLine);
+
   const patterns = [
     /export\s+default\s+(?:function\s+)?(\w+)/i,
     /function\s+(\w+)\s*\(/i,
@@ -190,13 +343,11 @@ export function generateIntelligentFilename(
     const match = content.match(pattern);
     if (match && match[1]) {
       const name = match[1];
-      // Convert to kebab-case
       const kebabName = name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
       return { name: kebabName, extension: getExtensionForLanguage(language) };
     }
   }
 
-  // Fallback to generic names based on language
   return { name: `component`, extension: getExtensionForLanguage(language) };
 }
 
@@ -215,7 +366,9 @@ export function getExtensionForLanguage(language: string): string {
     json: "json",
     markdown: "md",
     md: "md",
+    mdx: "mdx",
     sql: "sql",
+    prisma: "prisma",
     bash: "sh",
     sh: "sh",
     yaml: "yaml",
@@ -234,7 +387,7 @@ export function getLanguageOfFile(filePath: string): string {
     jsx: "javascript",
     py: "python",
     html: "html",
-    css: "css",
+    css: "html",
     json: "json",
     md: "markdown",
     sql: "sql",
@@ -274,10 +427,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function toTitleCase(rawName: string): string {
-  // Split on one or more hyphens or underscores
   const parts = rawName.split(/[-_]+/);
-
-  // Capitalize each part and join them back with spaces
   return parts
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
