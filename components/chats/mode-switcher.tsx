@@ -16,42 +16,52 @@ const modes: Array<{
   label: string
   icon: typeof Eye
   description: string
+  shortcut: string
 }> = [
   {
     id: 'preview',
     label: 'Preview',
     icon: Eye,
-    description: 'See your app in action',
+    description: 'See the current artifact live',
+    shortcut: 'Alt+1',
   },
   {
     id: 'code',
     label: 'Code',
     icon: Code,
-    description: 'Edit files and components',
+    description: 'Edit the current artifact files',
+    shortcut: 'Alt+2',
   },
   {
     id: 'design',
     label: 'Design',
     icon: Palette,
-    description: 'Customize theme and components',
+    description: 'Inspect and tune the current artifact',
+    shortcut: 'Alt+3',
   },
   {
     id: 'database',
     label: 'Database',
     icon: Database,
-    description: 'Inspect schema and relationships',
+    description: 'Inspect schema files from this artifact',
+    shortcut: 'Alt+4',
   },
 ]
 
 interface ModeSwitcherProps {
   currentMode: ChatMode
   onModeChange: (mode: ChatMode) => void
+  compact?: boolean
 }
 
-export function ModeSwitcher({ currentMode, onModeChange }: ModeSwitcherProps) {
+export function ModeSwitcher({ currentMode, onModeChange, compact }: ModeSwitcherProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-1">
+      <div
+        className="inline-flex max-w-full items-center gap-0.5 rounded-md border border-border bg-background p-0.5"
+        role="tablist"
+        aria-label="Workspace mode"
+      >
         {modes.map((mode) => {
           const Icon = mode.icon
           const isActive = currentMode === mode.id
@@ -60,15 +70,25 @@ export function ModeSwitcher({ currentMode, onModeChange }: ModeSwitcherProps) {
             <Tooltip key={mode.id}>
               <TooltipTrigger asChild>
                 <Button
-                  variant={isActive ? 'default' : 'ghost'}
+                  role="tab"
+                  aria-selected={isActive}
+                  variant={isActive ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => onModeChange(mode.id)}
-                  className="h-8 px-2"
+                  className={compact ? 'h-8 flex-1 px-2 text-xs' : 'h-8 px-2 text-xs'}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="h-4 w-4" />
+                  <span className={compact ? 'ml-1 hidden xs:inline' : 'ml-1.5 hidden lg:inline'}>
+                    {mode.label}
+                  </span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{mode.description}</TooltipContent>
+              <TooltipContent>
+                <div className="space-y-0.5">
+                  <p>{mode.description}</p>
+                  <p className="text-[10px] text-muted-foreground">{mode.shortcut}</p>
+                </div>
+              </TooltipContent>
             </Tooltip>
           )
         })}
