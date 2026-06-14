@@ -151,26 +151,33 @@ function PreviewStatusMonitor({
   const { sandpack, listen } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
 
-  // Report errors immediately
   useEffect(() => {
     if (sandpack.error) {
       onPreviewError?.(sandpack.error.message);
     }
   }, [sandpack.error, onPreviewError]);
 
-  // Report "ready" only after the bundler actually finishes without errors,
-  // debounced so a crash right after mount still counts as an error.
   useEffect(() => {
     let readyTimer: number | undefined;
 
     const unsubscribe = listen((message) => {
-      if (message.type === "done" && !(message as any).compilatonError) {
-        window.clearTimeout(readyTimer);
-        readyTimer = window.setTimeout(() => {
-          if (!sandpack.error) {
-            onPreviewReady?.();
-          }
-        }, 1200);
+      if (message.type === "done") {
+        const doneMessage = message as unknown as {
+          compilationError?: unknown;
+          compilatonError?: unknown;
+        };
+        const hasCompileError = Boolean(
+          doneMessage.compilationError || doneMessage.compilatonError,
+        );
+
+        if (!hasCompileError) {
+          window.clearTimeout(readyTimer);
+          readyTimer = window.setTimeout(() => {
+            if (!sandpack.error) {
+              onPreviewReady?.();
+            }
+          }, 1200);
+        }
       }
       if (message.type === "action" && (message as any).action === "show-error") {
         window.clearTimeout(readyTimer);
@@ -181,8 +188,7 @@ function PreviewStatusMonitor({
       window.clearTimeout(readyTimer);
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listen, onPreviewReady]);
+  }, [listen, onPreviewReady, sandpack.error]);
 
   if (!sandpack.error) return null;
 
