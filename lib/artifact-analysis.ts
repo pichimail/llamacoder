@@ -27,23 +27,30 @@ export type SchemaTable = {
 export function normalizeArtifactFiles(files: unknown): ArtifactFile[] {
   if (!Array.isArray(files)) return []
 
-  return files
-    .map((file) => {
-      if (!file || typeof file !== 'object') return null
-      const value = file as Record<string, unknown>
-      const path = typeof value.path === 'string' ? value.path : ''
-      const code =
-        typeof value.code === 'string'
-          ? value.code
-          : typeof value.content === 'string'
-            ? value.content
-            : ''
-      const language = typeof value.language === 'string' ? value.language : undefined
+  const normalized: ArtifactFile[] = []
 
-      if (!path || !code) return null
-      return { path: path.replace(/^\/+/, ''), code, language }
-    })
-    .filter((file): file is ArtifactFile => Boolean(file))
+  for (const file of files) {
+    if (!file || typeof file !== 'object') continue
+
+    const value = file as Record<string, unknown>
+    const path = typeof value.path === 'string' ? value.path.replace(/^\/+/, '') : ''
+    const code =
+      typeof value.code === 'string'
+        ? value.code
+        : typeof value.content === 'string'
+          ? value.content
+          : ''
+
+    if (!path || !code) continue
+
+    const artifactFile: ArtifactFile = { path, code }
+    if (typeof value.language === 'string' && value.language.length > 0) {
+      artifactFile.language = value.language
+    }
+    normalized.push(artifactFile)
+  }
+
+  return normalized
 }
 
 export function getLatestArtifactFiles(messages: Array<{ files?: unknown; content?: string; role?: string }>) {
