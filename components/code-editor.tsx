@@ -10,11 +10,17 @@ export default function CodeEditor({
   value,
   onChange,
   onEditorReady,
+  showMinimap = false,
+  wordWrap = true,
+  readOnly = false,
 }: {
   path: string;
   value: string;
   onChange: (v: string) => void;
   onEditorReady?: (api: { undo: () => void; redo: () => void }) => void;
+  showMinimap?: boolean;
+  wordWrap?: boolean;
+  readOnly?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
   const editorRef = useRef<any>(null);
@@ -44,7 +50,7 @@ export default function CodeEditor({
         });
       }}
       options={{
-        minimap: { enabled: false },
+        minimap: { enabled: showMinimap },
         fontSize: 13,
         lineHeight: 20,
         scrollBeyondLastLine: false,
@@ -52,8 +58,9 @@ export default function CodeEditor({
         padding: { top: 12 },
         renderLineHighlight: "none",
         tabSize: 2,
-        wordWrap: "on",
+        wordWrap: wordWrap ? "on" : "off",
         smoothScrolling: true,
+        readOnly,
       }}
     />
   );
