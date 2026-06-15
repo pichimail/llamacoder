@@ -39,12 +39,32 @@ export default async function Page({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const id = (await params).id;
-  const chat = await getChatById(id);
+  const [chat, sidebarChats] = await Promise.all([getChatById(id), getSidebarChats()]);
 
   if (!chat) notFound();
 
-  return <PageClient chat={chat} />;
+  return <PageClient chat={chat} sidebarChats={sidebarChats} />;
 }
+
+const getSidebarChats = cache(async () => {
+  const prisma = getPrisma();
+  const chats = await prisma.chat.findMany({
+    where: { isArchived: false },
+    orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    take: 60,
+    select: {
+      id: true,
+      title: true,
+      isPinned: true,
+      createdAt: true,
+    },
+  });
+
+  return chats.map((chat) => ({
+    ...chat,
+    createdAt: chat.createdAt.toISOString(),
+  }));
+});
 
 const getChatById = cache(async (id: string) => {
   const prisma = getPrisma();
@@ -106,6 +126,7 @@ const getChatById = cache(async (id: string) => {
 
 export type Chat = NonNullable<Awaited<ReturnType<typeof getChatById>>>;
 export type Message = Chat["messages"][number];
+export type SidebarChat = Awaited<ReturnType<typeof getSidebarChats>>[number];
 
 export const runtime = "edge";
 export const maxDuration = 45;
