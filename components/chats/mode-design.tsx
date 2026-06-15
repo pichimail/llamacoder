@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ImageIcon, Layers, Palette, Redo2, Save, Sparkles, Trash2, Type, Undo2 } from 'lucide-react'
+import { Check, ImageIcon, Layers, Palette, Redo2, Save, Sparkles, Type, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,12 +14,15 @@ import type { ArtifactFile, DesignToken } from '@/lib/artifact-analysis'
 import { applyTokenChange, detectDesignTokens, patchFileContent } from '@/lib/artifact-analysis'
 import { createMessage } from '@/app/(main)/actions'
 
+type SavedDesignMessage = Awaited<ReturnType<typeof createMessage>>
+
 interface ModeDesignProps {
   chatId: string
   files?: ArtifactFile[]
   saveRequest?: number
   onDirtyChange?: (dirty: boolean) => void
-  onSaved?: () => void
+  onPreviewFiles?: (files: ArtifactFile[]) => void
+  onSaved?: (message?: SavedDesignMessage, files?: ArtifactFile[]) => void
 }
 
 type Snapshot = ArtifactFile[]
@@ -31,13 +34,7 @@ const glassOptions = [
   { label: 'Fractal haze', value: 'bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.16),transparent_24%),linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02))] backdrop-blur-lg' },
 ]
 
-export function ModeDesign({
-  chatId,
-  files = [],
-  saveRequest = 0,
-  onDirtyChange,
-  onSaved,
-}: ModeDesignProps) {
+export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved }: ModeDesignProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [workspaceFiles, setWorkspaceFiles] = useState(files)
@@ -55,7 +52,8 @@ export function ModeDesign({
     setSelectedFilePath(files[0]?.path || '')
     setDirty(false)
     onDirtyChange?.(false)
-  }, [files, onDirtyChange])
+    onPreviewFiles?.(files)
+  }, [files, onDirtyChange, onPreviewFiles])
 
   const tokens = useMemo(() => detectDesignTokens(workspaceFiles), [workspaceFiles])
   const selectedToken = tokens.find((token) => token.name === selectedTokenName) || tokens[0]
@@ -65,7 +63,7 @@ export function ModeDesign({
   const spacingTokens = tokens.filter((token) => token.category === 'spacing')
   const radiusTokens = tokens.filter((token) => token.category === 'radius')
 
-  const markDirty = (nextFiles: ArtifactFile[]) => {
+  const markDirty = useCallback((nextFiles: ArtifactFile[]) => {
     const nextHistory = history.slice(0, historyIndex + 1)
     nextHistory.push(nextFiles)
     setHistory(nextHistory)
@@ -73,7 +71,8 @@ export function ModeDesign({
     setWorkspaceFiles(nextFiles)
     setDirty(true)
     onDirtyChange?.(true)
-  }
+    onPreviewFiles?.(nextFiles)
+  }, [history, historyIndex, onDirtyChange, onPreviewFiles])
 
   const updateToken = (token: DesignToken, nextValue: string) => {
     const result = applyTokenChange(workspaceFiles, token, nextValue)
@@ -97,38 +96,41 @@ export function ModeDesign({
   const undo = useCallback(() => {
     if (historyIndex <= 0) return
     const nextIndex = historyIndex - 1
+    const nextFiles = history[nextIndex]
     setHistoryIndex(nextIndex)
-    setWorkspaceFiles(history[nextIndex])
+    setWorkspaceFiles(nextFiles)
     setDirty(true)
     onDirtyChange?.(true)
-  }, [history, historyIndex, onDirtyChange])
+    onPreviewFiles?.(nextFiles)
+  }, [history, historyIndex, onDirtyChange, onPreviewFiles])
 
   const redo = useCallback(() => {
     if (historyIndex >= history.length - 1) return
     const nextIndex = historyIndex + 1
+    const nextFiles = history[nextIndex]
     setHistoryIndex(nextIndex)
-    setWorkspaceFiles(history[nextIndex])
+    setWorkspaceFiles(nextFiles)
     setDirty(true)
     onDirtyChange?.(true)
-  }, [history, historyIndex, onDirtyChange])
+    onPreviewFiles?.(nextFiles)
+  }, [history, historyIndex, onDirtyChange, onPreviewFiles])
 
   const saveDesign = useCallback(() => {
     if (!workspaceFiles.length) return
     startTransition(async () => {
       const content =
         'Design edits saved from the visual artifact editor.\n\n' +
-        workspaceFiles
-          .map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``)
-          .join('\n\n')
-      await createMessage(chatId, content, 'assistant', workspaceFiles)
+        workspaceFiles.map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``).join('\n\n')
+      const message = await createMessage(chatId, content, 'assistant', workspaceFiles)
       setDirty(false)
       onDirtyChange?.(false)
-      onSaved?.()
+      onPreviewFiles?.(workspaceFiles)
+      onSaved?.(message, workspaceFiles)
       setSavedPulse(true)
       window.setTimeout(() => setSavedPulse(false), 1200)
       router.refresh()
     })
-  }, [chatId, onDirtyChange, onSaved, router, workspaceFiles])
+  }, [chatId, onDirtyChange, onPreviewFiles, onSaved, router, workspaceFiles])
 
   useEffect(() => {
     if (saveRequest > 0) saveDesign()
@@ -152,7 +154,6 @@ export function ModeDesign({
         saveDesign()
       }
     }
-
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [redo, saveDesign, undo])
@@ -202,11 +203,7 @@ export function ModeDesign({
               <Label className="text-xs">Colors</Label>
               <div className="grid grid-cols-2 gap-2">
                 {colorTokens.slice(0, 12).map((token) => (
-                  <button
-                    key={`${token.name}-${token.value}`}
-                    onClick={() => setSelectedTokenName(token.name)}
-                    className={`rounded-md border border-border p-2 text-left transition hover:bg-background ${selectedToken?.name === token.name ? 'ring-1 ring-ring' : ''}`}
-                  >
+                  <button key={`${token.name}-${token.value}`} onClick={() => setSelectedTokenName(token.name)} className={`rounded-md border border-border p-2 text-left transition hover:bg-background ${selectedToken?.name === token.name ? 'ring-1 ring-ring' : ''}`}>
                     <div className="mb-2 h-8 rounded border border-border" style={{ background: token.value }} />
                     <p className="truncate font-mono text-[11px] text-foreground">{token.name}</p>
                     <p className="truncate text-[10px] text-muted-foreground">{token.value}</p>
@@ -258,34 +255,18 @@ export function ModeDesign({
           </TabsContent>
 
           <TabsContent value="asset" className="m-0 space-y-3 p-3">
-            <p className="text-xs leading-5 text-muted-foreground">Asset controls patch the selected file. For precision edits, switch to Code and edit the selected JSX directly.</p>
+            <p className="text-xs leading-5 text-muted-foreground">Asset controls patch the selected file and update the live preview immediately. Save commits them as a new version.</p>
             <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile('overflow-hidden')}>Prevent overflow</Button>
             <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile('object-cover')}>Image object-cover</Button>
-            <Button variant="destructive" size="sm" className="w-full justify-start text-xs" onClick={() => selectedFile && updateSelectedFile(selectedFile.code.replace(/<[^>]+>[^<]*<\/[^>]+>/, ''))}>
-              <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete first simple element
-            </Button>
           </TabsContent>
 
           <TabsContent value="code" className="m-0 space-y-3 p-3">
             <Label className="text-xs">File</Label>
-            <select
-              value={selectedFile?.path || ''}
-              onChange={(event) => setSelectedFilePath(event.target.value)}
-              className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground"
-              aria-label="Select file to edit"
-            >
+            <select value={selectedFile?.path || ''} onChange={(event) => setSelectedFilePath(event.target.value)} className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground" aria-label="Select file to edit">
               {workspaceFiles.map((file) => <option key={file.path} value={file.path}>{file.path}</option>)}
             </select>
-            <Textarea
-              value={selectedFile?.code || ''}
-              onChange={(event) => updateSelectedFile(event.target.value)}
-              className="min-h-72 resize-y bg-background font-mono text-xs text-foreground"
-              spellCheck={false}
-              aria-label="Live edit selected artifact file"
-            />
+            <Textarea value={selectedFile?.code || ''} onChange={(event) => updateSelectedFile(event.target.value)} className="min-h-72 resize-y bg-background font-mono text-xs text-foreground" spellCheck={false} aria-label="Live edit selected artifact file" />
           </TabsContent>
-
-          <TabsContent value="style" className="m-0 hidden" />
         </ScrollArea>
       </Tabs>
 
