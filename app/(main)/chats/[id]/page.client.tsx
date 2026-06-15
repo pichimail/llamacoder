@@ -36,7 +36,7 @@ import {
   Palette,
 } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
-import { ModeDesign } from "@/components/chats/mode-design";
+import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 
@@ -86,7 +86,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
   >("idle");
   const [designDirty, setDesignDirty] = useState(false);
 
-  // Admin-controlled default for the self-correcting repair loop
   useEffect(() => {
     fetch("/api/public-settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -658,33 +657,24 @@ ${error.trimStart()}`;
   const renderBuilderSurface = () => {
     if (builderMode === "design") {
       return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
-          <div className="min-h-0 flex-1 overflow-hidden bg-background">
-            {artifactFiles.length > 0 ? (
-              <CodeRunner
-                files={artifactFiles.map((file) => ({ path: file.path, content: file.code }))}
-                onRequestFix={(error: string) => {
-                  startTransition(async () => {
-                    await requestFix({ error, auto: false, attempt: 1, fallback: false });
-                  });
-                }}
-                onPreviewError={handlePreviewError}
-                onPreviewReady={handlePreviewReady}
-                showDeviceToggle={false}
-              />
-            ) : (
-              <AuxEmptyState label={streamPromise ? "Generating your app…" : "No files yet. Send a prompt to generate an app."} loading={!!streamPromise} />
-            )}
-          </div>
-          <aside className="min-h-0 h-[44dvh] shrink-0 overflow-hidden border-t border-border bg-card xl:h-auto xl:w-[380px] xl:border-l xl:border-t-0" aria-label="Design inspector">
-            <ModeDesign
-              chatId={chat.id}
-              files={artifactFiles}
-              onDirtyChange={setDesignDirty}
-              onSaved={() => setDesignDirty(false)}
-            />
-          </aside>
-        </div>
+        <DesignWorkspace
+          chatId={chat.id}
+          files={artifactFiles}
+          isStreaming={!!streamPromise}
+          onRequestFix={(error: string) => {
+            startTransition(async () => {
+              await requestFix({ error, auto: false, attempt: 1, fallback: false });
+            });
+          }}
+          onPreviewError={handlePreviewError}
+          onPreviewReady={handlePreviewReady}
+          onDirtyChange={setDesignDirty}
+          onSaved={(message) => {
+            setDesignDirty(false);
+            if (message) setActiveMessage(message as Message);
+            router.refresh();
+          }}
+        />
       );
     }
 
@@ -921,14 +911,5 @@ function BuilderModeButton({
       {icon}
       <span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span>
     </button>
-  );
-}
-
-function AuxEmptyState({ label, loading }: { label: string; loading?: boolean }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-      {loading && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
-      <p aria-live={loading ? "polite" : undefined}>{label}</p>
-    </div>
   );
 }
