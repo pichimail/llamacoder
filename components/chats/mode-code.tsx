@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileExplorer, type FileNode } from './file-explorer'
 import { Button } from '@/components/ui/button'
@@ -180,7 +181,7 @@ function MenuButton({
   disabled,
   destructive,
 }: {
-  icon: React.ReactNode
+  icon: ReactNode
   label: string
   onClick: () => void
   disabled?: boolean
