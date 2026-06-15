@@ -3,30 +3,29 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
+import { normalizeArtifactFiles } from "@/lib/artifact-analysis";
+import { SharePreviewClient } from "../v2/[id]/share-preview-client";
 
-/*
-  This is the Share page for v1 apps, before the chat interface was added.
-
-  It's here to preserve existing URLs.
-*/
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const generatedApp = await getGeneratedAppByID((await params).id);
+  const id = (await params).id;
+  const generatedApp = await getGeneratedAppByID(id);
+  const sharedMessage = generatedApp ? null : await getMessageByID(id);
+  const prompt = generatedApp?.prompt || sharedMessage?.chat?.title;
 
-  let prompt = generatedApp?.prompt;
   if (typeof prompt !== "string") {
     notFound();
   }
 
-  let searchParams = new URLSearchParams();
+  const searchParams = new URLSearchParams();
   searchParams.set("prompt", prompt);
 
   return {
     title: "An app generated on Chinna-Coder",
-    description: `Prompt: ${generatedApp?.prompt}`,
+    description: `Prompt: ${prompt}`,
     openGraph: {
       images: [`/api/og?${searchParams}`],
     },
@@ -44,22 +43,27 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  // if process.env.DATABASE_URL is not set, throw an error
   if (typeof id !== "string") {
     notFound();
   }
 
   const generatedApp = await getGeneratedAppByID(id);
 
-  if (!generatedApp) {
-    return <div>App not found</div>;
+  if (generatedApp) {
+    return (
+      <div className="flex h-full w-full grow items-center justify-center">
+        <CodeRunner language="tsx" code={generatedApp.code} showDeviceToggle={false} />
+      </div>
+    );
   }
 
-  return (
-    <div className="flex h-full w-full grow items-center justify-center">
-      <CodeRunner language="tsx" code={generatedApp.code} />
-    </div>
-  );
+  const message = await getMessageByID(id);
+  if (!message || message.role !== "assistant") notFound();
+
+  const files = normalizeArtifactFiles(message.files);
+  if (!files.length) notFound();
+
+  return <SharePreviewClient title={message.chat.title || "Shared app"} files={files} />;
 }
 
 const getGeneratedAppByID = cache(async (id: string) => {
@@ -68,5 +72,13 @@ const getGeneratedAppByID = cache(async (id: string) => {
     where: {
       id,
     },
+  });
+});
+
+const getMessageByID = cache(async (id: string) => {
+  const prisma = getPrisma();
+  return prisma.message.findUnique({
+    where: { id },
+    include: { chat: true },
   });
 });
