@@ -1,6 +1,6 @@
-import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
-import { extractAllCodeBlocks } from "@/lib/utils";
+import { normalizeArtifactFiles } from "@/lib/artifact-analysis";
+import { SharePreviewClient } from "@/components/chats/share-preview-client";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -10,14 +10,14 @@ export async function generateMetadata({
 }: {
   params: Promise<{ messageId: string }>;
 }): Promise<Metadata> {
-  let { messageId } = await params;
+  const { messageId } = await params;
   const message = await getMessage(messageId);
   if (!message) {
     notFound();
   }
 
-  let title = message.chat.title;
-  let searchParams = new URLSearchParams();
+  const title = message.chat.title;
+  const searchParams = new URLSearchParams();
   searchParams.set("prompt", title);
 
   return {
@@ -40,39 +40,17 @@ export default async function SharePage({
   params: Promise<{ messageId: string }>;
 }) {
   const { messageId } = await params;
-
-  const prisma = getPrisma();
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) {
+  const message = await getMessage(messageId);
+  if (!message || message.role !== "assistant") {
     notFound();
   }
 
-  const files = extractAllCodeBlocks(message.content);
+  const files = normalizeArtifactFiles(message.files);
   if (files.length === 0) {
     notFound();
   }
 
-  return (
-    <div className="flex h-full w-full grow flex-col">
-      <div className="flex h-full grow items-center justify-center">
-        <CodeRunner
-          files={files.map((f) => ({ path: f.path, content: f.code }))}
-        />
-      </div>
-
-      {/* Floating desktop banner */}
-      <div className="fixed bottom-4 right-4 z-50 hidden md:block">
-        <a
-          className="inline-flex shrink-0 items-center rounded-full border-[0.5px] border-[#BABABA] bg-white px-3.5 py-1.5 text-xs text-black shadow-lg transition-shadow hover:shadow-sm dark:border-white/20 dark:bg-zinc-900 dark:text-white"
-          href="/"
-        >
-          <span className="text-center">
-            Shared on <span className="font-semibold">Chinna-Coder</span>
-          </span>
-        </a>
-      </div>
-    </div>
-  );
+  return <SharePreviewClient title={message.chat.title || "Shared app"} files={files} />;
 }
 
 const getMessage = cache(async (messageId: string) => {
@@ -86,3 +64,5 @@ const getMessage = cache(async (messageId: string) => {
     },
   });
 });
+
+export const runtime = "edge";
