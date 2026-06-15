@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext } from 'react'
+import type { ReactNode } from 'react'
 import type { ChatMode } from './mode-switcher'
 
 export type WorkspacePreviewMode = 'web' | 'mobile'
@@ -23,7 +24,7 @@ export function WorkspaceProvider({
   children,
 }: {
   value: WorkspaceContextValue
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }
