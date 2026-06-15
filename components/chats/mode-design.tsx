@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ImageIcon, Layers, Palette, Redo2, Save, Sparkles, Type, Undo2 } from 'lucide-react'
+import { Check, ImageIcon, Layers, MousePointer2, Palette, Redo2, Save, Sparkles, Trash2, Type, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,8 @@ import { applyTokenChange, detectDesignTokens, patchFileContent } from '@/lib/ar
 import { createMessage } from '@/app/(main)/actions'
 
 type SavedDesignMessage = Awaited<ReturnType<typeof createMessage>>
+type Snapshot = ArtifactFile[]
+type ElementTarget = { id: string; filePath: string; tag: string; className: string; text: string; match: string }
 
 interface ModeDesignProps {
   chatId: string
@@ -23,9 +25,9 @@ interface ModeDesignProps {
   onDirtyChange?: (dirty: boolean) => void
   onPreviewFiles?: (files: ArtifactFile[]) => void
   onSaved?: (message?: SavedDesignMessage, files?: ArtifactFile[]) => void
+  inspectorActive?: boolean
+  onInspectorActiveChange?: (active: boolean) => void
 }
-
-type Snapshot = ArtifactFile[]
 
 const fontOptions = ['Inter, sans-serif', 'system-ui', 'Arial', 'Georgia, serif', 'Fira Code, monospace']
 const glassOptions = [
@@ -34,14 +36,33 @@ const glassOptions = [
   { label: 'Fractal haze', value: 'bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.16),transparent_24%),linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02))] backdrop-blur-lg' },
 ]
 
-export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved }: ModeDesignProps) {
+function detectElementTargets(files: ArtifactFile[]): ElementTarget[] {
+  const targets: ElementTarget[] = []
+  for (const file of files.filter((item) => /\.(tsx|jsx)$/i.test(item.path))) {
+    const matches = file.code.match(/<([A-Za-z][A-Za-z0-9.]*)\b[^>]*?(?:\/>|>[^<]{0,120}<\/[A-Za-z][A-Za-z0-9.]*>)/g) || []
+    matches.slice(0, 80).forEach((chunk, index) => {
+      const tag = chunk.match(/^<([A-Za-z][A-Za-z0-9.]*)/)?.[1] || 'Element'
+      const className = chunk.match(/className="([^"]*)"/)?.[1] || ''
+      const text = chunk.match(/>([^<]{1,120})<\//)?.[1]?.trim() || ''
+      targets.push({ id: `${file.path}:${index}:${tag}`, filePath: file.path, tag, className, text, match: chunk })
+    })
+  }
+  return targets.slice(0, 120)
+}
+
+function patchElement(files: ArtifactFile[], target: ElementTarget, nextMatch: string) {
+  return files.map((file) => (file.path === target.filePath ? { ...file, code: file.code.replace(target.match, nextMatch) } : file))
+}
+
+export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved, inspectorActive = true, onInspectorActiveChange }: ModeDesignProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [workspaceFiles, setWorkspaceFiles] = useState(files)
   const [history, setHistory] = useState<Snapshot[]>([files])
   const [historyIndex, setHistoryIndex] = useState(0)
-  const [selectedTokenName, setSelectedTokenName] = useState<string>('')
+  const [selectedTokenName, setSelectedTokenName] = useState('')
   const [selectedFilePath, setSelectedFilePath] = useState(files[0]?.path || '')
+  const [selectedElementId, setSelectedElementId] = useState('')
   const [dirty, setDirty] = useState(false)
   const [savedPulse, setSavedPulse] = useState(false)
 
@@ -50,14 +71,17 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
     setHistory([files])
     setHistoryIndex(0)
     setSelectedFilePath(files[0]?.path || '')
+    setSelectedElementId('')
     setDirty(false)
     onDirtyChange?.(false)
     onPreviewFiles?.(files)
   }, [files, onDirtyChange, onPreviewFiles])
 
   const tokens = useMemo(() => detectDesignTokens(workspaceFiles), [workspaceFiles])
+  const elements = useMemo(() => detectElementTargets(workspaceFiles), [workspaceFiles])
   const selectedToken = tokens.find((token) => token.name === selectedTokenName) || tokens[0]
   const selectedFile = workspaceFiles.find((file) => file.path === selectedFilePath) || workspaceFiles[0]
+  const selectedElement = elements.find((element) => element.id === selectedElementId) || elements[0]
   const colorTokens = tokens.filter((token) => token.category === 'color')
   const typographyTokens = tokens.filter((token) => token.category === 'typography')
   const spacingTokens = tokens.filter((token) => token.category === 'spacing')
@@ -84,13 +108,33 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
     markDirty(patchFileContent(workspaceFiles, selectedFile.path, nextCode))
   }
 
-  const appendUtilityToSelectedFile = (utility: string) => {
-    if (!selectedFile || !utility) return
-    const nextCode = selectedFile.code.replace(/className="([^"]*)"/, (match, className) => {
-      if (className.includes(utility)) return match
-      return `className="${className} ${utility}"`
-    })
+  const appendUtility = (utility: string) => {
+    if (selectedElement) {
+      updateSelectedElementClass(`${selectedElement.className} ${utility}`.trim())
+      return
+    }
+    if (!selectedFile) return
+    const nextCode = selectedFile.code.replace(/className="([^"]*)"/, (match, className) => className.includes(utility) ? match : `className="${className} ${utility}"`)
     if (nextCode !== selectedFile.code) updateSelectedFile(nextCode)
+  }
+
+  const updateSelectedElementClass = (nextClassName: string) => {
+    if (!selectedElement) return
+    const nextMatch = selectedElement.match.includes('className=')
+      ? selectedElement.match.replace(/className="([^"]*)"/, `className="${nextClassName}"`)
+      : selectedElement.match.replace(/^<([A-Za-z][A-Za-z0-9.]*)/, `<$1 className="${nextClassName}"`)
+    markDirty(patchElement(workspaceFiles, selectedElement, nextMatch))
+  }
+
+  const updateSelectedElementText = (nextText: string) => {
+    if (!selectedElement || !selectedElement.text) return
+    markDirty(patchElement(workspaceFiles, selectedElement, selectedElement.match.replace(selectedElement.text, nextText)))
+  }
+
+  const removeSelectedElement = () => {
+    if (!selectedElement) return
+    markDirty(patchElement(workspaceFiles, selectedElement, ''))
+    setSelectedElementId('')
   }
 
   const undo = useCallback(() => {
@@ -118,9 +162,7 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
   const saveDesign = useCallback(() => {
     if (!workspaceFiles.length) return
     startTransition(async () => {
-      const content =
-        'Design edits saved from the visual artifact editor.\n\n' +
-        workspaceFiles.map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``).join('\n\n')
+      const content = 'Design edits saved from the visual artifact editor.\n\n' + workspaceFiles.map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``).join('\n\n')
       const message = await createMessage(chatId, content, 'assistant', workspaceFiles)
       setDirty(false)
       onDirtyChange?.(false)
@@ -141,18 +183,9 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
       const mod = event.metaKey || event.ctrlKey
       if (!mod) return
       const key = event.key.toLowerCase()
-      if (key === 'z' && !event.shiftKey) {
-        event.preventDefault()
-        undo()
-      }
-      if ((key === 'z' && event.shiftKey) || key === 'y') {
-        event.preventDefault()
-        redo()
-      }
-      if (key === 's') {
-        event.preventDefault()
-        saveDesign()
-      }
+      if (key === 'z' && !event.shiftKey) { event.preventDefault(); undo() }
+      if ((key === 'z' && event.shiftKey) || key === 'y') { event.preventDefault(); redo() }
+      if (key === 's') { event.preventDefault(); saveDesign() }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -175,13 +208,12 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inspector</span>
         <div className="flex items-center gap-1">
+          <Button variant={inspectorActive ? 'secondary' : 'ghost'} size="sm" className="h-7 w-7 p-0" onClick={() => onInspectorActiveChange?.(!inspectorActive)} aria-label="Toggle visual inspector">
+            <MousePointer2 className="h-3.5 w-3.5" />
+          </Button>
           {dirty && <span className="hidden text-[11px] text-amber-500 sm:inline">Unsaved</span>}
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={undo} disabled={historyIndex <= 0} aria-label="Undo design change">
-            <Undo2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Redo design change">
-            <Redo2 className="h-3.5 w-3.5" />
-          </Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={undo} disabled={historyIndex <= 0} aria-label="Undo design change"><Undo2 className="h-3.5 w-3.5" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Redo design change"><Redo2 className="h-3.5 w-3.5" /></Button>
           <Button size="sm" className="h-7 px-2 text-xs" onClick={saveDesign} disabled={!dirty || isPending} aria-label="Save design changes">
             {savedPulse ? <Check className="mr-1 h-3.5 w-3.5" /> : <Save className="mr-1 h-3.5 w-3.5" />}
             Save
@@ -199,6 +231,36 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
 
         <ScrollArea className="min-h-0 flex-1">
           <TabsContent value="style" className="m-0 space-y-4 p-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Detected layers</Label>
+              <div className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-border p-1">
+                {elements.length ? elements.slice(0, 48).map((element) => (
+                  <button key={element.id} onClick={() => { setSelectedElementId(element.id); setSelectedFilePath(element.filePath) }} className={`block w-full rounded px-2 py-1.5 text-left transition hover:bg-background ${selectedElement?.id === element.id ? 'bg-background ring-1 ring-ring' : ''}`}>
+                    <p className="truncate font-mono text-[11px] text-foreground">{element.tag}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">{element.text || element.className || element.filePath}</p>
+                  </button>
+                )) : <p className="px-2 py-3 text-center text-xs text-muted-foreground">No selectable JSX layers detected.</p>}
+              </div>
+            </div>
+
+            {selectedElement && (
+              <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Selected element</Label>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={removeSelectedElement} aria-label="Remove selected element"><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+                <Input value={selectedElement.tag} readOnly className="h-8 font-mono text-xs" />
+                <Label className="text-xs">Class utilities</Label>
+                <Textarea value={selectedElement.className} onChange={(event) => updateSelectedElementClass(event.target.value)} className="min-h-20 bg-background font-mono text-xs" aria-label="Edit selected element class utilities" />
+                {selectedElement.text && (
+                  <>
+                    <Label className="text-xs">Text</Label>
+                    <Input value={selectedElement.text} onChange={(event) => updateSelectedElementText(event.target.value)} className="h-8 text-xs" aria-label="Edit selected element text" />
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="text-xs">Colors</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -222,7 +284,7 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
             <div className="space-y-2 border-t border-border pt-3">
               <Label className="text-xs">Glass utilities</Label>
               {glassOptions.map((option) => (
-                <Button key={option.label} variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile(option.value)}>
+                <Button key={option.label} variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtility(option.value)}>
                   <Sparkles className="mr-2 h-3.5 w-3.5" /> {option.label}
                 </Button>
               ))}
@@ -240,24 +302,19 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
               ))}
             </div>
             <Label className="text-xs">Font family utility</Label>
-            {fontOptions.map((font) => (
-              <Button key={font} variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile(`font-[${font.replace(/\s+/g, '_')}]`)}>
-                {font}
-              </Button>
-            ))}
+            {fontOptions.map((font) => <Button key={font} variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtility(`font-[${font.replace(/\s+/g, '_')}]`)}>{font}</Button>)}
             <div className="grid grid-cols-2 gap-2">
               {['text-xs', 'text-sm', 'text-base', 'text-lg', 'font-medium', 'font-semibold', 'leading-tight', 'leading-relaxed'].map((utility) => (
-                <Button key={utility} variant="outline" size="sm" className="text-xs" onClick={() => appendUtilityToSelectedFile(utility)}>
-                  {utility}
-                </Button>
+                <Button key={utility} variant="outline" size="sm" className="text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>
               ))}
             </div>
           </TabsContent>
 
           <TabsContent value="asset" className="m-0 space-y-3 p-3">
-            <p className="text-xs leading-5 text-muted-foreground">Asset controls patch the selected file and update the live preview immediately. Save commits them as a new version.</p>
-            <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile('overflow-hidden')}>Prevent overflow</Button>
-            <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtilityToSelectedFile('object-cover')}>Image object-cover</Button>
+            <p className="text-xs leading-5 text-muted-foreground">Asset controls patch the selected element or file and update the live preview immediately. Save commits them as a new version.</p>
+            <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtility('overflow-hidden')}>Prevent overflow</Button>
+            <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtility('object-cover')}>Image object-cover</Button>
+            <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => appendUtility('hidden')}>Hide selected</Button>
           </TabsContent>
 
           <TabsContent value="code" className="m-0 space-y-3 p-3">
