@@ -78,7 +78,7 @@ export function ModeSwitcher({ currentMode, onModeChange, compact }: ModeSwitche
                   className={compact ? 'h-8 flex-1 px-2 text-xs' : 'h-8 px-2 text-xs'}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className={compact ? 'ml-1 hidden xs:inline' : 'ml-1.5 hidden lg:inline'}>
+                  <span className={compact ? 'ml-1 hidden sm:inline' : 'ml-1.5 hidden lg:inline'}>
                     {mode.label}
                   </span>
                 </Button>
