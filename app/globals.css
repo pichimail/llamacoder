@@ -465,9 +465,44 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
-*:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+[contenteditable="true"]:focus,
+[contenteditable="true"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prompt composers: no focus ring or glow on container or field */
+#prompt-composer textarea:focus,
+#prompt-composer textarea:focus-visible,
+[aria-label="Chat panel"] textarea:focus,
+[aria-label="Chat panel"] textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#prompt-composer .rounded-an-input-border-radius:focus-within,
+[aria-label="Chat panel"] .rounded-an-input-border-radius:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+*:focus-visible:not(input):not(textarea):not(select):not([contenteditable="true"]) {
+  outline: 1px solid hsl(var(--ring) / 0.35);
+  outline-offset: 1px;
 }
 
 button:hover:not(:disabled),

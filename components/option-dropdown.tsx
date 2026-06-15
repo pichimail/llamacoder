@@ -54,7 +54,7 @@ export function OptionDropdown({
           aria-label={ariaLabel ?? tip}
           title={tip}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+            "inline-flex items-center gap-1.5 rounded-md text-sm outline-none transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
             triggerClassName,
           )}
         >

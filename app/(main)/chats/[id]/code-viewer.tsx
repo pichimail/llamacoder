@@ -694,7 +694,7 @@ export default function CodeViewer({
                           onKeyDown={(e) => e.key === "Escape" && setCreating(null)}
                           placeholder={creating === "file" ? "path/name.tsx" : "folder/name"}
                           aria-label={`New ${creating} name`}
-                          className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[11px] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[11px] focus:border-foreground/20 focus:outline-none focus-visible:ring-0"
                         />
                       </form>
                     )}
@@ -744,8 +744,8 @@ export default function CodeViewer({
                 {explorerPanel === "search" && (
                   <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
                     <div className="space-y-1">
-                      <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search" className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search files" />
-                      <input value={replaceValue} onChange={(e) => setReplaceValue(e.target.value)} placeholder="Replace" className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Replace value" />
+                      <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search" className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-none transition-colors focus:border-foreground/20 focus-visible:ring-0" aria-label="Search files" />
+                      <input value={replaceValue} onChange={(e) => setReplaceValue(e.target.value)} placeholder="Replace" className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-none transition-colors focus:border-foreground/20 focus-visible:ring-0" aria-label="Replace value" />
                       <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                         <input type="checkbox" checked={matchCase} onChange={(e) => setMatchCase(e.target.checked)} />
                         Match case

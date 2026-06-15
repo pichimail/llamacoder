@@ -69,8 +69,8 @@ export function ChatComposer({
             placeholder={placeholder}
             disabled={isLoading}
             className={clsx(
-              'w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm',
-              'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50',
+              'w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm',
+              'placeholder:text-muted-foreground transition-colors focus:border-foreground/20 focus:outline-none focus:ring-0',
               'resize-none max-h-[200px]',
               isLoading && 'opacity-60 cursor-not-allowed'
             )}

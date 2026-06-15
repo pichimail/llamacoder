@@ -439,8 +439,8 @@ export const InputBar = memo(function InputBar({
           {questionBarNode}
           <div
             className={cn(
-              "relative cursor-text rounded-an-input-border-radius bg-an-input-background shadow-2xs ring-1 ring-foreground/10",
-              isDragOver && "ring-2 ring-an-primary-color",
+              "relative cursor-text rounded-an-input-border-radius border border-an-input-border-color/80 bg-an-input-background",
+              isDragOver && "border-an-primary-color/50",
             )}
             onClick={handleContainerClick}
           >
@@ -519,12 +519,11 @@ export const InputBar = memo(function InputBar({
                     disabled={disabled}
                     rows={1}
                     className={cn(
-                      "peer w-full resize-none bg-transparent border-0 outline-none text-[14px] leading-[1.6] text-an-foreground placeholder:text-an-input-placeholder-color",
-                      "overflow-hidden",
-                      disabled && "opacity-50 cursor-not-allowed",
+                      "w-full resize-none border-0 bg-transparent text-[14px] leading-[1.6] text-an-foreground outline-none placeholder:text-an-input-placeholder-color",
+                      "overflow-hidden focus-visible:outline-none focus-visible:ring-0",
+                      disabled && "cursor-not-allowed opacity-50",
                     )}
                   />
-                  <div className="pointer-events-none absolute inset-0 rounded-an-input-border-radius outline-2 outline-an-input-focus-outline opacity-0 transition-opacity duration-75 peer-focus-visible:opacity-100 peer-focus:opacity-100 z-20 ease-in-out" />
                 </>
               )}
             </div>
