@@ -161,7 +161,7 @@ function MenuItem({ icon, label, shortcut, trailing, disabled, onClick }: { icon
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-foreground transition hover:bg-white/7 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-foreground transition hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
     >
       <span className="text-muted-foreground">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
