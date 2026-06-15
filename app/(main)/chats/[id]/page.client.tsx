@@ -4,6 +4,7 @@ import { createMessage } from "@/app/(main)/actions";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
@@ -12,7 +13,6 @@ import CodeViewer, { downloadFilesAsZip } from "./code-viewer";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { toast } from "@/hooks/use-toast";
 import { Code2, Database, Eye, Loader2, MessageSquare, Palette, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
@@ -97,7 +97,10 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const artifactFiles = useMemo(() => {
     const byPath = new Map<string, ArtifactFile>();
-    if (activeMessage) getMessageFiles(activeMessage).forEach((file) => byPath.set(normalizeFile(file).path, normalizeFile(file)));
+    if (activeMessage) getMessageFiles(activeMessage).forEach((file) => {
+      const normalized = normalizeFile(file);
+      byPath.set(normalized.path, normalized);
+    });
     parseReplySegments(streamText)
       .filter((segment) => segment.type === "file")
       .forEach((segment) => {
@@ -150,11 +153,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
   }, [autoFixEnabled]);
 
   const requestFix = useCallback(async ({ error, auto, attempt, fallback }: { error: string; auto: boolean; attempt: number; fallback: boolean }) => {
-    const prefix = auto
-      ? fallback
-        ? "Rebuild the generated app cleanly. Fix this preview error and return the full working files."
-        : "Apply a minimal patch to fix this preview error and return only changed files."
-      : "The code is not working. Fix it.";
+    const prefix = auto ? (fallback ? "Rebuild the generated app cleanly. Fix this preview error and return the full working files." : "Apply a minimal patch to fix this preview error and return only changed files.") : "The code is not working. Fix it.";
     const text = `${prefix}\n\nAttempt: ${attempt}\n\n${error.trimStart()}`;
     const message = await createMessage(chat.id, text, "user");
     const controller = new AbortController();
@@ -246,14 +245,14 @@ export default function PageClient({ chat }: { chat: Chat }) {
     return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
   }, []);
 
-  const onSplitterMouseDown = (e: React.MouseEvent) => {
+  const onSplitterMouseDown = (e: ReactMouseEvent) => {
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startChat: chatPanelWidth };
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   };
 
-  const onSplitterKeyDown = (e: React.KeyboardEvent) => {
+  const onSplitterKeyDown = (e: ReactKeyboardEvent) => {
     const step = e.shiftKey ? 48 : 16;
     if (e.key === "ArrowLeft") { e.preventDefault(); setChatPanelWidth((w) => Math.max(MIN_CHAT_WIDTH, w - step)); }
     if (e.key === "ArrowRight") { e.preventDefault(); setChatPanelWidth((w) => Math.min(MAX_CHAT_WIDTH, w + step)); }
@@ -330,102 +329,40 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const renderBuilderSurface = () => {
     if (builderMode === "design") {
-      return (
-        <DesignWorkspace
-          chatId={chat.id}
-          files={artifactFiles}
-          isStreaming={!!streamPromise}
-          onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
-          onPreviewError={handlePreviewError}
-          onPreviewReady={handlePreviewReady}
-          onDirtyChange={setDesignDirty}
-          onSaved={(message) => { setDesignDirty(false); if (message) setActiveMessage(message as Message); router.refresh(); }}
-        />
-      );
+      return <DesignWorkspace chatId={chat.id} files={artifactFiles} isStreaming={!!streamPromise} onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))} onPreviewError={handlePreviewError} onPreviewReady={handlePreviewReady} onDirtyChange={setDesignDirty} onSaved={(message) => { setDesignDirty(false); if (message) setActiveMessage(message as Message); router.refresh(); }} />;
     }
     if (builderMode === "database") return <ModeDatabase chatId={chat.id} files={artifactFiles} />;
-    return (
-      <CodeViewer
-        streamText={streamText}
-        chat={chat}
-        message={activeMessage}
-        activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); setBuilderMode(tab); setMobileView("builder"); }}
-        onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
-        onPreviewError={handlePreviewError}
-        onPreviewReady={handlePreviewReady}
-        onSaveFiles={handleSaveFiles}
-        autoFixEnabled={autoFixEnabled}
-        onAutoFixEnabledChange={handleAutoFixEnabledChange}
-        autoFixAttempt={autoFixAttempt}
-        autoFixStatus={autoFixStatus}
-      />
-    );
+    return <CodeViewer streamText={streamText} chat={chat} message={activeMessage} activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setBuilderMode(tab); setMobileView("builder"); }} onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))} onPreviewError={handlePreviewError} onPreviewReady={handlePreviewReady} onSaveFiles={handleSaveFiles} autoFixEnabled={autoFixEnabled} onAutoFixEnabledChange={handleAutoFixEnabledChange} autoFixAttempt={autoFixAttempt} autoFixStatus={autoFixStatus} />;
   };
 
   if (isFullscreenPreview) {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
-    return (
-      <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>
-        {files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}
-      </main>
-    );
+    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
   }
 
   return (
     <TooltipProvider>
       <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
         <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border bg-card px-3 text-sm">
-          <div className="flex min-w-0 items-center gap-2">
-            <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
-              <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>
-                {chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-              </button>
-            </Tip>
-            <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
-              <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span>
-            </div>
-          </div>
-
-          <div className="hidden items-center rounded-lg border border-border bg-background p-0.5 md:flex" role="tablist" aria-label="Artifact mode">
-            <BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} />
-            <BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} />
-            <BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} />
-            <BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} />
-          </div>
-
-          <div className="flex items-center justify-end gap-1">
-            <div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view">
-              <button role="tab" aria-selected={mobileView === "chat"} onClick={() => setMobileView("chat")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Chat view"><MessageSquare className="size-3.5" /></button>
-              <button role="tab" aria-selected={mobileView === "builder"} onClick={() => setMobileView("builder")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Builder view">{builderMode === "preview" ? <Eye className="size-3.5" /> : builderMode === "design" ? <Palette className="size-3.5" /> : builderMode === "database" ? <Database className="size-3.5" /> : <Code2 className="size-3.5" />}</button>
-            </div>
-            <ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} />
-            <ThemeToggle />
-          </div>
+          <div className="flex min-w-0 items-center gap-2"><Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}><button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button></Tip><div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground"><span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span><span className="hidden sm:inline">•</span><span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span></div></div>
+          <div className="hidden items-center rounded-lg border border-border bg-background p-0.5 md:flex" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} /><BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} /></div>
+          <div className="flex items-center justify-end gap-1"><div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view"><button role="tab" aria-selected={mobileView === "chat"} onClick={() => setMobileView("chat")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Chat view"><MessageSquare className="size-3.5" /></button><button role="tab" aria-selected={mobileView === "builder"} onClick={() => setMobileView("builder")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Builder view">{builderMode === "preview" ? <Eye className="size-3.5" /> : builderMode === "design" ? <Palette className="size-3.5" /> : builderMode === "database" ? <Database className="size-3.5" /> : <Code2 className="size-3.5" />}</button></div><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /><ThemeToggle /></div>
         </header>
-
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border`} aria-label="Chat panel">
             {activeMessage && activeVersion && <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2 text-xs"><span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
             <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); } }} /></div>
             <div className="shrink-0 border-t border-border bg-card p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobileView("builder"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
           </section>
-
           <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-[7px] flex-shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none`}><div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" /><div className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40" /></div>
-
-          <section className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`} aria-label="Artifact builder panel">
-            <div className="border-b border-border bg-card px-2 py-1 md:hidden"><div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} compact /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} compact /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} compact /><BuilderModeButton mode="database" current={builderMode} label="DB" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} compact /></div></div>
-            {renderBuilderSurface()}
-          </section>
+          <section className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`} aria-label="Artifact builder panel"><div className="border-b border-border bg-card px-2 py-1 md:hidden"><div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} compact /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} compact /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} compact /><BuilderModeButton mode="database" current={builderMode} label="DB" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} compact /></div></div>{renderBuilderSurface()}</section>
         </div>
       </div>
     </TooltipProvider>
   );
 }
 
-function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: React.ReactNode; onClick: () => void; compact?: boolean }) {
+function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
   return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}>{icon}<span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
 }
