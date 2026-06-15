@@ -143,9 +143,13 @@ export function detectDatabaseSchema(files: ArtifactFile[]): SchemaTable[] {
   const prismaFile = files.find((file) => /schema\.prisma$/i.test(file.path))
   if (prismaFile) return parsePrismaSchema(prismaFile.code)
 
-  const sqlFiles = files.filter((file) => /\.(sql)$/i.test(file.path))
-  const tables = sqlFiles.flatMap((file) => parseSqlTables(file.code))
-  return tables
+  const sqlFiles = files.filter((file) => /\.(sql)$/i.test(file.path) || /supabase\/.*\.(sql|ts)$/i.test(file.path))
+  const sqlTables = sqlFiles.flatMap((file) => parseSqlTables(file.code))
+
+  const drizzleFiles = files.filter((file) => /\.(ts|tsx|js|jsx)$/i.test(file.path) && /(pgTable|mysqlTable|sqliteTable)\s*\(/.test(file.code))
+  const drizzleTables = drizzleFiles.flatMap((file) => parseDrizzleTables(file.code))
+
+  return [...sqlTables, ...drizzleTables]
 }
 
 function parsePrismaSchema(schema: string): SchemaTable[] {
@@ -214,6 +218,37 @@ function parseSqlTables(sql: string): SchemaTable[] {
       })
 
     tables.push({ name, columns, relations: [] })
+  }
+
+  return tables
+}
+
+function parseDrizzleTables(source: string): SchemaTable[] {
+  const tables: SchemaTable[] = []
+  const tableRegex = /(pgTable|mysqlTable|sqliteTable)\s*\(\s*['"`]([\w.-]+)['"`]\s*,\s*{([\s\S]*?)}\s*\)/g
+  let match: RegExpExecArray | null
+
+  while ((match = tableRegex.exec(source))) {
+    const tableName = match[2]
+    const body = match[3]
+    const columns: SchemaColumn[] = []
+
+    body.split('\n').forEach((rawLine) => {
+      const line = rawLine.trim().replace(/,$/, '')
+      if (!line || line.startsWith('//') || !line.includes(':')) return
+      const [rawName, rawFactory = ''] = line.split(':')
+      const name = rawName.trim().replace(/["'`]/g, '')
+      const type = rawFactory.trim().match(/^(\w+)/)?.[1] || 'column'
+      columns.push({
+        name,
+        type,
+        nullable: !/\.notNull\(\)/.test(line),
+        isPrimary: /\.primaryKey\(\)/.test(line),
+        isForeign: /\.references\(/.test(line) || /Id$/.test(name),
+      })
+    })
+
+    tables.push({ name: tableName, columns, relations: [] })
   }
 
   return tables
