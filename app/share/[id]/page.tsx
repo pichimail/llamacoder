@@ -4,7 +4,7 @@ import { cache } from "react";
 import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
 import { normalizeArtifactFiles } from "@/lib/artifact-analysis";
-import { SharePreviewClient } from "../v2/[id]/share-preview-client";
+import { SharePreviewClient } from "@/components/chats/share-preview-client";
 
 export async function generateMetadata({
   params,
