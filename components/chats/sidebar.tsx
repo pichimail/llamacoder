@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import {
   Home,
   MessageSquare,
@@ -14,7 +15,8 @@ import {
   Clock,
   Settings,
   LogOut,
-  X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -55,29 +57,30 @@ export function Sidebar({
 
   const content = (
     <div
-      className={`flex h-full flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-200 ${
+      className={`flex h-full flex-col overflow-hidden border-r border-border/70 bg-transparent transition-[width] duration-200 ${
         collapsed ? 'w-14' : 'w-64'
       }`}
       aria-label="Chat sidebar"
     >
-      <div className="space-y-3 border-b border-border p-2">
+      <div className="space-y-3 border-b border-border/60 p-2">
         <div className="flex h-8 items-center justify-between gap-2">
-          {!collapsed && <h1 className="truncate text-sm font-bold">llamacoder</h1>}
+          {!collapsed && <h1 className="truncate text-sm font-bold text-foreground">llamacoder</h1>}
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 md:hidden"
-            onClick={() => onMobileOpenChange?.(false)}
-            aria-label="Close sidebar"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? 'Expand main sidebar' : 'Collapse main sidebar'}
+            aria-pressed={!collapsed}
           >
-            <X className="h-4 w-4" />
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
         </div>
         <Button
           onClick={onNewChat ?? (() => (window.location.href = '/'))}
           size="sm"
-          className="h-8 w-full text-xs"
-          variant="default"
+          className="h-8 w-full text-xs text-foreground"
+          variant="outline"
           aria-label="Create new chat"
         >
           <Plus className={collapsed ? 'h-4 w-4' : 'mr-2 h-3 w-3'} />
@@ -85,7 +88,7 @@ export function Sidebar({
         </Button>
       </div>
 
-      <nav className="space-y-1 border-b border-border px-2 py-3" aria-label="Primary navigation">
+      <nav className="space-y-1 border-b border-border/60 px-2 py-3" aria-label="Primary navigation">
         <NavItem icon={<Home className="h-4 w-4" />} label="Home" collapsed={collapsed} onClick={() => (window.location.href = '/')} />
         <NavItem icon={<MessageSquare className="h-4 w-4" />} label="Chats" collapsed={collapsed} active />
         <NavItem icon={<Palette className="h-4 w-4" />} label="Design" collapsed={collapsed} disabled />
@@ -93,14 +96,14 @@ export function Sidebar({
       </nav>
 
       {!collapsed && (
-        <div className="border-b border-border px-2 py-2">
+        <div className="border-b border-border/60 px-2 py-2">
           <div className="relative">
             <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
             <Input
               placeholder="Search chats..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-7 text-xs"
+              className="h-7 border-border/70 bg-transparent pl-7 text-xs"
               aria-label="Search chats"
             />
           </div>
@@ -150,7 +153,7 @@ export function Sidebar({
         </div>
       </ScrollArea>
 
-      <div className="space-y-1 border-t border-border p-2">
+      <div className="space-y-1 border-t border-border/60 p-2">
         <NavItem icon={<Settings className="h-4 w-4" />} label="Settings" collapsed={collapsed} disabled />
         <NavItem icon={<LogOut className="h-4 w-4" />} label="Sign Out" collapsed={collapsed} disabled />
       </div>
@@ -159,17 +162,15 @@ export function Sidebar({
 
   return (
     <>
-      <div className="hidden md:block">{content}</div>
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Mobile sidebar">
-          <button
-            className="absolute inset-0 bg-background/70 backdrop-blur-sm"
-            onClick={() => onMobileOpenChange?.(false)}
-            aria-label="Close sidebar overlay"
-          />
-          <div className="absolute inset-y-0 left-0 w-64">{content}</div>
-        </div>
-      )}
+      <div className="hidden h-full md:block">{content}</div>
+      <Drawer open={mobileOpen} onOpenChange={onMobileOpenChange} shouldScaleBackground={false} snapPoints={[0.3, 0.5, 0.7, 1]}>
+        <DrawerContent showOverlay={false} className="md:hidden h-[70dvh] rounded-t-2xl border-border/70 bg-background/95">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle className="text-sm">App menu</DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
+        </DrawerContent>
+      </Drawer>
     </>
   )
 }
@@ -195,8 +196,8 @@ function NavItem({ icon, label, active, onClick, collapsed, disabled }: NavItemP
         collapsed ? 'justify-center' : ''
       } ${
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-background hover:text-foreground'
+          ? 'text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]'
+          : 'text-muted-foreground hover:text-foreground'
       }`}
     >
       {icon}
@@ -224,8 +225,8 @@ function ChatItem({ chat, active, onClick, collapsed }: ChatItemProps) {
         collapsed ? 'justify-center' : ''
       } ${
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-background hover:text-foreground'
+          ? 'text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]'
+          : 'text-muted-foreground hover:text-foreground'
       }`}
       title={chat.title}
     >
