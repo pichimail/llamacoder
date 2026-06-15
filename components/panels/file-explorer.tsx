@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, Plus, MoreVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, Plus } from 'lucide-react';
 import clsx from 'clsx';
 
 interface FileNode {

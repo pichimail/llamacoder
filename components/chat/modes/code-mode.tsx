@@ -96,7 +96,7 @@ function FileTreeNode({ node, depth = 0 }: FileNodeProps) {
 }
 
 export function CodeMode({ chatId, projectId }: CodeModeProps) {
-  const { selectedFile, setSelectedFile } = useUIStore()
+  const { selectedFile } = useUIStore()
   const [fileContent, setFileContent] = useState('')
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+@import "../components/agent-elements/agent-ui.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -60,6 +61,14 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -86,6 +95,14 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -103,8 +120,140 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground antialiased;
   }
+}
+
+@layer components {
+  .typography {
+    @apply text-foreground;
+  }
+
+  .typography h1 {
+    @apply scroll-m-20 text-4xl font-extrabold tracking-tight text-balance;
+  }
+
+  .typography h2 {
+    @apply mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0;
+  }
+
+  .typography h3 {
+    @apply mt-8 scroll-m-20 text-2xl font-semibold tracking-tight;
+  }
+
+  .typography h4 {
+    @apply scroll-m-20 text-xl font-semibold tracking-tight;
+  }
+
+  .typography p {
+    @apply leading-7 [&:not(:first-child)]:mt-6;
+  }
+
+  .typography blockquote {
+    @apply mt-6 border-l-2 pl-6 italic;
+  }
+
+  .typography ul {
+    @apply my-6 ml-6 list-disc [&>li]:mt-2;
+  }
+
+  .typography ol {
+    @apply my-6 ml-6 list-decimal [&>li]:mt-2;
+  }
+
+  .typography a {
+    @apply font-medium text-primary underline underline-offset-4;
+  }
+
+  .typography :not(pre) > code {
+    @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold;
+  }
+
+  .typography pre {
+    @apply my-6 overflow-x-auto rounded-lg border bg-muted p-4;
+  }
+
+  .typography pre code {
+    @apply bg-transparent p-0 font-mono text-sm font-normal;
+  }
+
+  .typography table {
+    @apply w-full;
+  }
+
+  .typography .table-wrapper,
+  .typography > div:has(> table) {
+    @apply my-6 w-full overflow-y-auto;
+  }
+
+  .typography th {
+    @apply border px-4 py-2 text-left font-bold [&[align=center]]:text-center [&[align=right]]:text-right;
+  }
+
+  .typography td {
+    @apply border px-4 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right;
+  }
+
+  .typography tr {
+    @apply m-0 border-t p-0 even:bg-muted;
+  }
+
+  .typography small {
+    @apply text-sm leading-none font-medium;
+  }
+
+  .typography-sm {
+    @apply text-sm leading-relaxed;
+  }
+
+  .typography-sm h1 {
+    @apply text-2xl lg:text-3xl;
+  }
+
+  .typography-sm h2 {
+    @apply mt-8 text-2xl;
+  }
+
+  .typography-sm h3 {
+    @apply mt-6 text-xl;
+  }
+
+  .typography-sm h4 {
+    @apply text-lg;
+  }
+
+  .typography-sm p {
+    @apply leading-relaxed;
+  }
+}
+
+@layer utilities {
+  .text-lead {
+    @apply text-xl text-muted-foreground;
+  }
+
+  .text-large {
+    @apply text-lg font-semibold;
+  }
+
+  .text-small {
+    @apply text-sm leading-none font-medium;
+  }
+
+  .typography-muted {
+    @apply text-sm text-muted-foreground;
+  }
+}
+
+/* Sidebar headings: solid text only — no gradient / clip / shimmer artifacts */
+[data-sidebar="group-label"],
+[data-sidebar="header"] .font-semibold,
+[data-sidebar="header"] .text-xs {
+  background-image: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
 }
 
 ::-webkit-scrollbar {
@@ -338,7 +487,8 @@ a:hover {
   color: hsl(var(--muted-foreground));
 }
 
-.hyperspeed-gradient-text {
+/* Hero-only gradient text — never bleed into sidebar or UI chrome */
+#hero-headline .hyperspeed-gradient-text {
   background-image: linear-gradient(
     100deg,
     #5b8bf7 8%,
@@ -357,7 +507,7 @@ a:hover {
   animation: subtle-gradient-shift 14s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
 
-.hyperspeed-gradient-text span {
+#hero-headline .hyperspeed-gradient-text span {
   background-image: inherit;
   background-size: inherit;
   background-position: inherit;
@@ -376,8 +526,9 @@ a:hover {
   }
 }
 
-.hyperspeed-gradient-text:hover,
-.hyperspeed-gradient-text:hover span {
+/* Mouse hover effect: gentle speed-up + lift in vibrance */
+#hero-headline .hyperspeed-gradient-text:hover,
+#hero-headline .hyperspeed-gradient-text:hover span {
   animation-duration: 5.5s;
   filter: brightness(1.12) saturate(1.08);
 }

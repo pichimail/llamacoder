@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import {
   getMainCodingPrompt,
   screenshotToCodePrompt,
   softwareArchitectPrompt,
 } from "@/lib/prompts";
+import { getShadcnFewShotPrompt } from "@/lib/shadcn-examples";
 import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
@@ -17,7 +19,37 @@ const createChatSchema = z.object({
   quality: z.enum(["low", "high"]).optional().default("low"),
   screenshotUrl: z.string().url().optional(),
   mode: z.enum(["ask", "plan", "agent"]).optional().default("agent"),
+  attachments: z
+    .array(
+      z.object({
+        kind: z.enum(["image", "file"]),
+        filename: z.string().min(1),
+        url: z.string().url().optional(),
+        size: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .optional()
+    .default([]),
 });
+
+function attachmentContext(attachments: {
+  kind: "image" | "file";
+  filename: string;
+  url?: string;
+  size?: number;
+}[]) {
+  if (attachments.length === 0) return "";
+  return `\n\nAttachments:\n${attachments
+    .map((attachment, index) => {
+      const parts = [
+        `${index + 1}. [${attachment.kind}] ${attachment.filename}`,
+      ];
+      if (attachment.size) parts.push(`${Math.round(attachment.size / 1024)} KB`);
+      if (attachment.url) parts.push(attachment.url);
+      return parts.join(" - ");
+    })
+    .join("\n")}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,8 +59,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request body" }, { status: 400 });
     }
 
-    const { prompt, model, quality, screenshotUrl, mode } = parsed.data;
+    const { prompt, model, quality, screenshotUrl, mode, attachments } = parsed.data;
     const resolvedModel = resolveModel(model);
+    const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
@@ -48,7 +81,7 @@ export async function POST(request: NextRequest) {
       data: { model: resolvedModel, quality, prompt, title: "", shadcn: true },
     });
 
-    let title = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
+    let title = promptWithAttachments.trim().split(/\s+/).slice(0, 6).join(" ");
     if (title.length > 60) title = title.slice(0, 57) + "...";
     try {
       const responseForChatTitle = await createTextWithFallback({
@@ -57,7 +90,7 @@ export async function POST(request: NextRequest) {
         maxTokens: 80,
         messages: [
           { role: "system", content: "Create a succinct 3-5 word title for this app-building chat. Return only the title." },
-          { role: "user", content: prompt },
+          { role: "user", content: promptWithAttachments },
         ],
       });
       const aiTitle = responseForChatTitle.content.trim();
@@ -99,18 +132,23 @@ export async function POST(request: NextRequest) {
           maxTokens: 3000,
           messages: [
             { role: "system", content: softwareArchitectPrompt },
-            { role: "user", content: fullScreenshotDescription ? fullScreenshotDescription + prompt : prompt },
+            {
+              role: "user",
+              content: fullScreenshotDescription
+                ? fullScreenshotDescription + promptWithAttachments
+                : promptWithAttachments,
+            },
           ],
         });
         planContent = initialRes.content || undefined;
       } catch (planErr) {
         console.warn("High quality plan generation failed, falling back to raw prompt:", planErr);
       }
-      userMessage = planContent ?? prompt;
+      userMessage = planContent ?? promptWithAttachments;
     } else if (fullScreenshotDescription) {
-      userMessage = `${prompt}\n\nRECREATE THIS APP AS CLOSELY AS POSSIBLE:\n${fullScreenshotDescription}`;
+      userMessage = `${promptWithAttachments}\n\nRECREATE THIS APP AS CLOSELY AS POSSIBLE:\n${fullScreenshotDescription}`;
     } else {
-      userMessage = prompt;
+      userMessage = promptWithAttachments;
     }
 
     const newChat = await prisma.chat.update({
@@ -118,12 +156,27 @@ export async function POST(request: NextRequest) {
       data: {
         title,
         messages: {
-          createMany: {
-            data: [
-              { role: "system", content: getMainCodingPrompt(mode, !!fullScreenshotDescription, false, prompt), position: 0 },
-              { role: "user", content: userMessage, position: 1 },
-            ],
-          },
+          create: [
+            {
+              role: "system",
+              content:
+                getMainCodingPrompt(
+                  mode,
+                  !!fullScreenshotDescription,
+                  false,
+                  promptWithAttachments,
+                ) + getShadcnFewShotPrompt(promptWithAttachments),
+              position: 0,
+            },
+            {
+              role: "user",
+              content: userMessage,
+              position: 1,
+              ...(attachments.length > 0
+                ? { files: attachments as Prisma.InputJsonValue }
+                : {}),
+            },
+          ],
         },
       },
       include: { messages: true },

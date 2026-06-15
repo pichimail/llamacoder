@@ -3,36 +3,37 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
-import { normalizeArtifactFiles } from "@/lib/artifact-analysis";
-import { SharePreviewClient } from "@/components/chats/share-preview-client";
+import { buildOgImagePath } from "@/lib/og-shared";
 
+/*
+  This is the Share page for v1 apps, before the chat interface was added.
+
+  It's here to preserve existing URLs.
+*/
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const id = (await params).id;
-  const generatedApp = await getGeneratedAppByID(id);
-  const sharedMessage = generatedApp ? null : await getMessageByID(id);
-  const prompt = generatedApp?.prompt || sharedMessage?.chat?.title;
+  const generatedApp = await getGeneratedAppByID((await params).id);
 
+  let prompt = generatedApp?.prompt;
   if (typeof prompt !== "string") {
     notFound();
   }
 
-  const searchParams = new URLSearchParams();
-  searchParams.set("prompt", prompt);
+  const ogImageUrl = buildOgImagePath({ prompt });
 
   return {
     title: "An app generated on Chinna-Coder",
-    description: `Prompt: ${prompt}`,
+    description: `Prompt: ${generatedApp?.prompt}`,
     openGraph: {
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
     },
     twitter: {
       title: "An app generated on Chinna-Coder",
       card: "summary_large_image",
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
     },
   };
 }
@@ -43,27 +44,22 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // if process.env.DATABASE_URL is not set, throw an error
   if (typeof id !== "string") {
     notFound();
   }
 
   const generatedApp = await getGeneratedAppByID(id);
 
-  if (generatedApp) {
-    return (
-      <div className="flex h-full w-full grow items-center justify-center">
-        <CodeRunner language="tsx" code={generatedApp.code} showDeviceToggle={false} />
-      </div>
-    );
+  if (!generatedApp) {
+    return <div>App not found</div>;
   }
 
-  const message = await getMessageByID(id);
-  if (!message || message.role !== "assistant") notFound();
-
-  const files = normalizeArtifactFiles(message.files);
-  if (!files.length) notFound();
-
-  return <SharePreviewClient title={message.chat.title || "Shared app"} files={files} />;
+  return (
+    <div className="flex h-full w-full grow items-center justify-center">
+      <CodeRunner language="tsx" code={generatedApp.code} />
+    </div>
+  );
 }
 
 const getGeneratedAppByID = cache(async (id: string) => {
@@ -72,13 +68,5 @@ const getGeneratedAppByID = cache(async (id: string) => {
     where: {
       id,
     },
-  });
-});
-
-const getMessageByID = cache(async (id: string) => {
-  const prisma = getPrisma();
-  return prisma.message.findUnique({
-    where: { id },
-    include: { chat: true },
   });
 });

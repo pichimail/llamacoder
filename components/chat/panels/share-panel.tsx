@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Copy, Lock, Globe, Check, X } from 'lucide-react'
+import { Copy, Lock, Globe, Check } from 'lucide-react'
 
 interface SharePanelProps {
   chatId: string
@@ -22,7 +22,7 @@ interface SharePanelProps {
 export function SharePanel({ chatId, title }: SharePanelProps) {
   const [isCopied, setIsCopied] = useState(false)
   const [visibility, setVisibility] = useState<'private' | 'link' | 'public'>('private')
-  const [collaborators, setCollaborators] = useState([
+  const [collaborators] = useState([
     { email: 'you@example.com', name: 'You', role: 'Owner' },
   ])
 

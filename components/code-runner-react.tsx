@@ -240,14 +240,15 @@ function PreviewStatusMonitor({
             >
               <RefreshCw className="size-3.5" aria-hidden="true" /> Refresh
             </button>
-            <button
-              onClick={() => onRequestFix?.(errorMessage)}
-              disabled={!onRequestFix}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-foreground transition hover:border-foreground/40 disabled:opacity-40"
-              aria-label="Try to automatically fix the error"
-            >
-              <Wand2 className="size-3.5" aria-hidden="true" /> Try fix
-            </button>
+            {onRequestFix ? (
+              <button
+                onClick={() => onRequestFix(errorMessage)}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-foreground transition hover:border-foreground/40"
+                aria-label="Try to automatically fix the error"
+              >
+                <Wand2 className="size-3.5" aria-hidden="true" /> Try fix
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

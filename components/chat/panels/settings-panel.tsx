@@ -16,7 +16,6 @@ import {
   Settings,
   Zap,
   Lock,
-  Database,
   Globe,
   BarChart2,
   Plus,

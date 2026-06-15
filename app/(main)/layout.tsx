@@ -1,5 +1,6 @@
 import Providers from "@/app/(main)/providers";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
+import { Toaster as RadixToaster } from "@/components/ui/toaster";
 
 export default function Layout({
   children,
@@ -8,11 +9,11 @@ export default function Layout({
 }>) {
   return (
     <Providers>
-      <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
+      <div className="flex min-h-full flex-col">
         {children}
-
-        <Toaster />
-      </body>
+        <Toaster richColors closeButton position="top-right" />
+        <RadixToaster />
+      </div>
     </Providers>
   );
 }

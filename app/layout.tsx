@@ -43,8 +43,12 @@ export default function RootLayout({
       <head>
         <PlausibleProvider domain="llamacoder.io" />
       </head>
-
-      {children}
+      <body
+        className="flex min-h-full flex-col bg-background font-sans text-foreground antialiased"
+        suppressHydrationWarning
+      >
+        {children}
+      </body>
     </html>
   );
 }

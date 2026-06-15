@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, Database, Table, Eye, EyeOff } from 'lucide-react';
+import { ChevronRight, ChevronDown, Database, Table } from 'lucide-react';
 import clsx from 'clsx';
 
 interface Column {

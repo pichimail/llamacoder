@@ -1,8 +1,10 @@
 import { getPrisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { SUGGESTED_PROMPTS } from "@/lib/constants";
+import { buildOgImagePath } from "@/lib/og-shared";
 import Header from "@/components/header";
 import { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Hammer } from "lucide-react";
 
@@ -104,8 +106,23 @@ export default async function GalleryPage() {
             {builds.map((b) => (
               <div
                 key={b.id}
-                className="rounded-xl border border-border/70 bg-card/50 p-4"
+                className="overflow-hidden rounded-xl border border-border/70 bg-card/50"
               >
+                {b.shareMessageId ? (
+                  <div className="relative aspect-[1200/630] border-b border-border/70 bg-muted/40">
+                    <Image
+                      src={buildOgImagePath({
+                        prompt: b.title,
+                        messageId: b.shareMessageId,
+                      })}
+                      alt={`Preview card for ${b.title}`}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
+                <div className="p-4">
                 <div className="truncate text-sm font-medium">{b.title}</div>
                 <div className="mt-1 text-[11px] text-muted-foreground">
                   {b.model} · {b.fileCount} files
@@ -125,6 +142,7 @@ export default async function GalleryPage() {
                   >
                     Open in builder
                   </Link>
+                </div>
                 </div>
               </div>
             ))}
