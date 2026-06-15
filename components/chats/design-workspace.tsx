@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ComponentProps, KeyboardEvent, MouseEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import type { ArtifactFile } from '@/lib/artifact-analysis'
@@ -9,7 +10,7 @@ import { ModeDesign } from './mode-design'
 
 const CodeRunner = dynamic(() => import('@/components/code-runner'), { ssr: false })
 
-type SavedDesignMessage = Parameters<NonNullable<React.ComponentProps<typeof ModeDesign>['onSaved']>>[0]
+type SavedDesignMessage = Parameters<NonNullable<ComponentProps<typeof ModeDesign>['onSaved']>>[0]
 
 interface DesignWorkspaceProps {
   chatId: string
@@ -44,14 +45,14 @@ export function DesignWorkspace({
     setLiveFiles(files)
   }, [filesKey, files])
 
-  const onSplitterMouseDown = (event: React.MouseEvent) => {
+  const onSplitterMouseDown = (event: MouseEvent) => {
     event.preventDefault()
     dragRef.current = { startX: event.clientX, startWidth: inspectorWidth }
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
   }
 
-  const onSplitterKeyDown = (event: React.KeyboardEvent) => {
+  const onSplitterKeyDown = (event: KeyboardEvent) => {
     const step = event.shiftKey ? 48 : 16
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -64,7 +65,7 @@ export function DesignWorkspace({
   }
 
   useEffect(() => {
-    const onMouseMove = (event: MouseEvent) => {
+    const onMouseMove = (event: globalThis.MouseEvent) => {
       if (!dragRef.current) return
       const delta = dragRef.current.startX - event.clientX
       setInspectorWidth(
