@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   Code2,
   Copy,
@@ -89,7 +89,7 @@ export function ChatsContextMenu({
   const left = Math.min(x, Math.max(12, window.innerWidth - 286));
   const top = Math.min(y, Math.max(12, window.innerHeight - 430));
 
-  const run = (fn: () => void) => (event: React.MouseEvent) => {
+  const run = (fn: () => void) => (event: ReactMouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     fn();
@@ -154,7 +154,7 @@ function MenuSection({ children, last }: { children: ReactNode; last?: boolean }
   return <div className={last ? "py-1" : "border-b border-border/60 py-1"}>{children}</div>;
 }
 
-function MenuItem({ icon, label, shortcut, trailing, disabled, onClick }: { icon: ReactNode; label: string; shortcut?: string; trailing?: string; disabled?: boolean; onClick: (event: React.MouseEvent) => void }) {
+function MenuItem({ icon, label, shortcut, trailing, disabled, onClick }: { icon: ReactNode; label: string; shortcut?: string; trailing?: string; disabled?: boolean; onClick: (event: ReactMouseEvent) => void }) {
   return (
     <button
       type="button"
