@@ -17,6 +17,7 @@ import ThemeToggle from "@/components/theme-toggle";
 import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, Menu, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
+import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
 import { Sidebar } from "@/components/chats/sidebar";
@@ -62,6 +63,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [appSidebarCollapsed, setAppSidebarCollapsed] = useState(true);
   const [mobileAppMenuOpen, setMobileAppMenuOpen] = useState(false);
   const [mobileOptionsOpen, setMobileOptionsOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [designDirty, setDesignDirty] = useState(false);
   const [designSaveRequest, setDesignSaveRequest] = useState(0);
   const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
@@ -359,6 +361,11 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     toast({ title: "Share link copied", description: url });
   }, [activeMessage?.id]);
 
+  const handleCopyCurrentUrl = useCallback(async () => {
+    await navigator.clipboard.writeText(window.location.href).catch(() => undefined);
+    toast({ title: "Chat URL copied" });
+  }, []);
+
   const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     const response = await fetch(`/api/workspace/${chat.id}`, {
       method: "POST",
@@ -395,6 +402,18 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       toast({ title: "PR failed", description: error instanceof Error ? error.message : "Could not create PR.", variant: "destructive" });
     }
   }, [artifactFiles, workspaceRequest]);
+
+  const handleWorkspaceContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (window.innerWidth < 768) return;
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  const switchModeFromMenu = useCallback((mode: BuilderMode) => {
+    setModeSafely(mode);
+    if (mode === "preview" || mode === "design" || mode === "database") setMobilePanel("preview");
+    if (mode === "code") setMobilePanel("code");
+  }, [setModeSafely]);
 
   const renderBuilderSurface = () => {
     if (builderMode === "design") {
@@ -458,7 +477,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   return (
     <TooltipProvider>
-      <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+      <div className="flex h-dvh overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
         <Sidebar
           currentChatId={chat.id}
           chats={sidebarChats}
@@ -479,7 +498,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
                 <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button>
               </Tip>
-              <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 bg-transparent px-2 py-1 text-xs text-muted-foreground">
+              <div className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
                 <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
                 <span className="hidden sm:inline">•</span>
                 <span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span>
@@ -508,7 +527,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
-              {activeMessage && activeVersion && <div className="flex items-center gap-2 border-b border-border/60 bg-transparent px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+              {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
               <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
               <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
             </section>
@@ -518,6 +537,28 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
             <section className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:flex md:min-w-[360px]`} aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
           </div>
         </div>
+
+        <ChatsContextMenu
+          open={!!contextMenu}
+          x={contextMenu?.x ?? 0}
+          y={contextMenu?.y ?? 0}
+          canAct={canAct}
+          fileCount={artifactFiles.length}
+          activeVersionLabel={activeVersion?.label}
+          autoFixEnabled={autoFixEnabled}
+          previewMode={previewMode}
+          onClose={() => setContextMenu(null)}
+          onNewChat={() => router.push("/")}
+          onCopyUrl={handleCopyCurrentUrl}
+          onShare={handleShareLink}
+          onPublish={handlePublishMobile}
+          onDownload={handleDownloadZip}
+          onCreatePr={handleCreatePrMobile}
+          onPreviousVersion={handleUndo}
+          onToggleAutoFix={() => handleAutoFixEnabledChange(!autoFixEnabled)}
+          onSwitchMode={switchModeFromMenu}
+          onTogglePreviewMode={() => setPreviewMode(nextPreviewMode)}
+        />
 
         <Drawer open={mobileOptionsOpen} onOpenChange={setMobileOptionsOpen} shouldScaleBackground={false} snapPoints={[0.3, 0.5, 0.7, 1]}>
           <DrawerContent showOverlay={false} className="md:hidden h-[70dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
