@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 
 import type { ArtifactFile } from '@/lib/artifact-analysis'
 import { ModeDesign } from './mode-design'
+import type { PreviewMode } from '@/components/code-runner-react'
 
 const CodeRunner = dynamic(() => import('@/components/code-runner'), { ssr: false })
 
@@ -21,10 +22,12 @@ interface DesignWorkspaceProps {
   onPreviewReady: () => void
   onDirtyChange: (dirty: boolean) => void
   onSaved: (message?: SavedDesignMessage, files?: ArtifactFile[]) => void
+  saveRequest?: number
+  previewMode: PreviewMode
 }
 
 const MIN_INSPECTOR_WIDTH = 300
-const MAX_INSPECTOR_WIDTH = 520
+const MAX_INSPECTOR_WIDTH = 560
 
 export function DesignWorkspace({
   chatId,
@@ -35,9 +38,12 @@ export function DesignWorkspace({
   onPreviewReady,
   onDirtyChange,
   onSaved,
+  saveRequest = 0,
+  previewMode,
 }: DesignWorkspaceProps) {
   const [liveFiles, setLiveFiles] = useState(files)
-  const [inspectorWidth, setInspectorWidth] = useState(380)
+  const [inspectorWidth, setInspectorWidth] = useState(400)
+  const [inspectorActive, setInspectorActive] = useState(true)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const filesKey = files.map((file) => `${file.path}:${file.code.length}`).join('|')
 
@@ -104,15 +110,26 @@ export function DesignWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
-      <section className="min-h-0 flex-1 overflow-hidden bg-background" aria-label="Live design preview">
+      <section
+        className={`relative min-h-0 flex-1 overflow-hidden bg-background ${inspectorActive ? 'cursor-crosshair' : ''}`}
+        aria-label="Live design preview"
+      >
         {liveFiles.length > 0 ? (
-          <CodeRunner
-            files={liveFiles.map((file) => ({ path: file.path, content: file.code }))}
-            onRequestFix={onRequestFix}
-            onPreviewError={onPreviewError}
-            onPreviewReady={onPreviewReady}
-            showDeviceToggle={false}
-          />
+          <>
+            <CodeRunner
+              files={liveFiles.map((file) => ({ path: file.path, content: file.code }))}
+              onRequestFix={onRequestFix}
+              onPreviewError={onPreviewError}
+              onPreviewReady={onPreviewReady}
+              showDeviceToggle={false}
+              previewMode={previewMode}
+            />
+            {inspectorActive && (
+              <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-background/85 px-2 py-1 text-[11px] text-muted-foreground shadow-lg backdrop-blur">
+                Inspector active. Select exact JSX layers from the right panel.
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             {isStreaming && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
@@ -150,6 +167,9 @@ export function DesignWorkspace({
           onDirtyChange={onDirtyChange}
           onPreviewFiles={handlePreviewFiles}
           onSaved={handleSaved}
+          saveRequest={saveRequest}
+          inspectorActive={inspectorActive}
+          onInspectorActiveChange={setInspectorActive}
         />
       </aside>
     </div>
