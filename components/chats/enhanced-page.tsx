@@ -27,7 +27,6 @@ import { Sidebar } from './sidebar'
 import { ArtifactPreview } from './artifact-preview'
 import { WorkspaceProvider, type WorkspacePreviewMode } from './workspace-context'
 import type { ArtifactFile } from '@/lib/artifact-analysis'
-import { downloadFilesAsZip } from '@/app/(main)/chats/[id]/code-viewer'
 
 interface EnhancedPageProps {
   chatId: string
@@ -46,7 +45,6 @@ export function EnhancedPage({
   chatModel,
   artifactFiles,
   latestMessageId,
-  children,
 }: EnhancedPageProps) {
   const [currentMode, setCurrentMode] = useState<ChatMode>('preview')
   const [pendingMode, setPendingMode] = useState<ChatMode | null>(null)
@@ -138,21 +136,29 @@ export function EnhancedPage({
     }
   }, [currentMode])
 
-  const publishUrl = latestMessageId ? `/share/v2/${latestMessageId}` : ''
-
   const handlePublish = () => {
     if (!latestMessageId) return
-    const absolute = `${window.location.origin}${publishUrl}`
-    void navigator.clipboard?.writeText(absolute)
-    window.open(absolute, '_blank', 'noopener,noreferrer')
+    const url = `${window.location.origin}/share/v2/${latestMessageId}`
+    void navigator.clipboard?.writeText(url)
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const handleDownload = () => {
-    void downloadFilesAsZip(artifactFiles, chatTitle || 'artifact')
+  const handleDownload = async () => {
+    if (!artifactFiles.length) return
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+    artifactFiles.forEach((file) => zip.file(file.path.replace(/^\/+/, ''), file.code))
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(chatTitle || 'artifact').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const promptPanel = (
-    <aside className="hidden w-[360px] shrink-0 border-r border-border bg-background lg:flex lg:flex-col" aria-label="Prompt and artifact versions">
+    <aside className="hidden w-[360px] shrink-0 border-r border-border bg-background lg:flex lg:flex-col" aria-label="Prompt and files">
       <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         Prompt
       </div>
@@ -172,40 +178,35 @@ export function EnhancedPage({
   )
 
   const renderModeContent = () => {
-    switch (currentMode) {
-      case 'code':
-        return <ModeCode chatId={chatId} files={artifactFiles} />
-      case 'design':
-        return (
-          <div className="flex h-full min-w-0 overflow-hidden">
-            {promptPanel}
-            <section className="min-w-0 flex-1 overflow-hidden" aria-label="Live artifact canvas">
-              <ArtifactPreview files={artifactFiles} previewMode={previewMode} />
-            </section>
-            <aside className="hidden w-[380px] shrink-0 overflow-hidden border-l border-border bg-card xl:block" aria-label="Design inspector">
-              <ModeDesign
-                chatId={chatId}
-                files={artifactFiles}
-                saveRequest={requestDesignSave}
-                onDirtyChange={setDesignDirty}
-                onSaved={afterDesignSaved}
-              />
-            </aside>
-          </div>
-        )
-      case 'database':
-        return <ModeDatabase chatId={chatId} files={artifactFiles} />
-      case 'preview':
-      default:
-        return (
-          <div className="flex h-full min-w-0 overflow-hidden">
-            {promptPanel}
-            <section className="min-w-0 flex-1 overflow-hidden" aria-label="Artifact preview">
-              <ArtifactPreview files={artifactFiles} previewMode={previewMode} />
-            </section>
-          </div>
-        )
+    if (currentMode === 'code') return <ModeCode chatId={chatId} files={artifactFiles} />
+    if (currentMode === 'database') return <ModeDatabase chatId={chatId} files={artifactFiles} />
+    if (currentMode === 'design') {
+      return (
+        <div className="flex h-full min-w-0 overflow-hidden">
+          {promptPanel}
+          <section className="min-w-0 flex-1 overflow-hidden" aria-label="Live artifact canvas">
+            <ArtifactPreview files={artifactFiles} previewMode={previewMode} />
+          </section>
+          <aside className="hidden w-[380px] shrink-0 overflow-hidden border-l border-border bg-card xl:block" aria-label="Design inspector">
+            <ModeDesign
+              chatId={chatId}
+              files={artifactFiles}
+              saveRequest={requestDesignSave}
+              onDirtyChange={setDesignDirty}
+              onSaved={afterDesignSaved}
+            />
+          </aside>
+        </div>
+      )
     }
+    return (
+      <div className="flex h-full min-w-0 overflow-hidden">
+        {promptPanel}
+        <section className="min-w-0 flex-1 overflow-hidden" aria-label="Artifact preview">
+          <ArtifactPreview files={artifactFiles} previewMode={previewMode} />
+        </section>
+      </div>
+    )
   }
 
   return (
@@ -225,13 +226,7 @@ export function EnhancedPage({
             <main className="flex min-w-0 flex-1 flex-col overflow-hidden" aria-label="Artifact workspace">
               <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border bg-background px-2 text-sm">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 md:hidden"
-                    onClick={() => setMobileSidebarOpen(true)}
-                    aria-label="Open sidebar"
-                  >
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 md:hidden" onClick={() => setMobileSidebarOpen(true)} aria-label="Open sidebar">
                     <PanelLeftOpen className="h-4 w-4" />
                   </Button>
                   <Button
@@ -272,7 +267,7 @@ export function EnhancedPage({
                     </Tip>
                   )}
                   <Tip label="Download ZIP">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleDownload} aria-label="Download artifact ZIP">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleDownload} aria-label="Download artifact ZIP" disabled={!artifactFiles.length}>
                       <Download className="h-4 w-4" />
                     </Button>
                   </Tip>
@@ -288,24 +283,10 @@ export function EnhancedPage({
                       Publish
                     </Button>
                   </Tip>
-                  <Button
-                    variant={rightPanel === 'share' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setRightPanel(rightPanel === 'share' ? null : 'share')}
-                    aria-label="Share current artifact"
-                    aria-pressed={rightPanel === 'share'}
-                  >
+                  <Button variant={rightPanel === 'share' ? 'secondary' : 'ghost'} size="sm" className="h-8 w-8 p-0" onClick={() => setRightPanel(rightPanel === 'share' ? null : 'share')} aria-label="Share current artifact" aria-pressed={rightPanel === 'share'}>
                     <Share2 className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant={rightPanel === 'settings' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setRightPanel(rightPanel === 'settings' ? null : 'settings')}
-                    aria-label="Open artifact menu"
-                    aria-pressed={rightPanel === 'settings'}
-                  >
+                  <Button variant={rightPanel === 'settings' ? 'secondary' : 'ghost'} size="sm" className="h-8 w-8 p-0" onClick={() => setRightPanel(rightPanel === 'settings' ? null : 'settings')} aria-label="Open artifact menu" aria-pressed={rightPanel === 'settings'}>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </div>
@@ -321,13 +302,7 @@ export function EnhancedPage({
                     {rightPanel === 'share' ? (
                       <SharePanel chatId={chatId} onClose={() => setRightPanel(null)} />
                     ) : (
-                      <SettingsPanel
-                        chatId={chatId}
-                        chatTitle={chatTitle}
-                        chatModel={chatModel}
-                        files={artifactFiles}
-                        onClose={() => setRightPanel(null)}
-                      />
+                      <SettingsPanel chatId={chatId} chatTitle={chatTitle} chatModel={chatModel} files={artifactFiles} onClose={() => setRightPanel(null)} />
                     )}
                   </aside>
                 )}
@@ -342,25 +317,14 @@ export function EnhancedPage({
                 {rightPanel === 'share' ? (
                   <SharePanel chatId={chatId} onClose={() => setRightPanel(null)} />
                 ) : (
-                  <SettingsPanel
-                    chatId={chatId}
-                    chatTitle={chatTitle}
-                    chatModel={chatModel}
-                    files={artifactFiles}
-                    onClose={() => setRightPanel(null)}
-                  />
+                  <SettingsPanel chatId={chatId} chatTitle={chatTitle} chatModel={chatModel} files={artifactFiles} onClose={() => setRightPanel(null)} />
                 )}
               </div>
             </div>
           )}
 
           {pendingMode && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="unsaved-design-title"
-            >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
               <div className="w-full max-w-sm rounded-lg border border-border bg-card p-4 shadow-2xl">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 id="unsaved-design-title" className="text-sm font-semibold">Unsaved design changes</h2>
@@ -368,16 +332,10 @@ export function EnhancedPage({
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Save the live edits before leaving Design mode, or discard the pending changes.
-                </p>
+                <p className="mb-4 text-sm text-muted-foreground">Save the live edits before leaving Design mode, or discard the pending changes.</p>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={confirmDiscardDesignChanges}>
-                    Discard Changes
-                  </Button>
-                  <Button size="sm" onClick={confirmSaveDesignChanges}>
-                    Save Changes <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                  </Button>
+                  <Button variant="outline" size="sm" onClick={confirmDiscardDesignChanges}>Discard Changes</Button>
+                  <Button size="sm" onClick={confirmSaveDesignChanges}>Save Changes <ChevronRight className="ml-1 h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             </div>
