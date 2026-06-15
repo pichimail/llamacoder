@@ -27,7 +27,6 @@ import { Tip } from "@/components/ui/tooltip";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 
 type WorkspaceState = Awaited<ReturnType<typeof getArtifactWorkspace>>;
-
 type VersionOption = { id: string; version: number; label: string };
 
 interface ArtifactActionBarProps {
@@ -127,10 +126,12 @@ export function ArtifactActionBar({
     startTransition(async () => {
       const result = await createGithubPullRequest(chatId, files);
       if (!result.ok) {
-        toast({ title: "GitHub not ready", description: result.reason, variant: "destructive" });
+        const reason = "reason" in result ? result.reason : "GitHub is not ready yet.";
+        toast({ title: "GitHub not ready", description: reason, variant: "destructive" });
         return;
       }
-      toast({ title: "PR request queued", description: `${files.length} files prepared for GitHub.` });
+      const preparedCount = "fileCount" in result ? result.fileCount : files.length;
+      toast({ title: "PR request queued", description: `${preparedCount} files prepared for GitHub.` });
       const next = await getArtifactWorkspace(chatId);
       setWorkspace(next);
     });
@@ -174,20 +175,8 @@ export function ArtifactActionBar({
       {versions.length > 0 && (
         <label className="hidden items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground sm:flex">
           <span className="sr-only">Version</span>
-          <select
-            value={activeMessageId || ""}
-            onChange={(event) => onSwitchVersion(event.target.value)}
-            className="max-w-[110px] bg-transparent text-xs text-foreground outline-none"
-            aria-label="Switch generated version"
-          >
-            {versions
-              .slice()
-              .reverse()
-              .map((version) => (
-                <option key={version.id} value={version.id}>
-                  {version.label}
-                </option>
-              ))}
+          <select value={activeMessageId || ""} onChange={(event) => onSwitchVersion(event.target.value)} className="max-w-[110px] bg-transparent text-xs text-foreground outline-none" aria-label="Switch generated version">
+            {versions.slice().reverse().map((version) => <option key={version.id} value={version.id}>{version.label}</option>)}
           </select>
           <ChevronDown className="size-3" aria-hidden="true" />
         </label>
@@ -195,82 +184,33 @@ export function ArtifactActionBar({
 
       <input ref={uploadRef} type="file" className="hidden" onChange={handleUpload} />
 
-      <Tip label="Upload asset">
-        <button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset">
-          <Upload className="size-4" aria-hidden="true" />
-        </button>
-      </Tip>
-      <Tip label="Export zip">
-        <button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files">
-          <Download className="size-4" aria-hidden="true" />
-        </button>
-      </Tip>
-      <Tip label="Share link">
-        <button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link">
-          <Share2 className="size-4" aria-hidden="true" />
-        </button>
-      </Tip>
+      <Tip label="Upload asset"><button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset"><Upload className="size-4" aria-hidden="true" /></button></Tip>
+      <Tip label="Export zip"><button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files"><Download className="size-4" aria-hidden="true" /></button></Tip>
+      <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Publish site">
-        <button
-          type="button"
-          onClick={handlePublish}
-          disabled={!canAct || isPending}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45"
-          aria-label="Publish site"
-        >
-          <ExternalLink className="size-3.5" aria-hidden="true" />
-          <span className="hidden lg:inline">Publish</span>
+        <button type="button" onClick={handlePublish} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site">
+          <ExternalLink className="size-3.5" aria-hidden="true" /><span className="hidden lg:inline">Publish</span>
         </button>
       </Tip>
-      {workspace?.hasGithub && (
-        <Tip label="Create pull request">
-          <button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request">
-            <GitPullRequest className="size-4" aria-hidden="true" />
-          </button>
-        </Tip>
-      )}
-      <Tip label="More project actions">
-        <button type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="More project actions">
-          <MoreHorizontal className="size-4" aria-hidden="true" />
-        </button>
-      </Tip>
+      {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
+      <Tip label="More project actions"><button type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
 
       {open && (
         <div className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
-          <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground">
-            <p className="font-medium text-foreground">{chatTitle}</p>
-            <p>{activeVersionLabel || "No version"} · {workspace?.fileCount ?? files.length} backend files</p>
-          </div>
+          <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground"><p className="font-medium text-foreground">{chatTitle}</p><p>{activeVersionLabel || "No version"} · {workspace?.fileCount ?? files.length} backend files</p></div>
           <div className="py-1">
-            <button type="button" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}>
-              <RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files
-            </button>
-            <button type="button" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}>
-              <GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}
-            </button>
+            <button type="button" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button>
+            <button type="button" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button>
           </div>
           <div className="border-t border-border p-2">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <KeyRound className="size-3" aria-hidden="true" /> Env vars
-            </div>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-1">
               <input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" />
               <input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" />
-              <button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">
-                Save
-              </button>
+              <button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">Save</button>
             </div>
             <div className="mt-2 max-h-24 space-y-1 overflow-auto">
-              {workspace?.envVars?.length ? (
-                workspace.envVars.map((env) => (
-                  <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]">
-                    <span className="font-mono text-foreground">{env.key}</span>
-                    <span className="text-muted-foreground">{env.value}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>
-              )}
+              {workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}
             </div>
           </div>
         </div>
