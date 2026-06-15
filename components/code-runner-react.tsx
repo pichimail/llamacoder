@@ -74,7 +74,15 @@ function PreviewStatusMonitor({
     let readyTimer: number | undefined;
 
     const unsubscribe = listen((message) => {
-      if (message.type === "done" && !(message as any).compilatonError) {
+      if (message.type === "done") {
+        if ((message as { compilatonError?: boolean }).compilatonError) {
+          window.clearTimeout(readyTimer);
+          if (sandpack.error?.message) {
+            onPreviewError?.(sandpack.error.message);
+          }
+          return;
+        }
+
         window.clearTimeout(readyTimer);
         readyTimer = window.setTimeout(() => {
           if (!sandpack.error) {
@@ -84,6 +92,14 @@ function PreviewStatusMonitor({
       }
       if (message.type === "action" && (message as any).action === "show-error") {
         window.clearTimeout(readyTimer);
+        const payload = (message as { payload?: { message?: string; title?: string } }).payload;
+        const errorText =
+          payload?.message ||
+          payload?.title ||
+          sandpack.error?.message;
+        if (errorText) {
+          onPreviewError?.(errorText);
+        }
       }
     });
 

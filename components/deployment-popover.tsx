@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import { Globe, Copy, Check, ExternalLink, Loader2 } from 'lucide-react';
-import clsx from 'clsx';
+
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface DeploymentPopoverProps {
   isOpen?: boolean;
@@ -29,33 +38,39 @@ export function DeploymentPopover({
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-lg border border-border max-w-md w-full p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Globe className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Deployments
-          </h2>
-        </div>
+    <AlertDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose?.();
+      }}
+    >
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-muted-foreground" />
+            <AlertDialogTitle>Deployments</AlertDialogTitle>
+          </div>
+          <AlertDialogDescription>
+            Preview and production URLs for {projectName}.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
         <div className="space-y-4">
-          {/* Preview Deployment */}
-          <div className="border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-foreground mb-2">Preview</h3>
+          <div className="rounded-lg border border-border p-4">
+            <h3 className="mb-2 text-sm font-medium text-foreground">Preview</h3>
             {previewUrl ? (
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground truncate">
+                <code className="flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
                   {previewUrl}
                 </code>
                 <button
+                  type="button"
                   onClick={() => handleCopy(previewUrl)}
-                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                  className="rounded p-1.5 hover:bg-muted"
                 >
                   {copiedUrl === previewUrl ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-green-500" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -63,31 +78,31 @@ export function DeploymentPopover({
                 <a
                   href={previewUrl}
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                  rel="noreferrer"
+                  className="rounded p-1.5 hover:bg-muted"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No preview available</p>
+              <p className="text-sm text-muted-foreground">No preview deployment yet</p>
             )}
           </div>
 
-          {/* Production Deployment */}
-          <div className="border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-foreground mb-2">Production</h3>
+          <div className="rounded-lg border border-border p-4">
+            <h3 className="mb-2 text-sm font-medium text-foreground">Production</h3>
             {productionUrl ? (
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground truncate">
+                <code className="flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
                   {productionUrl}
                 </code>
                 <button
+                  type="button"
                   onClick={() => handleCopy(productionUrl)}
-                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                  className="rounded p-1.5 hover:bg-muted"
                 >
                   {copiedUrl === productionUrl ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-green-500" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -95,69 +110,40 @@ export function DeploymentPopover({
                 <a
                   href={productionUrl}
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                  rel="noreferrer"
+                  className="rounded p-1.5 hover:bg-muted"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No production URL set</p>
+              <p className="text-sm text-muted-foreground">Not deployed to production</p>
             )}
           </div>
 
-          {/* Deployment Status */}
-          {deploymentStatus !== 'idle' && (
-            <div
-              className={clsx(
-                'p-3 rounded-lg text-sm font-medium flex items-center gap-2',
-                deploymentStatus === 'deploying' &&
-                  'bg-blue-600/20 text-blue-600',
-                deploymentStatus === 'success' &&
-                  'bg-green-600/20 text-green-600',
-                deploymentStatus === 'error' && 'bg-red-600/20 text-red-600'
-              )}
-            >
-              {deploymentStatus === 'deploying' && (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Deploying...
-                </>
-              )}
-              {deploymentStatus === 'success' && (
-                <>
-                  <Check className="h-4 w-4" />
-                  Successfully deployed
-                </>
-              )}
-              {deploymentStatus === 'error' && (
-                <>
-                  <span>Deployment failed</span>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Custom Domain */}
-          <div className="border-t border-border pt-4">
-            <label className="text-sm font-medium text-foreground block mb-2">
-              Custom Domain
-            </label>
-            <input
-              type="text"
-              placeholder="your-domain.com"
-              className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-sm placeholder:text-muted-foreground"
-            />
+          <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm">
+            {deploymentStatus === 'deploying' && (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                <span className="text-muted-foreground">Deploying...</span>
+              </>
+            )}
+            {deploymentStatus === 'success' && (
+              <span className="text-green-600">Deployment successful</span>
+            )}
+            {deploymentStatus === 'error' && (
+              <span className="text-red-500">Deployment failed</span>
+            )}
+            {deploymentStatus === 'idle' && (
+              <span className="text-muted-foreground">Ready to deploy</span>
+            )}
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted transition-colors mt-6"
-        >
-          Close
-        </button>
-      </div>
-    </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose}>Close</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

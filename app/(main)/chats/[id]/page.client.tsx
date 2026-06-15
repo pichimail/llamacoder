@@ -26,6 +26,12 @@ import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { toast } from "@/hooks/use-toast";
 import { Download, ExternalLink, Loader2, MessageSquare, Code2, Eye } from "lucide-react";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), {
@@ -50,18 +56,21 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const [streamText, setStreamText] = useState("");
   const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code");
   const [mobileView, setMobileView] = useState<MobilePanel>("code");
-  const [autoFixEnabled, setAutoFixEnabled] = useState(false);
+  const [autoFixEnabled, setAutoFixEnabled] = useState(true);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<
     "idle" | "watching" | "fixing" | "fallback" | "ready"
-  >("idle");
+  >("watching");
 
-  // Admin-controlled default for the self-correcting repair loop
+  // Admin can disable the self-correcting repair loop globally
   useEffect(() => {
     fetch("/api/public-settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.autoFixDefault) {
+        if (d?.autoFixDefault === false) {
+          setAutoFixEnabled(false);
+          setAutoFixStatus("idle");
+        } else {
           setAutoFixEnabled(true);
           setAutoFixStatus("watching");
         }
@@ -86,70 +95,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
   );
 
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
-
-  // Resizable left chat pane
-  const [chatPanelWidth, setChatPanelWidth] = useState(420);
-
-  const dragRef = useRef<{ startX: number; startChat: number } | null>(null);
-
-  const onSplitterMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startChat: chatPanelWidth };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  };
-
-  // Keyboard-accessible splitter resize
-  const onSplitterKeyDown = (e: React.KeyboardEvent) => {
-    const step = e.shiftKey ? 48 : 16;
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      setChatPanelWidth((w) => Math.max(MIN_CHAT_WIDTH, w - step));
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      setChatPanelWidth((w) => Math.min(MAX_CHAT_WIDTH, w + step));
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      setChatPanelWidth(MIN_CHAT_WIDTH);
-    } else if (e.key === "End") {
-      e.preventDefault();
-      setChatPanelWidth(MAX_CHAT_WIDTH);
-    }
-  };
-
-  useEffect(() => {
-    setChatPanelWidth((width) => {
-      const target = Math.round(window.innerWidth * 0.3);
-      return Math.max(
-        MIN_CHAT_WIDTH,
-        Math.min(MAX_CHAT_WIDTH, target || width),
-      );
-    });
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragRef.current) return;
-      const { startX, startChat } = dragRef.current;
-      const delta = e.clientX - startX;
-      setChatPanelWidth(
-        Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, startChat + delta)),
-      );
-    };
-
-    const handleMouseUp = () => {
-      if (dragRef.current) {
-        dragRef.current = null;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
 
   const searchParams = useSearchParams();
   const targetMessageId = searchParams.get("message");
@@ -412,16 +357,6 @@ ${error.trimStart()}`;
     [buildFixPrompt, chat.id, chat.model, router],
   );
 
-  const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
-    setAutoFixEnabled(enabled);
-    autoFixAttemptRef.current = 0;
-    autoFixPendingRef.current = false;
-    lastAutoFixErrorRef.current = "";
-    lastAutoFixAtRef.current = 0;
-    setAutoFixAttempt(0);
-    setAutoFixStatus(enabled ? "watching" : "idle");
-  }, []);
-
   const handlePreviewError = useCallback(
     (error: string) => {
       if (!autoFixEnabled) return;
@@ -454,6 +389,13 @@ ${error.trimStart()}`;
       lastAutoFixAtRef.current = now;
       setAutoFixAttempt(nextAttempt);
       setAutoFixStatus(fallback ? "fallback" : "fixing");
+
+      toast({
+        title: "Self-correcting",
+        description: fallback
+          ? "Rebuilding the app after repeated preview errors…"
+          : `Fixing preview error (attempt ${Math.min(nextAttempt, 3)}/3)…`,
+      });
 
       startTransition(async () => {
         try {
@@ -568,8 +510,13 @@ ${error.trimStart()}`;
                   setAutoFixStatus("watching");
                 }
                 setActiveMessage(message);
-                setActiveTab("code");
-                setMobileView("code");
+                if (autoFixEnabled) {
+                  setActiveTab("preview");
+                  setMobileView("preview");
+                } else {
+                  setActiveTab("code");
+                  setMobileView("code");
+                }
                 router.refresh();
               });
             });
@@ -667,8 +614,9 @@ ${error.trimStart()}`;
     <TooltipProvider>
     <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       {/* Top bar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm md:hidden">
-        <div className="mx-auto grid w-full max-w-[19rem] grid-cols-3 rounded-xl border border-border bg-muted/70 p-1 md:hidden" role="tablist" aria-label="Mobile workspace view">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3 text-sm md:hidden">
+        <SidebarTrigger className="-ml-1 shrink-0" />
+        <div className="mx-auto grid w-full max-w-[19rem] grid-cols-3 rounded-xl border border-border bg-muted/70 p-1" role="tablist" aria-label="Mobile workspace view">
           {[
             { value: "chat" as const, label: "Chat", icon: MessageSquare },
             { value: "code" as const, label: "Code", icon: Code2 },
@@ -700,6 +648,7 @@ ${error.trimStart()}`;
 
       <header className="hidden h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3 text-sm md:flex">
         <div className="flex min-w-0 items-center gap-3">
+          <SidebarTrigger className="-ml-1" />
           <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
           <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
             <span className="font-mono">
@@ -740,9 +689,8 @@ ${error.trimStart()}`;
       {/* Two-pane layout with resizable splitter */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
-          style={{ ["--chat-w" as any]: chatPanelWidth + "px" }}
           id="chat-mobile-panel"
-          className={`${mobileView === "chat" ? "flex animate-in fade-in-0 slide-in-from-left-1 duration-200" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:flex md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border md:animate-none`}
+          className={`${mobileView === "chat" ? "flex animate-in fade-in-0 slide-in-from-left-1 duration-200" : "hidden"} h-full w-full flex-col overflow-hidden bg-card md:hidden`}
           aria-label="Chat panel"
         >
           {activeMessage && activeVersion && (
@@ -791,31 +739,9 @@ ${error.trimStart()}`;
           </div>
         </section>
 
-        <div
-          role="separator"
-          tabIndex={0}
-          aria-orientation="vertical"
-          aria-label="Resize chat panel (arrow keys to adjust)"
-          aria-valuemin={MIN_CHAT_WIDTH}
-          aria-valuemax={MAX_CHAT_WIDTH}
-          aria-valuenow={chatPanelWidth}
-          onMouseDown={onSplitterMouseDown}
-          onKeyDown={onSplitterKeyDown}
-          className="group relative z-10 hidden w-[7px] flex-shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none md:block"
-        >
-          <div
-            className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60"
-            aria-hidden="true"
-          />
-          <div
-            className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40"
-            aria-hidden="true"
-          />
-        </div>
-
         <section
           id={`${activeTab}-mobile-panel`}
-          className={`${mobileView !== "chat" ? "flex animate-in fade-in-0 slide-in-from-right-1 duration-200" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px] md:animate-none`}
+          className={`${mobileView !== "chat" ? "flex animate-in fade-in-0 slide-in-from-right-1 duration-200" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:hidden`}
           aria-label="Code and preview panel"
         >
           <CodeViewer
@@ -841,12 +767,105 @@ ${error.trimStart()}`;
             onPreviewError={handlePreviewError}
             onPreviewReady={handlePreviewReady}
             onSaveFiles={handleSaveFiles}
-            autoFixEnabled={autoFixEnabled}
-            onAutoFixEnabledChange={handleAutoFixEnabledChange}
             autoFixAttempt={autoFixAttempt}
             autoFixStatus={autoFixStatus}
           />
         </section>
+
+        <ResizablePanelGroup
+          orientation="horizontal"
+          className="hidden min-h-0 flex-1 md:flex"
+        >
+          <ResizablePanel
+            id="chat-panel"
+            defaultSize="30%"
+            minSize={`${MIN_CHAT_WIDTH}px`}
+            maxSize={`${MAX_CHAT_WIDTH}px`}
+            className="flex flex-col overflow-hidden border-r border-border bg-card"
+          >
+            {activeMessage && activeVersion && (
+              <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2 text-xs">
+                <span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">
+                  {activeVersion.label}
+                </span>
+                <span className="font-medium text-foreground">
+                  Version {activeVersion.version}
+                </span>
+                <span className="text-muted-foreground">
+                  • {activeFileCount} file{activeFileCount === 1 ? "" : "s"}
+                </span>
+              </div>
+            )}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ChatLog
+                chat={chat}
+                streamText={streamText}
+                activeMessage={activeMessage}
+                onMessageClick={(message) => {
+                  if (message !== activeMessage) {
+                    setActiveMessage(message);
+                    setActiveTab("code");
+                    setMobileView("code");
+                  }
+                }}
+              />
+            </div>
+            <div className="shrink-0 border-t border-border bg-card p-3">
+              <ChatBox
+                chat={chat}
+                onNewStreamPromise={setStreamPromise}
+                onAbortController={(c) => {
+                  abortControllerRef.current = c;
+                }}
+                isStreaming={!!streamPromise}
+                onStop={stopStreaming}
+                onUndo={handleUndo}
+                versions={assistantVersions}
+                currentVersionId={activeMessage?.id}
+                onSwitchVersion={handleSwitchVersion}
+                shouldFocusInput={shouldFocusInput}
+                onInputFocused={() => setShouldFocusInput(false)}
+              />
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle className="w-1.5" />
+
+          <ResizablePanel
+            id="workspace-panel"
+            minSize="360px"
+            className="flex min-h-0 flex-col overflow-hidden bg-background"
+          >
+            <CodeViewer
+              streamText={streamText}
+              chat={chat}
+              message={activeMessage}
+              activeTab={activeTab}
+              onTabChange={(nextTab) => {
+                setActiveTab(nextTab);
+                if (nextTab === "code" || nextTab === "preview") {
+                  setMobileView(nextTab);
+                }
+              }}
+              hideHeaderOnMobile
+              onRequestFix={(error: string) => {
+                startTransition(async () => {
+                  await requestFix({
+                    error,
+                    auto: false,
+                    attempt: 1,
+                    fallback: false,
+                  });
+                });
+              }}
+              onPreviewError={handlePreviewError}
+              onPreviewReady={handlePreviewReady}
+              onSaveFiles={handleSaveFiles}
+              autoFixAttempt={autoFixAttempt}
+              autoFixStatus={autoFixStatus}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
     </TooltipProvider>

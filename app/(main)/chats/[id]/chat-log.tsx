@@ -173,7 +173,7 @@ function AssistantMessage({
         {segments.map((seg, i) => {
           if (seg.type === "text") {
             return (
-              <div key={i} className="prose prose-sm dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
+              <div key={i} className="typography typography-sm max-w-none text-foreground/90">
                 <Streamdown>{seg.content}</Streamdown>
               </div>
             );
@@ -205,7 +205,7 @@ function AssistantMessage({
     );
   } else {
     return (
-      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/90 leading-relaxed">
+      <div className="typography typography-sm max-w-none text-foreground/90">
         <Streamdown>{content}</Streamdown>
       </div>
     );

@@ -9,6 +9,7 @@ import {
   Copy,
   MessageSquare,
 } from 'lucide-react';
+import { ConfirmAlertDialog } from '@/components/confirm-alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import {
   renameChat,
@@ -34,6 +35,8 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const pinnedChats = chats.filter((c) => c.isPinned && !c.isArchived);
   const recentChats = chats.filter((c) => !c.isPinned && !c.isArchived);
@@ -53,17 +56,21 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
     }
   };
 
-  const handleDelete = async (chatId: string) => {
-    if (!confirm('Are you sure you want to delete this chat?')) return;
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await deleteChat(chatId);
+      await deleteChat(deleteTarget);
+      setDeleteTarget(null);
       onUpdate?.();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to delete chat',
         variant: 'destructive',
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -164,7 +171,7 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
             <Copy className="h-4 w-4" />
           </button>
           <button
-            onClick={() => handleDelete(chat.id)}
+            onClick={() => setDeleteTarget(chat.id)}
             className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded"
             title="Delete"
           >
@@ -176,6 +183,19 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
   );
 
   return (
+    <>
+    <ConfirmAlertDialog
+      open={deleteTarget !== null}
+      onOpenChange={(open) => {
+        if (!open && !isDeleting) setDeleteTarget(null);
+      }}
+      title="Delete chat?"
+      description="This action cannot be undone. The chat and all of its messages will be permanently removed."
+      confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+      cancelLabel="Cancel"
+      destructive
+      onConfirm={handleDeleteConfirm}
+    />
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* Pinned Section */}
@@ -225,5 +245,6 @@ export function ChatsList({ chats, onUpdate }: ChatsListProps) {
         )}
       </div>
     </div>
+    </>
   );
 }

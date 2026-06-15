@@ -14,7 +14,7 @@ const DEFAULTS: Record<string, string> = {
   saasMode: "off",
   googleAuth: "on",
   gallery: "on",
-  autoFixDefault: "off",
+  autoFixDefault: "on",
 };
 
 export async function getSettings(): Promise<Record<string, string>> {

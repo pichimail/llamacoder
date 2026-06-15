@@ -27,10 +27,15 @@ import {
   SquareTerminal,
   Trash2,
   Type,
-  Wand2,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 
 import {
   copyWorkspaceFile,
@@ -42,7 +47,7 @@ import {
   type WorkspaceFile,
 } from "@/app/actions/project-files";
 import BuilderTerminal from "@/components/builder-terminal";
-import { Switch } from "@/components/ui/switch";
+
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, parseReplySegments } from "@/lib/utils";
@@ -265,8 +270,6 @@ export default function CodeViewer({
   onPreviewError,
   onPreviewReady,
   onSaveFiles,
-  autoFixEnabled,
-  onAutoFixEnabledChange,
   autoFixAttempt,
   autoFixStatus,
   hideHeaderOnMobile = false,
@@ -280,15 +283,12 @@ export default function CodeViewer({
   onPreviewError: (error: string) => void;
   onPreviewReady: () => void;
   onSaveFiles: (files: ViewerFile[]) => void;
-  autoFixEnabled: boolean;
-  onAutoFixEnabledChange: (enabled: boolean) => void;
   autoFixAttempt: number;
   autoFixStatus: AutoFixStatus;
   hideHeaderOnMobile?: boolean;
 }) {
   const currentTab: ArtifactTab = ["code", "preview", "database"].includes(activeTab) ? (activeTab as ArtifactTab) : "code";
   const [isPending, startTransition] = useTransition();
-  const terminalResizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const getInitialFiles = () => {
     if (!message) return [];
     const stored = message.files as ViewerFile[] | null;
@@ -308,7 +308,6 @@ export default function CodeViewer({
   const [extensionFilter, setExtensionFilter] = useState<string | null>(null);
   const [extraDependencies, setExtraDependencies] = useState<Record<string, string>>({});
   const [terminalOpen, setTerminalOpen] = useState(true);
-  const [terminalHeight, setTerminalHeight] = useState(190);
   const [refresh, setRefresh] = useState(0);
 
   const streamedFiles = useMemo<ViewerFile[]>(() => parseReplySegments(streamText)
@@ -393,24 +392,6 @@ export default function CodeViewer({
       .map((file) => ({ path: file.path, matches: countMatches(file.code, searchQuery.trim()) }))
       .filter((result) => result.matches > 0);
   }, [draft, searchQuery]);
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!terminalResizeRef.current) return;
-      const delta = terminalResizeRef.current.startY - event.clientY;
-      const nextHeight = Math.min(420, Math.max(112, terminalResizeRef.current.startHeight + delta));
-      setTerminalHeight(nextHeight);
-    };
-    const handlePointerUp = () => {
-      terminalResizeRef.current = null;
-    };
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, []);
 
   const runBackendAction = (action: () => Promise<ViewerFile[] | WorkspaceFile[]>, success?: string) => {
     startTransition(async () => {
@@ -504,11 +485,6 @@ export default function CodeViewer({
     toast({ title: success, description: "Preview will reload from the edited code." });
   };
 
-  const handleTerminalResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    terminalResizeRef.current = { startY: event.clientY, startHeight: terminalHeight };
-  };
-
   const tabs: Array<{ value: ArtifactTab; label: string; icon: React.ReactNode }> = [
     { value: "code", label: "Code", icon: <Code2 className="size-3.5" /> },
     { value: "preview", label: "Preview", icon: <Eye className="size-3.5" /> },
@@ -530,12 +506,6 @@ export default function CodeViewer({
 
           <div className="flex shrink-0 items-center gap-1">
             <AutoFixStatusBadge status={autoFixStatus} attempt={autoFixAttempt} />
-            <Tip label="Auto-fix preview errors">
-              <span className="inline-flex items-center gap-1.5 px-1">
-                <Wand2 className="size-3.5 text-muted-foreground" />
-                <Switch checked={autoFixEnabled} onCheckedChange={onAutoFixEnabledChange} aria-label="Toggle automatic error fixing" />
-              </span>
-            </Tip>
             <Tip label="Download zip">
               <button type="button" onClick={() => void downloadFilesAsZip(visibleFiles(draft), chat.title || "app")} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Download zip">
                 <Download className="size-3.5" />
@@ -573,7 +543,6 @@ export default function CodeViewer({
               searchResults={searchResults}
               selectedFile={selectedFile}
               selectedPath={selectedPath}
-              terminalHeight={terminalHeight}
               terminalOpen={terminalOpen}
               tree={tree}
               onActivityChange={setActivityTab}
@@ -600,7 +569,6 @@ export default function CodeViewer({
                 setExtraDependencies((current) => ({ ...current, [pkg]: version }));
                 setRefresh((value) => value + 1);
               }}
-              onTerminalResizeStart={handleTerminalResizeStart}
               onTerminalToggle={() => setTerminalOpen((open) => !open)}
               onToggleFolder={(path) => setExpandedFolders((current) => {
                 const next = new Set(current);
@@ -660,7 +628,6 @@ function CodeTab({
   searchResults,
   selectedFile,
   selectedPath,
-  terminalHeight,
   terminalOpen,
   tree,
   onActivityChange,
@@ -681,7 +648,6 @@ function CodeTab({
   onTerminalCreateFile,
   onTerminalDeleteFile,
   onTerminalInstall,
-  onTerminalResizeStart,
   onTerminalToggle,
   onToggleFolder,
   previewDependencies,
@@ -701,7 +667,6 @@ function CodeTab({
   searchResults: Array<{ path: string; matches: number }>;
   selectedFile: ViewerFile | null;
   selectedPath: string | null;
-  terminalHeight: number;
   terminalOpen: boolean;
   tree: TreeNode[];
   onActivityChange: (tab: ActivityTab) => void;
@@ -722,7 +687,6 @@ function CodeTab({
   onTerminalCreateFile: (path: string, code?: string) => void;
   onTerminalDeleteFile: (path: string) => void;
   onTerminalInstall: (pkg: string, version?: string) => void;
-  onTerminalResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTerminalToggle: () => void;
   onToggleFolder: (path: string) => void;
   previewDependencies: Record<string, string>;
@@ -735,9 +699,8 @@ function CodeTab({
     { value: "inspect", label: "Inspect", icon: <Inspect className="size-4" /> },
   ];
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
-      <aside className="flex min-h-0 shrink-0 border-b border-border bg-card sm:w-[19rem] sm:border-b-0 sm:border-r" aria-label="Code workspace controls">
+  const explorerPanel = (
+      <aside className="flex h-full min-h-0 border-border bg-card sm:border-r" aria-label="Code workspace controls">
         <div className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-border py-2">
           {activityItems.map((item) => (
             <Tip key={item.value} label={item.label} side="right">
@@ -821,7 +784,9 @@ function CodeTab({
           </div>
         </div>
       </aside>
+  );
 
+  const editorPanel = (
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Code editor">
         <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-card px-3 text-xs">
           <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" />
@@ -846,33 +811,61 @@ function CodeTab({
             </>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {selectedFile ? <CodeEditor key={selectedFile.path} path={selectedFile.path} value={selectedFile.code} onChange={onChange} /> : <EmptyState isStreaming={false} />}
-        </div>
-        {terminalOpen && (
-          <>
-            <div
-              role="separator"
-              aria-label="Resize terminal"
-              aria-orientation="horizontal"
-              tabIndex={0}
-              onPointerDown={onTerminalResizeStart}
-              className="group flex h-2 shrink-0 cursor-row-resize items-center justify-center border-y border-border bg-card"
-            >
-              <div className="h-0.5 w-14 rounded-full bg-border transition group-hover:bg-primary/60" />
-            </div>
-            <div className="shrink-0 border-t border-border" style={{ height: terminalHeight }}>
-              <BuilderTerminal
-                deps={previewDependencies}
-                files={visibleFiles(draft)}
-                onCreateFile={onTerminalCreateFile}
-                onDeleteFile={onTerminalDeleteFile}
-                onInstall={onTerminalInstall}
-              />
-            </div>
-          </>
+        {terminalOpen ? (
+          <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
+            <ResizablePanel defaultSize={75} minSize={30}>
+              <div className="h-full overflow-hidden">
+                {selectedFile ? <CodeEditor key={selectedFile.path} path={selectedFile.path} value={selectedFile.code} onChange={onChange} /> : <EmptyState isStreaming={false} />}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={25} minSize="112px" maxSize="420px">
+              <div className="h-full border-t border-border">
+                <BuilderTerminal
+                  deps={previewDependencies}
+                  files={visibleFiles(draft)}
+                  onCreateFile={onTerminalCreateFile}
+                  onDeleteFile={onTerminalDeleteFile}
+                  onInstall={onTerminalInstall}
+                />
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {selectedFile ? <CodeEditor key={selectedFile.path} path={selectedFile.path} value={selectedFile.code} onChange={onChange} /> : <EmptyState isStreaming={false} />}
+          </div>
         )}
       </section>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:hidden">
+        <div className="max-h-[40%] shrink-0 overflow-hidden border-b border-border">
+          {explorerPanel}
+        </div>
+        {editorPanel}
+      </div>
+
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="hidden min-h-0 flex-1 sm:flex"
+      >
+        <ResizablePanel
+          id="explorer-panel"
+          defaultSize="22%"
+          minSize="240px"
+          maxSize="420px"
+          className="min-h-0"
+        >
+          {explorerPanel}
+        </ResizablePanel>
+        <ResizableHandle withHandle className="w-1.5" />
+        <ResizablePanel id="editor-panel" minSize="40%" className="min-h-0">
+          {editorPanel}
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
@@ -1307,7 +1300,7 @@ function EmptyState({ isStreaming }: { isStreaming: boolean }) {
 
 function AutoFixStatusBadge({ status, attempt }: { status: AutoFixStatus; attempt: number }) {
   if (status === "idle") return null;
-  const label = status === "fixing" ? `Fixing ${Math.min(attempt, 3)}/3` : status === "ready" ? "Healthy" : status === "fallback" ? "Rebuilding" : "Watching";
+  const label = status === "fixing" ? `Self-fix ${Math.min(attempt, 3)}/3` : status === "ready" ? "Healthy" : status === "fallback" ? "Rebuilding" : "Self-correct on";
   return <span className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground md:inline-flex" role="status" aria-live="polite">
     <CheckCircle2 className="size-3" />
     {label}

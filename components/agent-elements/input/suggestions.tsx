@@ -31,7 +31,14 @@ export function Suggestions({
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        "max-md:overflow-x-auto max-md:flex-nowrap max-md:pb-1 max-md:[-ms-overflow-style:none] max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden",
+        "md:flex-wrap md:overflow-visible",
+        className,
+      )}
+    >
       {items.map((item) => (
         <button
           key={item.id}
@@ -39,7 +46,7 @@ export function Suggestions({
           disabled={disabled}
           onClick={() => onSelect(item)}
           className={cn(
-            "inline-flex h-7 items-center gap-1 rounded-[6px] border border-border bg-transparent px-2 text-sm text-an-foreground-muted transition-colors hover:bg-an-background-secondary/40 hover:text-an-foreground disabled:opacity-50 disabled:pointer-events-none",
+            "inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-[6px] border border-border bg-transparent px-2 text-sm text-an-foreground-muted transition-colors hover:bg-an-background-secondary/40 hover:text-an-foreground disabled:opacity-50 disabled:pointer-events-none",
             itemClassName,
             item.className,
           )}

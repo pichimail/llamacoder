@@ -3,12 +3,11 @@
 import Hyperspeed from "@/components/Hyperspeed";
 import { hyperspeedPresets } from "@/components/HyperSpeedPresets";
 import LiquidEther from "@/components/LiquidEther";
-import StaggeredMenu from "@/components/StaggeredMenu";
+import { HomeShell } from "@/components/home/home-shell";
 import BlurText from "@/components/BlurText";
 import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
 import type { QuestionAnswer } from "@/components/agent-elements/question/question-prompt";
-import * as Select from "@radix-ui/react-select";
-import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { OptionDropdown } from "@/components/option-dropdown";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   use,
@@ -38,20 +37,6 @@ const HEADLINES = [
   "Forge code at light velocity",
   "Neon synthesis of full-stack apps",
   "Synthesize vision at warp speed",
-];
-
-const staggeredMenuItems = [
-  { label: "Home", ariaLabel: "Go to home section", link: "/" },
-  { label: "Build", ariaLabel: "Go to the prompt composer", link: "#prompt-composer" },
-  { label: "Examples", ariaLabel: "Go to prompt examples", link: "#examples" },
-  { label: "Gallery", ariaLabel: "Browse the community gallery", link: "/gallery" },
-];
-
-const staggeredSocialItems = [
-  {
-    label: "GitHub",
-    link: "https://github.com/pichimail/llamacoder",
-  },
 ];
 
 const PROMPT_CHIP_GROUPS = [
@@ -249,11 +234,7 @@ export default function Home() {
             description: "Best for questions, refinements, and targeted changes.",
             position: "bottom" as const,
           }
-        : {
-            title: "Agent mode",
-            description: "Best for full-stack builds with model and attachment controls.",
-            position: "bottom" as const,
-          };
+        : undefined;
 
   const homeQuestionBar =
     mode === "plan"
@@ -400,6 +381,7 @@ export default function Home() {
   };
 
   return (
+    <HomeShell>
     <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
       {showHyperspeed && (
         <div className="absolute inset-0 z-0 overflow-hidden">
@@ -434,27 +416,14 @@ export default function Home() {
         </div>
       )}
 
-      <StaggeredMenu
-        className="[&_.sm-logo]:hidden [&_.sm-toggle-textWrap]:hidden [&_.staggered-menu-header]:top-8 [&_.staggered-menu-panel]:pt-24"
-        position="left"
-        isFixed={true}
-        logoUrl="/chinna-coder-logo-dark.svg"
-        items={staggeredMenuItems}
-        socialItems={staggeredSocialItems}
-        displaySocials={true}
-        displayItemNumbering={true}
-        menuButtonColor={mounted && resolvedTheme === "dark" ? "#f8fafc" : "#0f172a"}
-        openMenuButtonColor="#fff"
-        changeMenuColorOnOpen={true}
-        colors={["#0f172a", "#111827", "#1f2937"]}
-        accentColor="#60a5fa"
-      />
-
       <div className="relative z-10 isolate flex h-full grow flex-col">
-        <Header hideLogo />
+        <Header hideLogo showSidebarTrigger />
 
         <div className="mt-8 flex grow flex-col items-center px-4 lg:mt-14">
-          <h1 className="text-balance text-center text-4xl font-semibold tracking-tight md:text-6xl min-h-[4.25rem] md:min-h-[5.25rem]">
+          <h1
+            id="hero-headline"
+            className="text-balance text-center text-4xl font-semibold tracking-tight md:text-6xl min-h-[4.25rem] md:min-h-[5.25rem]"
+          >
             <BlurText
               key={headlineIndex}
               text={HEADLINES[headlineIndex]}
@@ -495,77 +464,55 @@ export default function Home() {
               }}
               infoBar={homeInfoBar}
               questionBar={homeQuestionBar}
-              suggestions={PROMPT_CHIP_GROUPS.map((group) => ({
-                id: group.title,
-                label: group.title,
-                className:
-                  typeof promptChipIndexes[group.title] === "number"
-                    ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
-                    : undefined,
-              }))}
+              suggestions={{
+                className: "max-md:-mx-3 max-md:px-3",
+                items: PROMPT_CHIP_GROUPS.map((group) => ({
+                  id: group.title,
+                  label: group.title,
+                  className:
+                    typeof promptChipIndexes[group.title] === "number"
+                      ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
+                      : undefined,
+                })),
+              }}
               onSuggestionSelect={(item) => {
                 const group = PROMPT_GROUP_BY_TITLE.get(item.id);
                 if (group) handlePromptChipClick(group);
               }}
               leftActions={
-                <Select.Root value={mode} onValueChange={(v) => setMode(v as Mode)}>
-                  <Select.Trigger className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-zinc-800 hover:text-foreground">
-                    <span>{currentMode.icon} {currentMode.label}</span>
-                    <ChevronDownIcon className="h-3 w-3 opacity-60" />
-                  </Select.Trigger>
-                  <Select.Portal>
-                    <Select.Content
-                      className="z-[999] overflow-hidden rounded-lg border border-border bg-popover text-sm shadow-xl"
-                      position="popper"
-                      sideOffset={4}
-                    >
-                      <Select.Viewport className="p-1">
-                        {modes.map((m) => (
-                          <Select.Item
-                            key={m.value}
-                            value={m.value}
-                            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent"
-                          >
-                            <Select.ItemText>{m.icon} {m.label}</Select.ItemText>
-                            {mode === m.value && (
-                              <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />
-                            )}
-                          </Select.Item>
-                        ))}
-                      </Select.Viewport>
-                    </Select.Content>
-                  </Select.Portal>
-                </Select.Root>
+                <OptionDropdown
+                  value={mode}
+                  onValueChange={(value) => setMode(value as Mode)}
+                  aria-label="Select mode"
+                  triggerLabel={
+                    <span>
+                      {currentMode.icon} {currentMode.label}
+                    </span>
+                  }
+                  triggerClassName="h-8 px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
+                  options={modes.map((item) => ({
+                    value: item.value,
+                    label: (
+                      <span>
+                        {item.icon} {item.label}
+                      </span>
+                    ),
+                  }))}
+                />
               }
               rightActions={
-                <Select.Root value={model} onValueChange={setModel}>
-                  <Select.Trigger className="flex h-8 min-w-[180px] items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-zinc-800 hover:text-foreground">
-                    <Select.Value>{getModelLabel(model)}</Select.Value>
-                    <ChevronDownIcon className="h-3 w-3 opacity-60" />
-                  </Select.Trigger>
-                  <Select.Portal>
-                    <Select.Content
-                      className="z-[999] max-h-[320px] overflow-hidden rounded-lg border border-border bg-popover text-sm shadow-xl"
-                      position="popper"
-                      sideOffset={4}
-                    >
-                      <Select.Viewport className="p-1">
-                        {MODELS.filter((m) => !m.hidden).map((m) => (
-                          <Select.Item
-                            key={m.value}
-                            value={m.value}
-                            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 hover:bg-accent data-[highlighted]:bg-accent"
-                          >
-                            <Select.ItemText>{m.label}</Select.ItemText>
-                            {model === m.value && (
-                              <CheckIcon className="ml-auto h-3.5 w-3.5 text-blue-500" />
-                            )}
-                          </Select.Item>
-                        ))}
-                      </Select.Viewport>
-                    </Select.Content>
-                  </Select.Portal>
-                </Select.Root>
+                <OptionDropdown
+                  value={model}
+                  onValueChange={setModel}
+                  aria-label="Select AI model"
+                  triggerLabel={getModelLabel(model)}
+                  triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
+                  contentClassName="max-h-[320px]"
+                  options={MODELS.filter((item) => !item.hidden).map((item) => ({
+                    value: item.value,
+                    label: item.label,
+                  }))}
+                />
               }
             />
             <input
@@ -579,9 +526,10 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="mt-auto flex w-full justify-center pb-6 text-xs text-muted-foreground">Chinna-Coder — Build production apps from a prompt</footer>
+        <footer id="examples" className="mt-auto flex w-full justify-center pb-6 text-xs text-muted-foreground">Chinna-Coder — Build production apps from a prompt</footer>
       </div>
     </div>
+    </HomeShell>
   );
 }
 

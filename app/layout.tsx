@@ -44,7 +44,7 @@ export default function RootLayout({
         <PlausibleProvider domain="llamacoder.io" />
       </head>
       <body
-        className="flex min-h-full flex-col bg-background text-foreground antialiased"
+        className="flex min-h-full flex-col bg-background font-sans text-foreground antialiased"
         suppressHydrationWarning
       >
         {children}

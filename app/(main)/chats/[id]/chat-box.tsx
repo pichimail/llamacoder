@@ -1,8 +1,8 @@
 "use client";
 
 import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
-import * as Select from "@radix-ui/react-select";
-import { ChevronDown, Undo2, Zap } from "lucide-react";
+import { OptionDropdown } from "@/components/option-dropdown";
+import { Undo2, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
@@ -12,12 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 
-const selectItemCls =
-  "flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs text-popover-foreground outline-none data-[highlighted]:bg-accent";
-const selectContentCls =
-  "z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-xl";
 const ghostTrigger =
-  "inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
 type ComposerMode = "ask" | "plan" | "agent";
 type ComposerAttachment = {
   kind: "image" | "file";
@@ -258,6 +254,21 @@ export default function ChatBox({
 
   const canUndo = !!onUndo && versions.length > 1;
 
+  const chatInfoBar =
+    mode === "plan"
+      ? {
+          title: "Plan mode",
+          description: "Collect a focused brief before sending the patch.",
+          position: "bottom" as const,
+        }
+      : mode === "ask"
+        ? {
+            title: "Ask mode",
+            description: "Use this for targeted answers and smaller edits.",
+            position: "bottom" as const,
+          }
+        : undefined;
+
   return (
     <TooltipProvider>
       <div className="relative w-full">
@@ -298,114 +309,76 @@ export default function ChatBox({
             setAttachedFiles([]);
             setScreenshotUrl(undefined);
           }}
-          infoBar={{
-            title:
-              mode === "agent"
-                ? "Agent mode"
-                : mode === "plan"
-                  ? "Plan mode"
-                  : "Ask mode",
-            description:
-              mode === "agent"
-                ? "Full-stack builds with model, quality, and version controls."
-                : mode === "plan"
-                  ? "Collect a focused brief before sending the patch."
-                  : "Use this for targeted answers and smaller edits.",
-            position: "bottom",
-          }}
+          infoBar={chatInfoBar}
           leftActions={
-            <Select.Root value={mode} onValueChange={(value) => setMode(value as ComposerMode)}>
-              <Tip label="Mode">
-                <Select.Trigger aria-label="Select mode" className={ghostTrigger}>
-                  <span className="capitalize">{mode}</span>
-                  <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
-                </Select.Trigger>
-              </Tip>
-              <Select.Portal>
-                <Select.Content className={selectContentCls}>
-                  <Select.Viewport className="p-1">
-                    {["ask", "plan", "agent"].map((value) => (
-                      <Select.Item key={value} value={value} className={selectItemCls}>
-                        <Select.ItemText className="capitalize">{value}</Select.ItemText>
-                      </Select.Item>
-                    ))}
-                  </Select.Viewport>
-                </Select.Content>
-              </Select.Portal>
-            </Select.Root>
+            <OptionDropdown
+              value={mode}
+              onValueChange={(value) => setMode(value as ComposerMode)}
+              aria-label="Select mode"
+              tip="Mode"
+              triggerLabel={<span className="capitalize">{mode}</span>}
+              triggerClassName={ghostTrigger}
+              options={(["ask", "plan", "agent"] as const).map((value) => ({
+                value,
+                label: <span className="capitalize">{value}</span>,
+              }))}
+            />
           }
           rightActions={
             <div className="flex items-center gap-1">
-              <Select.Root value={model} onValueChange={setModel}>
-                <Tip label="Model">
-                  <Select.Trigger aria-label="Select AI model" className={ghostTrigger}>
-                    <Select.Value />
-                    <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
-                  </Select.Trigger>
-                </Tip>
-                <Select.Portal>
-                  <Select.Content className={selectContentCls}>
-                    <Select.Viewport className="p-1">
-                      {MODELS.filter((m) => !m.hidden).map((m) => (
-                        <Select.Item key={m.value} value={m.value} className={selectItemCls}>
-                          <Select.ItemText>{m.label}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
+              <OptionDropdown
+                value={model}
+                onValueChange={setModel}
+                aria-label="Select AI model"
+                tip="Model"
+                triggerLabel={
+                  MODELS.find((item) => item.value === model)?.label ?? model
+                }
+                triggerClassName={ghostTrigger}
+                options={MODELS.filter((item) => !item.hidden).map((item) => ({
+                  value: item.value,
+                  label: item.label,
+                }))}
+              />
 
-              <Select.Root value={quality} onValueChange={setQuality}>
-                <Tip label={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}>
-                  <Select.Trigger aria-label="Select generation quality" className={ghostTrigger}>
-                    <Zap
-                      className={`size-3.5 ${quality === "high" ? "text-amber-400" : ""}`}
-                      aria-hidden="true"
-                    />
-                  </Select.Trigger>
-                </Tip>
-                <Select.Portal>
-                  <Select.Content className={selectContentCls}>
-                    <Select.Viewport className="p-1">
-                      <Select.Item value="low" className={selectItemCls}>
-                        <Select.ItemText>Fast</Select.ItemText>
-                      </Select.Item>
-                      <Select.Item value="high" className={selectItemCls}>
-                        <Select.ItemText>High quality</Select.ItemText>
-                      </Select.Item>
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
+              <OptionDropdown
+                value={quality}
+                onValueChange={setQuality}
+                aria-label="Select generation quality"
+                tip={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}
+                triggerLabel={
+                  <Zap
+                    className={`size-3.5 ${quality === "high" ? "text-amber-400" : ""}`}
+                    aria-hidden="true"
+                  />
+                }
+                triggerClassName={ghostTrigger}
+                options={[
+                  { value: "low", label: "Fast" },
+                  { value: "high", label: "High quality" },
+                ]}
+              />
 
               {versions.length > 0 && onSwitchVersion && (
-                <Select.Root
-                  value={currentVersionId || ""}
+                <OptionDropdown
+                  value={currentVersionId || versions[versions.length - 1]?.id || ""}
                   onValueChange={onSwitchVersion}
+                  aria-label="Switch app version"
+                  tip="Switch version"
                   disabled={disabled}
-                >
-                  <Tip label="Switch version">
-                    <Select.Trigger aria-label="Switch app version" className={ghostTrigger}>
-                      <Select.Value />
-                      <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
-                    </Select.Trigger>
-                  </Tip>
-                  <Select.Portal>
-                    <Select.Content className={selectContentCls}>
-                      <Select.Viewport className="p-1">
-                        {versions
-                          .slice()
-                          .reverse()
-                          .map((v) => (
-                            <Select.Item key={v.id} value={v.id} className={selectItemCls}>
-                              <Select.ItemText>{v.label}</Select.ItemText>
-                            </Select.Item>
-                          ))}
-                      </Select.Viewport>
-                    </Select.Content>
-                  </Select.Portal>
-                </Select.Root>
+                  triggerLabel={
+                    versions.find((version) => version.id === currentVersionId)?.label ??
+                    versions[versions.length - 1]?.label
+                  }
+                  triggerClassName={ghostTrigger}
+                  options={versions
+                    .slice()
+                    .reverse()
+                    .map((version) => ({
+                      value: version.id,
+                      label: version.label,
+                    }))}
+                />
               )}
 
               {onUndo && (
