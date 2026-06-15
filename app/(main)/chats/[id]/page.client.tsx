@@ -13,12 +13,13 @@ import CodeViewer, { downloadFilesAsZip } from "./code-viewer";
 import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Code2, Database, Eye, Loader2, MessageSquare, Palette, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Code2, Database, Eye, Loader2, MessageSquare, Monitor, Palette, PanelLeftClose, PanelLeftOpen, Smartphone } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
+import type { PreviewMode } from "@/components/code-runner-react";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: false });
 
@@ -55,6 +56,10 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const [mobileView, setMobileView] = useState<"chat" | "builder">("builder");
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
+  const [designSaveRequest, setDesignSaveRequest] = useState(0);
+  const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
+  const [showUnsavedOverlay, setShowUnsavedOverlay] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
@@ -110,15 +115,20 @@ export default function PageClient({ chat }: { chat: Chat }) {
     return Array.from(byPath.values());
   }, [activeMessage, streamText]);
 
-  const setModeSafely = useCallback((mode: BuilderMode) => {
-    if (builderMode === "design" && designDirty && mode !== "design") {
-      if (!window.confirm("You have unsaved design changes. Leave Design mode without saving?")) return;
-      setDesignDirty(false);
-    }
+  const applyMode = useCallback((mode: BuilderMode) => {
     setBuilderMode(mode);
     setMobileView("builder");
     if (mode === "code" || mode === "preview") setActiveTab(mode);
-  }, [builderMode, designDirty]);
+  }, []);
+
+  const setModeSafely = useCallback((mode: BuilderMode) => {
+    if (builderMode === "design" && designDirty && mode !== "design") {
+      setPendingMode(mode);
+      setShowUnsavedOverlay(true);
+      return;
+    }
+    applyMode(mode);
+  }, [applyMode, builderMode, designDirty]);
 
   const handleSwitchVersion = useCallback((messageId: string) => {
     const msg = chat.messages.find((m) => m.id === messageId);
@@ -217,6 +227,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       const isInput = Boolean(activeElement && ["TEXTAREA", "INPUT", "SELECT"].includes(activeElement.tagName));
       if (((e.metaKey || e.ctrlKey) && e.key === ".") || e.key === "Escape") {
         if (streamPromise) { e.preventDefault(); stopStreaming(); }
+        if (showUnsavedOverlay) { e.preventDefault(); setShowUnsavedOverlay(false); }
       }
       if (e.key === "/" && !isInput && !streamPromise) { e.preventDefault(); setShouldFocusInput(true); }
       if (!isInput && e.altKey) {
@@ -226,7 +237,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [streamPromise, stopStreaming, setModeSafely]);
+  }, [streamPromise, stopStreaming, setModeSafely, showUnsavedOverlay]);
 
   useEffect(() => {
     setChatPanelWidth((width) => Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, Math.round(window.innerWidth * 0.3) || width)));
@@ -329,16 +340,58 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const renderBuilderSurface = () => {
     if (builderMode === "design") {
-      return <DesignWorkspace chatId={chat.id} files={artifactFiles} isStreaming={!!streamPromise} onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))} onPreviewError={handlePreviewError} onPreviewReady={handlePreviewReady} onDirtyChange={setDesignDirty} onSaved={(message) => { setDesignDirty(false); if (message) setActiveMessage(message as Message); router.refresh(); }} />;
+      return (
+        <DesignWorkspace
+          chatId={chat.id}
+          files={artifactFiles}
+          isStreaming={!!streamPromise}
+          onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
+          onPreviewError={handlePreviewError}
+          onPreviewReady={handlePreviewReady}
+          onDirtyChange={setDesignDirty}
+          onSaved={(message) => {
+            setDesignDirty(false);
+            setShowUnsavedOverlay(false);
+            if (message) setActiveMessage(message as Message);
+            if (pendingMode) {
+              applyMode(pendingMode);
+              setPendingMode(null);
+            }
+            router.refresh();
+          }}
+          saveRequest={designSaveRequest}
+          previewMode={previewMode}
+        />
+      );
     }
     if (builderMode === "database") return <ModeDatabase chatId={chat.id} files={artifactFiles} />;
-    return <CodeViewer streamText={streamText} chat={chat} message={activeMessage} activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setBuilderMode(tab); setMobileView("builder"); }} onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))} onPreviewError={handlePreviewError} onPreviewReady={handlePreviewReady} onSaveFiles={handleSaveFiles} autoFixEnabled={autoFixEnabled} onAutoFixEnabledChange={handleAutoFixEnabledChange} autoFixAttempt={autoFixAttempt} autoFixStatus={autoFixStatus} />;
+    return (
+      <CodeViewer
+        streamText={streamText}
+        chat={chat}
+        message={activeMessage}
+        activeTab={activeTab}
+        onTabChange={(tab) => { setActiveTab(tab); setBuilderMode(tab); setMobileView("builder"); }}
+        onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
+        onPreviewError={handlePreviewError}
+        onPreviewReady={handlePreviewReady}
+        onSaveFiles={handleSaveFiles}
+        autoFixEnabled={autoFixEnabled}
+        onAutoFixEnabledChange={handleAutoFixEnabledChange}
+        autoFixAttempt={autoFixAttempt}
+        autoFixStatus={autoFixStatus}
+        previewMode={previewMode}
+        onPreviewModeChange={setPreviewMode}
+      />
+    );
   };
 
   if (isFullscreenPreview) {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
-    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
+    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showDeviceToggle /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
   }
+
+  const nextPreviewMode = previewMode === "web" ? "mobile" : "web";
 
   return (
     <TooltipProvider>
@@ -346,7 +399,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
         <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border bg-card px-3 text-sm">
           <div className="flex min-w-0 items-center gap-2"><Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}><button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button></Tip><div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground"><span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span><span className="hidden sm:inline">•</span><span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span></div></div>
           <div className="hidden items-center rounded-lg border border-border bg-background p-0.5 md:flex" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} /><BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} /></div>
-          <div className="flex items-center justify-end gap-1"><div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view"><button role="tab" aria-selected={mobileView === "chat"} onClick={() => setMobileView("chat")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Chat view"><MessageSquare className="size-3.5" /></button><button role="tab" aria-selected={mobileView === "builder"} onClick={() => setMobileView("builder")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Builder view">{builderMode === "preview" ? <Eye className="size-3.5" /> : builderMode === "design" ? <Palette className="size-3.5" /> : builderMode === "database" ? <Database className="size-3.5" /> : <Code2 className="size-3.5" />}</button></div><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /><ThemeToggle /></div>
+          <div className="flex items-center justify-end gap-1"><div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view"><button role="tab" aria-selected={mobileView === "chat"} onClick={() => setMobileView("chat")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Chat view"><MessageSquare className="size-3.5" /></button><button role="tab" aria-selected={mobileView === "builder"} onClick={() => setMobileView("builder")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Builder view">{builderMode === "preview" ? <Eye className="size-3.5" /> : builderMode === "design" ? <Palette className="size-3.5" /> : builderMode === "database" ? <Database className="size-3.5" /> : <Code2 className="size-3.5" />}</button></div>{(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}<ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /><ThemeToggle /></div>
         </header>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border`} aria-label="Chat panel">
@@ -357,6 +410,19 @@ export default function PageClient({ chat }: { chat: Chat }) {
           <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-[7px] flex-shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none`}><div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" /><div className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40" /></div>
           <section className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`} aria-label="Artifact builder panel"><div className="border-b border-border bg-card px-2 py-1 md:hidden"><div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} compact /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} compact /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} compact /><BuilderModeButton mode="database" current={builderMode} label="DB" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} compact /></div></div>{renderBuilderSurface()}</section>
         </div>
+        {showUnsavedOverlay && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
+            <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-2xl shadow-black/30">
+              <h2 id="unsaved-design-title" className="text-sm font-semibold text-foreground">Save design changes?</h2>
+              <p className="mt-2 text-sm leading-5 text-muted-foreground">You have live visual edits that are not committed as a version yet.</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => { setShowUnsavedOverlay(false); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Cancel</button>
+                <button type="button" onClick={() => { setDesignDirty(false); setShowUnsavedOverlay(false); if (pendingMode) applyMode(pendingMode); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Discard</button>
+                <button type="button" onClick={() => setDesignSaveRequest((value) => value + 1)} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500">Save Changes</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
