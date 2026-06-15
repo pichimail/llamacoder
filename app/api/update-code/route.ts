@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
-import { createMessage } from "@/app/(main)/actions";
 import { getFallbackModel } from "@/lib/constants";
 import { createChatStreamWithFallback } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
@@ -43,7 +42,10 @@ export async function POST(request: NextRequest) {
   const latestAssistant = chat.messages.slice().reverse().find((message) => message.role === "assistant" && Array.isArray(message.files));
   const latestFiles = fileContext(latestAssistant?.files);
   const editPrompt = `Apply this request as a precise code patch. Use only the latest file context below. Return only changed files with path metadata.\n\nREQUEST:\n${parsed.data.request}\n\nLATEST FILES:\n${latestFiles}`;
-  const userMessage = await createMessage(chat.id, editPrompt, "user");
+  const maxPosition = chat.messages.length ? Math.max(...chat.messages.map((message) => message.position)) : -1;
+  const userMessage = await prisma.message.create({
+    data: { role: "user", content: editPrompt, files: null, position: maxPosition + 1, chatId: chat.id },
+  });
 
   const result = await createChatStreamWithFallback({
     model: parsed.data.model || chat.model || getFallbackModel().value,
