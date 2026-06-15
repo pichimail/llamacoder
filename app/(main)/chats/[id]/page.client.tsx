@@ -1,23 +1,26 @@
 "use client";
 
 import { createMessage } from "@/app/(main)/actions";
+import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
-import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
 import CodeViewer, { downloadFilesAsZip } from "./code-viewer";
-import type { Chat, Message } from "./page";
+import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Code2, Database, Eye, Loader2, MessageSquare, Monitor, Palette, PanelLeftClose, PanelLeftOpen, Smartphone } from "lucide-react";
+import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, Menu, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
+import { Sidebar } from "@/components/chats/sidebar";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 import type { PreviewMode } from "@/components/code-runner-react";
 
@@ -27,6 +30,7 @@ const MIN_CHAT_WIDTH = 260;
 const MAX_CHAT_WIDTH = 720;
 
 type BuilderMode = "preview" | "code" | "design" | "database";
+type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
@@ -42,7 +46,7 @@ function normalizeFile(file: RawGeneratedFile): ArtifactFile {
   return { path, code, language };
 }
 
-export default function PageClient({ chat }: { chat: Chat }) {
+export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; sidebarChats?: SidebarChat[] }) {
   const context = use(Context);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,8 +57,11 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const [streamText, setStreamText] = useState("");
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [builderMode, setBuilderMode] = useState<BuilderMode>("code");
-  const [mobileView, setMobileView] = useState<"chat" | "builder">("builder");
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [appSidebarCollapsed, setAppSidebarCollapsed] = useState(true);
+  const [mobileAppMenuOpen, setMobileAppMenuOpen] = useState(false);
+  const [mobileOptionsOpen, setMobileOptionsOpen] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
   const [designSaveRequest, setDesignSaveRequest] = useState(0);
   const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
@@ -117,7 +124,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
   const applyMode = useCallback((mode: BuilderMode) => {
     setBuilderMode(mode);
-    setMobileView("builder");
     if (mode === "code" || mode === "preview") setActiveTab(mode);
   }, []);
 
@@ -130,12 +136,19 @@ export default function PageClient({ chat }: { chat: Chat }) {
     applyMode(mode);
   }, [applyMode, builderMode, designDirty]);
 
+  const switchMobilePanel = useCallback((panel: MobilePanel) => {
+    setMobilePanel(panel);
+    if (panel === "code") setModeSafely("code");
+    if (panel === "preview") setModeSafely("preview");
+  }, [setModeSafely]);
+
   const handleSwitchVersion = useCallback((messageId: string) => {
     const msg = chat.messages.find((m) => m.id === messageId);
     if (!msg) return;
     setActiveMessage(msg);
     setActiveTab("code");
     setBuilderMode("code");
+    setMobilePanel("code");
   }, [chat.messages]);
 
   const handleUndo = useCallback(() => {
@@ -178,6 +191,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       return res.body;
     });
     setStreamPromise(nextStreamPromise);
+    setMobilePanel("code");
     router.refresh();
   }, [chat.id, chat.model, router]);
 
@@ -288,7 +302,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
               didPushToCode = true;
               setActiveTab("code");
               setBuilderMode("code");
-              setMobileView("builder");
+              setMobilePanel("code");
             }
           })
           .on("finalContent", async (finalText) => {
@@ -309,7 +323,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
                 setActiveMessage(message);
                 setActiveTab("code");
                 setBuilderMode("code");
-                setMobileView("builder");
+                setMobilePanel("code");
                 setChatCollapsed(false);
                 router.refresh();
               });
@@ -337,6 +351,50 @@ export default function PageClient({ chat }: { chat: Chat }) {
     const files = activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : [];
     void downloadFilesAsZip(files, chat.title || "app");
   }, [activeMessage, chat.title]);
+
+  const handleShareLink = useCallback(async () => {
+    if (!activeMessage?.id) return;
+    const url = `${window.location.origin}/share/v2/${activeMessage.id}`;
+    await navigator.clipboard.writeText(url).catch(() => undefined);
+    toast({ title: "Share link copied", description: url });
+  }, [activeMessage?.id]);
+
+  const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
+    const response = await fetch(`/api/workspace/${chat.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok && !data.reason) throw new Error(data.error || "Workspace request failed");
+    return data as any;
+  }, [chat.id]);
+
+  const handlePublishMobile = useCallback(async () => {
+    if (!activeMessage?.id || artifactFiles.length === 0) return;
+    try {
+      const result = await workspaceRequest("publish", { messageId: activeMessage.id, files: artifactFiles });
+      const absoluteUrl = `${window.location.origin}${result.url}`;
+      await navigator.clipboard.writeText(absoluteUrl).catch(() => undefined);
+      toast({ title: "Published", description: "Live share link copied." });
+      window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast({ title: "Publish failed", description: error instanceof Error ? error.message : "Could not publish.", variant: "destructive" });
+    }
+  }, [activeMessage?.id, artifactFiles, workspaceRequest]);
+
+  const handleCreatePrMobile = useCallback(async () => {
+    try {
+      const result = await workspaceRequest("create-pr", { files: artifactFiles });
+      if (result.ok === false) {
+        toast({ title: "GitHub not ready", description: result.reason || "Connect GitHub first.", variant: "destructive" });
+        return;
+      }
+      toast({ title: "PR request created", description: `${result.fileCount ?? artifactFiles.length} files prepared for GitHub.` });
+    } catch (error) {
+      toast({ title: "PR failed", description: error instanceof Error ? error.message : "Could not create PR.", variant: "destructive" });
+    }
+  }, [artifactFiles, workspaceRequest]);
 
   const renderBuilderSurface = () => {
     if (builderMode === "design") {
@@ -371,7 +429,11 @@ export default function PageClient({ chat }: { chat: Chat }) {
         chat={chat}
         message={activeMessage}
         activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); setBuilderMode(tab); setMobileView("builder"); }}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setBuilderMode(tab);
+          setMobilePanel(tab === "preview" ? "preview" : "code");
+        }}
         onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
         onPreviewError={handlePreviewError}
         onPreviewReady={handlePreviewReady}
@@ -392,26 +454,115 @@ export default function PageClient({ chat }: { chat: Chat }) {
   }
 
   const nextPreviewMode = previewMode === "web" ? "mobile" : "web";
+  const canAct = !!activeMessage?.id && artifactFiles.length > 0;
 
   return (
     <TooltipProvider>
-      <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-        <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border bg-card px-3 text-sm">
-          <div className="flex min-w-0 items-center gap-2"><Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}><button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button></Tip><div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground"><span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span><span className="hidden sm:inline">•</span><span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span></div></div>
-          <div className="hidden items-center rounded-lg border border-border bg-background p-0.5 md:flex" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} /><BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} /></div>
-          <div className="flex items-center justify-end gap-1"><div className="mr-1 flex items-center rounded-lg border border-border p-0.5 md:hidden" role="tablist" aria-label="Mobile view"><button role="tab" aria-selected={mobileView === "chat"} onClick={() => setMobileView("chat")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Chat view"><MessageSquare className="size-3.5" /></button><button role="tab" aria-selected={mobileView === "builder"} onClick={() => setMobileView("builder")} className={`inline-flex size-7 items-center justify-center rounded-md ${mobileView === "builder" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} aria-label="Builder view">{builderMode === "preview" ? <Eye className="size-3.5" /> : builderMode === "design" ? <Palette className="size-3.5" /> : builderMode === "database" ? <Database className="size-3.5" /> : <Code2 className="size-3.5" />}</button></div>{(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}<ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /><ThemeToggle /></div>
-        </header>
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobileView === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-card ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border`} aria-label="Chat panel">
-            {activeMessage && activeVersion && <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2 text-xs"><span className="inline-flex items-center rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-            <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); } }} /></div>
-            <div className="shrink-0 border-t border-border bg-card p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobileView("builder"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
-          </section>
-          <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-[7px] flex-shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none`}><div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" /><div className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40" /></div>
-          <section className={`${mobileView === "builder" ? "flex" : "hidden"} min-h-0 flex-1 flex-col overflow-hidden bg-background md:flex md:min-w-[360px]`} aria-label="Artifact builder panel"><div className="border-b border-border bg-card px-2 py-1 md:hidden"><div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Artifact mode"><BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} compact /><BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} compact /><BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} compact /><BuilderModeButton mode="database" current={builderMode} label="DB" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} compact /></div></div>{renderBuilderSurface()}</section>
+      <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+        <Sidebar
+          currentChatId={chat.id}
+          chats={sidebarChats}
+          collapsed={mobileAppMenuOpen ? false : appSidebarCollapsed}
+          mobileOpen={mobileAppMenuOpen}
+          onMobileOpenChange={setMobileAppMenuOpen}
+          onToggleCollapse={() => setAppSidebarCollapsed((value) => !value)}
+          onNewChat={() => router.push("/")}
+          onSelectChat={(chatId) => router.push(`/chats/${chatId}`)}
+        />
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/70 bg-transparent px-3 text-sm">
+            <div className="flex min-w-0 items-center gap-2">
+              <Tip label="Open app menu">
+                <button type="button" onClick={() => setMobileAppMenuOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open app menu"><Menu className="size-4" /></button>
+              </Tip>
+              <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
+                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button>
+              </Tip>
+              <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 bg-transparent px-2 py-1 text-xs text-muted-foreground">
+                <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span>
+              </div>
+            </div>
+
+            <div className="hidden items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:flex" role="tablist" aria-label="Artifact mode">
+              <BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} />
+              <BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} />
+              <BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} />
+              <BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} />
+            </div>
+
+            <div className="flex items-center justify-end gap-1">
+              <div className="flex items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:hidden" role="tablist" aria-label="Mobile panels">
+                <MobilePanelButton panel="chat" current={mobilePanel} label="Chat" icon={<MessageSquare className="size-3.5" />} onClick={() => switchMobilePanel("chat")} />
+                <MobilePanelButton panel="code" current={mobilePanel} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => switchMobilePanel("code")} />
+                <MobilePanelButton panel="preview" current={mobilePanel} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => switchMobilePanel("preview")} />
+              </div>
+              <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
+              {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
+              <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
+              <div className="hidden md:block"><ThemeToggle /></div>
+            </div>
+          </header>
+
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
+              {activeMessage && activeVersion && <div className="flex items-center gap-2 border-b border-border/60 bg-transparent px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+              <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
+              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+            </section>
+
+            <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-px flex-shrink-0 cursor-col-resize bg-border/70 transition focus-visible:outline-none`} />
+
+            <section className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:flex md:min-w-[360px]`} aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
+          </div>
         </div>
+
+        <Drawer open={mobileOptionsOpen} onOpenChange={setMobileOptionsOpen} shouldScaleBackground={false} snapPoints={[0.3, 0.5, 0.7, 1]}>
+          <DrawerContent showOverlay={false} className="md:hidden h-[70dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
+            <DrawerHeader className="px-0 text-left">
+              <DrawerTitle className="text-sm">Builder options</DrawerTitle>
+              <DrawerDescription>No mobile dropdowns. Use this sheet for secondary controls.</DrawerDescription>
+            </DrawerHeader>
+            <div className="grid gap-3 overflow-y-auto pb-3 text-sm">
+              <div className="grid grid-cols-3 gap-2" aria-label="Mobile panel shortcuts">
+                <SheetAction icon={<MessageSquare className="size-4" />} label="Chat" onClick={() => { switchMobilePanel("chat"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<Code2 className="size-4" />} label="Code" onClick={() => { switchMobilePanel("code"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<Eye className="size-4" />} label="Preview" onClick={() => { switchMobilePanel("preview"); setMobileOptionsOpen(false); }} />
+              </div>
+
+              <div className="grid gap-1 border-t border-border/70 pt-3">
+                <SheetAction icon={<Palette className="size-4" />} label="Visual editor" onClick={() => { setModeSafely("design"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />} label={`Switch to ${nextPreviewMode}`} onClick={() => setPreviewMode(nextPreviewMode)} />
+                <SheetAction icon={<Database className="size-4" />} label="Database workspace" onClick={() => { setModeSafely("database"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<PanelLeftOpen className="size-4" />} label="Main app menu" onClick={() => { setMobileOptionsOpen(false); setMobileAppMenuOpen(true); }} />
+              </div>
+
+              <div className="grid gap-1 border-t border-border/70 pt-3">
+                <SheetAction icon={<Share2 className="size-4" />} label="Share link" disabled={!activeMessage?.id} onClick={handleShareLink} />
+                <SheetAction icon={<ExternalLink className="size-4" />} label="Publish site" disabled={!canAct} onClick={handlePublishMobile} />
+                <SheetAction icon={<Download className="size-4" />} label="Download zip" disabled={!canAct} onClick={handleDownloadZip} />
+                <SheetAction icon={<GitPullRequest className="size-4" />} label="Create PR" disabled={!canAct} onClick={handleCreatePrMobile} />
+              </div>
+
+              {assistantVersions.length > 0 && (
+                <div className="grid gap-1 border-t border-border/70 pt-3">
+                  <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Layers className="size-3.5" /> Versions</div>
+                  {assistantVersions.slice().reverse().map((version) => (
+                    <button key={version.id} type="button" onClick={() => { handleSwitchVersion(version.id); setMobileOptionsOpen(false); }} className={`flex items-center justify-between rounded-md px-2 py-2 text-left text-xs ${activeMessage?.id === version.id ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground"}`}>
+                      <span>{version.label}</span>
+                      <span>{version.version === activeVersion?.version ? "Current" : "Revert"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DrawerContent>
+        </Drawer>
+
         {showUnsavedOverlay && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
+          <div className="fixed inset-0 z-50 hidden items-center justify-center bg-background/70 p-4 backdrop-blur-sm md:flex" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
             <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-2xl shadow-black/30">
               <h2 id="unsaved-design-title" className="text-sm font-semibold text-foreground">Save design changes?</h2>
               <p className="mt-2 text-sm leading-5 text-muted-foreground">You have live visual edits that are not committed as a version yet.</p>
@@ -423,6 +574,16 @@ export default function PageClient({ chat }: { chat: Chat }) {
             </div>
           </div>
         )}
+        <Drawer open={showUnsavedOverlay} onOpenChange={setShowUnsavedOverlay} shouldScaleBackground={false} snapPoints={[0.3, 0.5]}>
+          <DrawerContent showOverlay={false} className="md:hidden h-[42dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
+            <DrawerHeader className="px-0 text-left"><DrawerTitle className="text-sm">Save design changes?</DrawerTitle><DrawerDescription>You have live visual edits that are not committed yet.</DrawerDescription></DrawerHeader>
+            <div className="grid gap-2">
+              <button type="button" onClick={() => setDesignSaveRequest((value) => value + 1)} className="rounded-md border border-border px-3 py-2 text-sm text-foreground">Save Changes</button>
+              <button type="button" onClick={() => { setDesignDirty(false); setShowUnsavedOverlay(false); if (pendingMode) applyMode(pendingMode); setPendingMode(null); }} className="rounded-md border border-border px-3 py-2 text-sm text-foreground">Discard Changes</button>
+              <button type="button" onClick={() => { setShowUnsavedOverlay(false); setPendingMode(null); }} className="rounded-md px-3 py-2 text-sm text-muted-foreground">Cancel</button>
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
     </TooltipProvider>
   );
@@ -430,5 +591,14 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}>{icon}<span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}>{icon}<span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+}
+
+function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
+  const active = current === panel;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"}`} aria-label={label}>{icon}<span className="sr-only">{label}</span></button>;
+}
+
+function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
+  return <button type="button" onClick={onClick} disabled={disabled} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-left text-xs text-foreground disabled:opacity-40">{icon}<span>{label}</span></button>;
 }
