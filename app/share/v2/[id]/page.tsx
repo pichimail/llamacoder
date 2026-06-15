@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getPrisma } from '@/lib/prisma'
 import { normalizeArtifactFiles } from '@/lib/artifact-analysis'
-import { SharePreviewClient } from './share-preview-client'
+import { SharePreviewClient } from '@/components/chats/share-preview-client'
 
 export default async function ShareVersionPage({
   params,
