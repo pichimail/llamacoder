@@ -5,12 +5,15 @@ export const dynamic = "force-dynamic";
 
 export default async function FeaturedPage() {
   const prisma = getPrisma();
-  const messages = await prisma.message.findMany({
-    where: { role: "assistant", files: { not: undefined as any } },
+  const rawMessages = await prisma.message.findMany({
+    where: { role: "assistant" },
     include: { chat: true },
     orderBy: { createdAt: "desc" },
-    take: 24,
+    take: 48,
   });
+  const messages = rawMessages
+    .filter((message) => Array.isArray(message.files) && message.files.length > 0)
+    .slice(0, 24);
 
   return (
     <main className="min-h-dvh bg-background px-5 py-10 text-foreground">
