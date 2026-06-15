@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   const editPrompt = `Apply this request as a precise code patch. Use only the latest file context below. Return only changed files with path metadata.\n\nREQUEST:\n${parsed.data.request}\n\nLATEST FILES:\n${latestFiles}`;
   const maxPosition = chat.messages.length ? Math.max(...chat.messages.map((message) => message.position)) : -1;
   const userMessage = await prisma.message.create({
-    data: { role: "user", content: editPrompt, files: null, position: maxPosition + 1, chatId: chat.id },
+    data: { role: "user", content: editPrompt, position: maxPosition + 1, chatId: chat.id },
   });
 
   const result = await createChatStreamWithFallback({
