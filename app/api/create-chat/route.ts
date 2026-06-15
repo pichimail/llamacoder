@@ -5,10 +5,11 @@ import {
   screenshotToCodePrompt,
   softwareArchitectPrompt,
 } from "@/lib/prompts";
-import Together from "together-ai";
 import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
+import { anyProviderConfigured, createTextWithFallback } from "@/lib/providers/generation";
+import { rateLimitOrThrow } from "@/lib/rate-limit";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -23,30 +24,31 @@ export async function POST(request: NextRequest) {
     const json = await request.json().catch(() => null);
     const parsed = createChatSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error:
-            parsed.error.issues[0]?.message || "Invalid request body",
-        },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request body" }, { status: 400 });
     }
+
     const { prompt, model, quality, screenshotUrl, mode } = parsed.data;
     const resolvedModel = resolveModel(model);
 
-    // Fail fast with clear messages if required secrets are missing
     if (!process.env.DATABASE_URL) {
-      console.error("Missing DATABASE_URL environment variable");
+      return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
+    }
+    if (!anyProviderConfigured()) {
       return NextResponse.json(
-        { error: "Server misconfiguration: missing database URL" },
+        { error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" },
         { status: 500 },
       );
     }
-    if (!process.env.TOGETHER_API_KEY) {
-      console.error("Missing TOGETHER_API_KEY environment variable");
+
+    try {
+      await rateLimitOrThrow(`create-chat:${request.headers.get("x-forwarded-for") || "local"}`, {
+        limit: 18,
+        windowSeconds: 60,
+      });
+    } catch (error) {
       return NextResponse.json(
-        { error: "Server misconfiguration: missing Together AI API key" },
-        { status: 500 },
+        { error: error instanceof Error ? error.message : "Rate limited" },
+        { status: 429 },
       );
     }
 
@@ -61,71 +63,46 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    let options: ConstructorParameters<typeof Together>[0] = {};
-    if (process.env.HELICONE_API_KEY) {
-      options.baseURL = "https://together.helicone.ai/v1";
-      options.defaultHeaders = {
-        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-        "Helicone-Property-appname": "LlamaCoder",
-        "Helicone-Session-Id": chat.id,
-        "Helicone-Session-Name": "LlamaCoder Chat",
-      };
-    }
-
-    const together = new Together(options);
-
-    // Title generation is non-critical — always provide a fallback so we don't 500 the whole creation
     let title = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
     if (title.length > 60) title = title.slice(0, 57) + "...";
     try {
-      const responseForChatTitle = await together.chat.completions.create({
-        model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      const responseForChatTitle = await createTextWithFallback({
+        model: resolvedModel,
+        temperature: 0.2,
+        maxTokens: 80,
         messages: [
           {
             role: "system",
             content:
-              "You are a chatbot helping the user create a simple app or script, and your current job is to create a succinct title, maximum 3-5 words, for the chat given their initial prompt. Please return only the title.",
+              "Create a succinct 3-5 word title for this app-building chat. Return only the title.",
           },
-          {
-            role: "user",
-            content: prompt,
-          },
+          { role: "user", content: prompt },
         ],
       });
-      const aiTitle = responseForChatTitle.choices?.[0]?.message?.content?.trim();
-      if (aiTitle && aiTitle.length > 0 && aiTitle.length < 100) {
-        title = aiTitle;
-      }
+      const aiTitle = responseForChatTitle.content.trim();
+      if (aiTitle && aiTitle.length < 100) title = aiTitle;
     } catch (titleErr) {
       console.warn("Failed to generate AI title, using fallback from prompt:", titleErr);
     }
 
-    let fullScreenshotDescription;
+    let fullScreenshotDescription: string | undefined;
     if (screenshotUrl) {
       try {
-        const screenshotResponse = await together.chat.completions.create({
-          model: "moonshotai/Kimi-K2.5",
-          reasoning: { enabled: false },
-          temperature: 0.4,
-          max_tokens: 1000,
+        const screenshotResponse = await createTextWithFallback({
+          model: resolvedModel,
+          temperature: 0.3,
+          maxTokens: 1200,
           messages: [
             {
               role: "user",
               content: [
                 { type: "text", text: screenshotToCodePrompt },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: screenshotUrl,
-                  },
-                },
+                { type: "image_url", image_url: { url: screenshotUrl } },
               ],
             },
           ],
         });
-
-        fullScreenshotDescription =
-          screenshotResponse.choices[0].message?.content;
+        fullScreenshotDescription = screenshotResponse.content;
       } catch (err) {
         console.warn("Screenshot processing failed, continuing without it:", err);
       }
@@ -133,97 +110,60 @@ export async function POST(request: NextRequest) {
 
     let userMessage: string;
     if (quality === "high") {
-      // High-quality plan generation is important but we still want to avoid hard 500s
       let planContent: string | undefined;
       try {
-        const initialRes = await together.chat.completions.create({
-          model: "Qwen/Qwen3-Coder-Next-FP8",
+        const initialRes = await createTextWithFallback({
+          model: resolvedModel,
+          temperature: 0.35,
+          maxTokens: 3000,
           messages: [
-            {
-              role: "system",
-              content: softwareArchitectPrompt,
-            },
-            {
-              role: "user",
-              content: fullScreenshotDescription
-                ? fullScreenshotDescription + prompt
-                : prompt,
-            },
+            { role: "system", content: softwareArchitectPrompt },
+            { role: "user", content: fullScreenshotDescription ? fullScreenshotDescription + prompt : prompt },
           ],
-          temperature: 0.4,
-          max_tokens: 3000,
         });
-
-        planContent = initialRes.choices?.[0]?.message?.content ?? undefined;
-        if (planContent) {
-          console.log("PLAN:", planContent);
-        }
+        planContent = initialRes.content || undefined;
       } catch (planErr) {
         console.warn("High quality plan generation failed, falling back to raw prompt:", planErr);
       }
       userMessage = planContent ?? prompt;
     } else if (fullScreenshotDescription) {
-      userMessage =
-        prompt +
-        "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " +
-        fullScreenshotDescription;
+      userMessage = `${prompt}\n\nRECREATE THIS APP AS CLOSELY AS POSSIBLE:\n${fullScreenshotDescription}`;
     } else {
       userMessage = prompt;
     }
 
-    let newChat = await prisma.chat.update({
-      where: {
-        id: chat.id,
-      },
+    const newChat = await prisma.chat.update({
+      where: { id: chat.id },
       data: {
         title,
         messages: {
           createMany: {
             data: [
-              {
-                role: "system",
-                content: getMainCodingPrompt(mode, !!fullScreenshotDescription),
-                position: 0,
-              },
+              { role: "system", content: getMainCodingPrompt(mode, !!fullScreenshotDescription), position: 0 },
               { role: "user", content: userMessage, position: 1 },
             ],
           },
         },
       },
-      include: {
-        messages: true,
-      },
+      include: { messages: true },
     });
 
-    const lastMessage = newChat.messages
-      .sort((a, b) => a.position - b.position)
-      .at(-1);
+    const lastMessage = newChat.messages.sort((a, b) => a.position - b.position).at(-1);
     if (!lastMessage) throw new Error("No new message");
 
-    // Log initial generation to Braintrust for evals & measurement over time
     logGeneration({
       chatId: chat.id,
       model: resolvedModel,
       input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode },
-      output: userMessage, // the enriched prompt that was used
+      output: userMessage,
       metadata: { type: "initial_generation", title },
     });
 
-    return NextResponse.json({
-      chatId: chat.id,
-      lastMessageId: lastMessage.id,
-    });
+    return NextResponse.json({ chatId: chat.id, lastMessageId: lastMessage.id });
   } catch (error) {
     console.error("Error creating chat:", error);
-
-    // In development / preview, surface the real error to make debugging easy.
-    // In production we keep the generic message.
     const isDev = process.env.NODE_ENV !== "production";
-    const message =
-      isDev && error instanceof Error
-        ? `Failed to create chat: ${error.message}`
-        : "Failed to create chat";
-
+    const message = isDev && error instanceof Error ? `Failed to create chat: ${error.message}` : "Failed to create chat";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
