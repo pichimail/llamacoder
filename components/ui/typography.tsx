@@ -98,3 +98,12 @@ export function TypographySmall({ className, ...props }: ComponentPropsWithoutRe
 export function TypographyMuted({ className, ...props }: ComponentPropsWithoutRef<"p">) {
   return <p className={cn("text-sm text-muted-foreground", className)} {...props} />;
 }
+
+export function TypographyTable({
+  className,
+  ...props
+}: ComponentPropsWithoutRef<"div">) {
+  return (
+    <div className={cn("my-6 w-full overflow-y-auto", className)} {...props} />
+  );
+}

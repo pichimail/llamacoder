@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
+import { buildOgImagePath } from "@/lib/og-shared";
 
 /*
   This is the Share page for v1 apps, before the chat interface was added.
@@ -21,19 +22,18 @@ export async function generateMetadata({
     notFound();
   }
 
-  let searchParams = new URLSearchParams();
-  searchParams.set("prompt", prompt);
+  const ogImageUrl = buildOgImagePath({ prompt });
 
   return {
     title: "An app generated on Chinna-Coder",
     description: `Prompt: ${generatedApp?.prompt}`,
     openGraph: {
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
     },
     twitter: {
       title: "An app generated on Chinna-Coder",
       card: "summary_large_image",
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
     },
   };
 }

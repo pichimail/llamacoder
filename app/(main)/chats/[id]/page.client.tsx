@@ -2,7 +2,6 @@
 
 import { createMessage } from "@/app/(main)/actions";
 import {
-  parseReplySegments,
   extractFirstCodeBlock,
   extractAllCodeBlocks,
 } from "@/lib/utils";
@@ -25,6 +24,7 @@ import type { Chat, Message } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { toast } from "@/hooks/use-toast";
+import { getShareScreenshotUrl } from "@/lib/og-shared";
 import { Download, ExternalLink, Loader2, MessageSquare, Code2, Eye } from "lucide-react";
 import {
   ResizableHandle,
@@ -57,22 +57,16 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code");
   const [mobileView, setMobileView] = useState<MobilePanel>("code");
   const [autoFixEnabled, setAutoFixEnabled] = useState(true);
-  const [autoFixAttempt, setAutoFixAttempt] = useState(0);
-  const [autoFixStatus, setAutoFixStatus] = useState<
-    "idle" | "watching" | "fixing" | "fallback" | "ready"
-  >("watching");
 
-  // Admin can disable the self-correcting repair loop globally
+  // Admin can disable the self-correcting repair loop globally (no user-facing UI)
   useEffect(() => {
     fetch("/api/public-settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.autoFixDefault === false) {
           setAutoFixEnabled(false);
-          setAutoFixStatus("idle");
         } else {
           setAutoFixEnabled(true);
-          setAutoFixStatus("watching");
         }
       })
       .catch(() => {});
@@ -84,6 +78,8 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const autoFixPendingRef = useRef(false);
   const lastAutoFixErrorRef = useRef("");
   const lastAutoFixAtRef = useRef(0);
+  const pendingAutoPreviewRef = useRef(false);
+  const previewImageSavedForRef = useRef<string | null>(null);
   const streamPromiseRef = useRef<Promise<ReadableStream> | undefined>(
     streamPromise,
   );
@@ -113,8 +109,13 @@ export default function PageClient({ chat }: { chat: Chat }) {
     setStreamPromise(undefined);
     isHandlingStreamRef.current = false;
     autoFixPendingRef.current = false;
-    setAutoFixStatus(autoFixEnabled ? "watching" : "idle");
-  }, [autoFixEnabled]);
+    pendingAutoPreviewRef.current = false;
+  }, []);
+
+  const openPreviewPanel = useCallback(() => {
+    setActiveTab("preview");
+    setMobileView("preview");
+  }, []);
 
   const assistantVersions = useMemo(() => {
     const assistants = chat.messages.filter(
@@ -225,42 +226,6 @@ export default function PageClient({ chat }: { chat: Chat }) {
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [streamPromise, stopStreaming]);
 
-  const playCompletionSound = useCallback(() => {
-    try {
-      const AudioContextConstructor: typeof window.AudioContext | undefined =
-        window.AudioContext ||
-        (
-          window as typeof window & {
-            webkitAudioContext?: typeof window.AudioContext;
-          }
-        ).webkitAudioContext;
-      if (!AudioContextConstructor) return;
-
-      const audioContext = new AudioContextConstructor();
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(660, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(
-        0.18,
-        audioContext.currentTime + 0.02,
-      );
-      gain.gain.exponentialRampToValueAtTime(
-        0.0001,
-        audioContext.currentTime + 0.32,
-      );
-
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.34);
-      window.setTimeout(() => void audioContext.close(), 500);
-    } catch {}
-  }, []);
-
   const buildFixPrompt = useCallback(
     (error: string, attempt: number, useFallback: boolean) => {
       if (useFallback) {
@@ -368,7 +333,6 @@ ${error.trimStart()}`;
       const isSameError = normalizedError === lastAutoFixErrorRef.current;
 
       if (isSameError && autoFixAttemptRef.current >= 4) {
-        setAutoFixStatus("fallback");
         return;
       }
 
@@ -387,15 +351,6 @@ ${error.trimStart()}`;
       autoFixPendingRef.current = true;
       lastAutoFixErrorRef.current = normalizedError;
       lastAutoFixAtRef.current = now;
-      setAutoFixAttempt(nextAttempt);
-      setAutoFixStatus(fallback ? "fallback" : "fixing");
-
-      toast({
-        title: "Self-correcting",
-        description: fallback
-          ? "Rebuilding the app after repeated preview errors…"
-          : `Fixing preview error (attempt ${Math.min(nextAttempt, 3)}/3)…`,
-      });
 
       startTransition(async () => {
         try {
@@ -407,24 +362,55 @@ ${error.trimStart()}`;
           });
         } catch {
           autoFixPendingRef.current = false;
-          setAutoFixStatus("watching");
         }
       });
     },
     [autoFixEnabled, requestFix],
   );
 
+  const handleManualFix = useCallback(
+    (error: string) => {
+      startTransition(async () => {
+        await requestFix({
+          error,
+          auto: false,
+          attempt: 1,
+          fallback: false,
+        });
+      });
+    },
+    [requestFix],
+  );
+
   const handlePreviewReady = useCallback(() => {
-    if (!autoFixEnabled) return;
     if (streamPromiseRef.current || streamTextRef.current) return;
 
     autoFixPendingRef.current = false;
     lastAutoFixErrorRef.current = "";
     autoFixAttemptRef.current = 0;
-    setAutoFixAttempt(0);
-    setAutoFixStatus("ready");
-    playCompletionSound();
-  }, [autoFixEnabled, playCompletionSound]);
+
+    const messageId = activeMessage?.id;
+    if (
+      messageId &&
+      previewImageSavedForRef.current !== messageId &&
+      typeof window !== "undefined"
+    ) {
+      previewImageSavedForRef.current = messageId;
+      const previewImageUrl = getShareScreenshotUrl(
+        window.location.origin,
+        messageId,
+      );
+      void fetch(`/api/messages/${messageId}/preview-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ previewImageUrl }),
+      }).catch(() => {});
+    }
+
+    if (!pendingAutoPreviewRef.current) return;
+    pendingAutoPreviewRef.current = false;
+    openPreviewPanel();
+  }, [activeMessage?.id, openPreviewPanel]);
 
   useEffect(() => {
     async function f() {
@@ -456,22 +442,11 @@ ${error.trimStart()}`;
         return;
       }
 
-      let didPushToCode = false;
-
       try {
         ChatCompletionStream.fromReadableStream(stream)
-          .on("content", (delta, content) => {
+          .on("content", (delta) => {
             if (!streamPromiseRef.current) return;
             setStreamText((text) => text + delta);
-
-            if (
-              !didPushToCode &&
-              parseReplySegments(content).some((seg) => seg.type === "file")
-            ) {
-              didPushToCode = true;
-              setActiveTab("code");
-              setMobileView("code");
-            }
           })
           .on("finalContent", async (finalText) => {
             abortControllerRef.current = null;
@@ -506,17 +481,9 @@ ${error.trimStart()}`;
                 setStreamText("");
                 setStreamPromise(undefined);
                 autoFixPendingRef.current = false;
-                if (autoFixEnabled) {
-                  setAutoFixStatus("watching");
-                }
                 setActiveMessage(message);
-                if (autoFixEnabled) {
-                  setActiveTab("preview");
-                  setMobileView("preview");
-                } else {
-                  setActiveTab("code");
-                  setMobileView("code");
-                }
+                pendingAutoPreviewRef.current = true;
+                openPreviewPanel();
                 router.refresh();
               });
             });
@@ -533,7 +500,7 @@ ${error.trimStart()}`;
     }
 
     f();
-  }, [chat.id, router, streamPromise, context, autoFixEnabled]);
+  }, [chat.id, router, streamPromise, context, openPreviewPanel]);
 
   // Manual editor saves -> persist as a new version and refresh
   const handleSaveFiles = useCallback(
@@ -754,21 +721,10 @@ ${error.trimStart()}`;
               if (nextTab === "code" || nextTab === "preview") setMobileView(nextTab);
             }}
             hideHeaderOnMobile
-            onRequestFix={(error: string) => {
-              startTransition(async () => {
-                await requestFix({
-                  error,
-                  auto: false,
-                  attempt: 1,
-                  fallback: false,
-                });
-              });
-            }}
+            onRequestFix={autoFixEnabled ? undefined : handleManualFix}
             onPreviewError={handlePreviewError}
             onPreviewReady={handlePreviewReady}
             onSaveFiles={handleSaveFiles}
-            autoFixAttempt={autoFixAttempt}
-            autoFixStatus={autoFixStatus}
           />
         </section>
 
@@ -848,21 +804,10 @@ ${error.trimStart()}`;
                 }
               }}
               hideHeaderOnMobile
-              onRequestFix={(error: string) => {
-                startTransition(async () => {
-                  await requestFix({
-                    error,
-                    auto: false,
-                    attempt: 1,
-                    fallback: false,
-                  });
-                });
-              }}
+              onRequestFix={autoFixEnabled ? undefined : handleManualFix}
               onPreviewError={handlePreviewError}
               onPreviewReady={handlePreviewReady}
               onSaveFiles={handleSaveFiles}
-              autoFixAttempt={autoFixAttempt}
-              autoFixStatus={autoFixStatus}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

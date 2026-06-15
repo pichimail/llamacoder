@@ -6,6 +6,7 @@ import {
   screenshotToCodePrompt,
   softwareArchitectPrompt,
 } from "@/lib/prompts";
+import { getShadcnFewShotPrompt } from "@/lib/shadcn-examples";
 import Together from "together-ai";
 import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
@@ -213,7 +214,13 @@ export async function POST(request: NextRequest) {
           create: [
             {
               role: "system",
-              content: getMainCodingPrompt(mode, !!fullScreenshotDescription),
+              content:
+                getMainCodingPrompt(
+                  mode,
+                  !!fullScreenshotDescription,
+                  false,
+                  promptWithAttachments,
+                ) + getShadcnFewShotPrompt(promptWithAttachments),
               position: 0,
             },
             {

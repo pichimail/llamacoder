@@ -41,11 +41,12 @@ model Chat {
 }
 
 model Message {
-  id        String   @id @default(nanoid(16))
-  role      String
-  content   String
-  files     Json?
-  chatId    String
+  id               String   @id @default(nanoid(16))
+  role             String
+  content          String
+  files            Json?
+  previewImageUrl  String?
+  chatId           String
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   position  Int
   createdAt DateTime @default(now())

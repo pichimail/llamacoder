@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CheckCircle2,
   Code2,
   Copy,
   Database,
@@ -70,7 +69,7 @@ type ChangeRecord = {
   status: "added" | "modified" | "deleted";
 };
 
-export type AutoFixStatus = "idle" | "watching" | "fixing" | "fallback" | "ready";
+
 
 const FOLDER_MARKER = ".gitkeep";
 
@@ -270,8 +269,6 @@ export default function CodeViewer({
   onPreviewError,
   onPreviewReady,
   onSaveFiles,
-  autoFixAttempt,
-  autoFixStatus,
   hideHeaderOnMobile = false,
 }: {
   chat: Chat;
@@ -279,12 +276,10 @@ export default function CodeViewer({
   message?: Message;
   activeTab: string;
   onTabChange: (value: "code" | "preview" | "database") => void;
-  onRequestFix: (error: string) => void;
+  onRequestFix?: (error: string) => void;
   onPreviewError: (error: string) => void;
   onPreviewReady: () => void;
   onSaveFiles: (files: ViewerFile[]) => void;
-  autoFixAttempt: number;
-  autoFixStatus: AutoFixStatus;
   hideHeaderOnMobile?: boolean;
 }) {
   const currentTab: ArtifactTab = ["code", "preview", "database"].includes(activeTab) ? (activeTab as ArtifactTab) : "code";
@@ -505,7 +500,6 @@ export default function CodeViewer({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
-            <AutoFixStatusBadge status={autoFixStatus} attempt={autoFixAttempt} />
             <Tip label="Download zip">
               <button type="button" onClick={() => void downloadFilesAsZip(visibleFiles(draft), chat.title || "app")} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Download zip">
                 <Download className="size-3.5" />
@@ -580,23 +574,34 @@ export default function CodeViewer({
             />
           )}
 
-          {currentTab === "preview" && (
-            <PreviewInspectorTab
-              files={visibleFiles(draft)}
-              refresh={refresh}
-              runnerFiles={runnerFiles}
-              selectedFile={selectedFile}
-              streamText={streamText}
-              extraDependencies={extraDependencies}
-              onCreateFile={upsertDraftFile}
-              onDeleteFile={deleteDraftFile}
-              onMutateFile={mutateDraftFile}
-              onPreviewError={onPreviewError}
-              onPreviewReady={onPreviewReady}
-              onRequestFix={onRequestFix}
-              onSelect={setSelectedPath}
-            />
-          )}
+          {runnerFiles.length > 0 ? (
+            <div
+              className={
+                currentTab === "preview"
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                  : "hidden"
+              }
+              aria-hidden={currentTab !== "preview"}
+            >
+              <PreviewInspectorTab
+                files={visibleFiles(draft)}
+                refresh={refresh}
+                runnerFiles={runnerFiles}
+                selectedFile={selectedFile}
+                streamText={streamText}
+                extraDependencies={extraDependencies}
+                onCreateFile={upsertDraftFile}
+                onDeleteFile={deleteDraftFile}
+                onMutateFile={mutateDraftFile}
+                onPreviewError={onPreviewError}
+                onPreviewReady={onPreviewReady}
+                onRequestFix={onRequestFix}
+                onSelect={setSelectedPath}
+              />
+            </div>
+          ) : currentTab === "preview" ? (
+            <EmptyState isStreaming={Boolean(streamText)} />
+          ) : null}
           {currentTab === "database" && <DatabaseTab files={databaseFiles} totalFiles={visibleFiles(draft).length} />}
         </div>
 
@@ -1103,7 +1108,7 @@ function PreviewInspectorTab({
   onMutateFile: (path: string, mutate: (code: string) => string, success: string) => void;
   onPreviewError: (error: string) => void;
   onPreviewReady: () => void;
-  onRequestFix: (error: string) => void;
+  onRequestFix?: (error: string) => void;
   onSelect: (path: string) => void;
 }) {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -1298,11 +1303,4 @@ function EmptyState({ isStreaming }: { isStreaming: boolean }) {
   </div>;
 }
 
-function AutoFixStatusBadge({ status, attempt }: { status: AutoFixStatus; attempt: number }) {
-  if (status === "idle") return null;
-  const label = status === "fixing" ? `Self-fix ${Math.min(attempt, 3)}/3` : status === "ready" ? "Healthy" : status === "fallback" ? "Rebuilding" : "Self-correct on";
-  return <span className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground md:inline-flex" role="status" aria-live="polite">
-    <CheckCircle2 className="size-3" />
-    {label}
-  </span>;
-}
+

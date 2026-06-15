@@ -1,5 +1,6 @@
 import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
+import { getOgDataForChat } from "@/lib/og-utils";
 import { extractAllCodeBlocks } from "@/lib/utils";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -16,19 +17,35 @@ export async function generateMetadata({
     notFound();
   }
 
-  let title = message.chat.title;
-  let searchParams = new URLSearchParams();
-  searchParams.set("prompt", title);
+  const title = message.chat.title;
+  const { ogImageUrl } = getOgDataForChat(
+    {
+      id: message.chat.id,
+      title: message.chat.title,
+      prompt: message.chat.prompt,
+      messages: [
+        ...(message.chat.messages ?? []),
+        {
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          files: message.files,
+          previewImageUrl: message.previewImageUrl,
+        },
+      ],
+    },
+    messageId,
+  );
 
   return {
     title,
     description: `An app generated on Chinna-Coder: ${title}`,
     openGraph: {
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
     },
     twitter: {
       card: "summary_large_image",
-      images: [`/api/og?${searchParams}`],
+      images: [ogImageUrl],
       title,
     },
   };
@@ -82,7 +99,15 @@ const getMessage = cache(async (messageId: string) => {
       id: messageId,
     },
     include: {
-      chat: true,
+      chat: {
+        include: {
+          messages: {
+            where: { role: "user" },
+            orderBy: { position: "asc" },
+            take: 1,
+          },
+        },
+      },
     },
   });
 });

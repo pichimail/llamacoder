@@ -140,17 +140,18 @@ function PreviewStatusMonitor({
           >
             {didCopy ? <CheckIcon size={18} /> : <CopyIcon size={18} />}
           </button>
-          <button
-            onClick={() => {
-              if (!sandpack.error) return;
-              onRequestFix?.(sandpack.error.message);
-            }}
-            disabled={!onRequestFix}
-            className="rounded bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline focus-visible:outline-2"
-            aria-label="Try to automatically fix the error"
-          >
-            Try to fix
-          </button>
+          {onRequestFix ? (
+            <button
+              onClick={() => {
+                if (!sandpack.error) return;
+                onRequestFix(sandpack.error.message);
+              }}
+              className="rounded bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline focus-visible:outline-2"
+              aria-label="Try to automatically fix the error"
+            >
+              Try to fix
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { getOgDataForChat } from "@/lib/og-utils";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import PageClient from "./page.client";
@@ -21,6 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  const { ogImageUrl } = getOgDataForChat(chat);
+
   return {
     title: `App: ${chat.title}`,
     description: `Building an app for ${chat.title} with ${chat.model}`,
@@ -28,7 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `App: ${chat.title}`,
       description: `Building an app for ${chat.title} with ${chat.model}`,
       type: "website",
-      images: [`/api/og?prompt=${encodeURIComponent(chat.title)}`],
+      images: [ogImageUrl],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `App: ${chat.title}`,
+      images: [ogImageUrl],
     },
   };
 }
@@ -109,6 +117,10 @@ const getChatById = cache(async (id: string) => {
     (a, b) => a.position - b.position,
   );
 
+  const latestAssistant = [...allMessages]
+    .reverse()
+    .find((m) => m.role === "assistant");
+
   const assistantMessagesInLoaded = allMessages.filter(
     (m) => m.role === "assistant",
   );
@@ -131,6 +143,7 @@ const getChatById = cache(async (id: string) => {
     messages: allMessages,
     totalMessages,
     assistantMessagesCountBefore,
+    latestAssistantMessageId: latestAssistant?.id,
   };
 });
 
