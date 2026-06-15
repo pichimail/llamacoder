@@ -109,9 +109,9 @@ export function DesignWorkspace({
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent xl:flex-row">
       <section
-        className={`relative min-h-0 flex-1 overflow-hidden bg-background ${inspectorActive ? 'cursor-crosshair' : ''}`}
+        className={`relative min-h-0 flex-1 overflow-hidden bg-transparent ${inspectorActive ? 'cursor-crosshair' : ''}`}
         aria-label="Live design preview"
       >
         {liveFiles.length > 0 ? (
@@ -125,8 +125,8 @@ export function DesignWorkspace({
               previewMode={previewMode}
             />
             {inspectorActive && (
-              <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-background/85 px-2 py-1 text-[11px] text-muted-foreground shadow-lg backdrop-blur">
-                Inspector active. Select exact JSX layers from the right panel.
+              <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border/70 bg-transparent px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
+                Inspector active. Select JSX layers from the right panel.
               </div>
             )}
           </>
@@ -150,15 +150,14 @@ export function DesignWorkspace({
         tabIndex={0}
         onMouseDown={onSplitterMouseDown}
         onKeyDown={onSplitterKeyDown}
-        className="group relative hidden w-[7px] shrink-0 cursor-col-resize bg-transparent focus-visible:outline-none xl:block"
+        className="group relative hidden w-px shrink-0 cursor-col-resize bg-transparent focus-visible:outline-none xl:block"
       >
-        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" aria-hidden="true" />
-        <div className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/0 transition group-hover:bg-primary/30 group-focus-visible:bg-primary/40" aria-hidden="true" />
+        <div className="absolute inset-y-0 left-0 w-px bg-border/80 transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" aria-hidden="true" />
       </div>
 
       <aside
         style={{ width: inspectorWidth }}
-        className="min-h-0 h-[44dvh] shrink-0 overflow-hidden border-t border-border bg-card xl:h-auto xl:border-l xl:border-t-0"
+        className="min-h-0 h-[44dvh] shrink-0 overflow-hidden border-t border-border/70 bg-transparent xl:h-auto xl:border-l xl:border-t-0"
         aria-label="Design inspector"
       >
         <ModeDesign
