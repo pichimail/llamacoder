@@ -34,33 +34,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
     if (!anyProviderConfigured()) {
-      return NextResponse.json(
-        { error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" }, { status: 500 });
     }
 
     try {
-      await rateLimitOrThrow(`create-chat:${request.headers.get("x-forwarded-for") || "local"}`, {
-        limit: 18,
-        windowSeconds: 60,
-      });
+      await rateLimitOrThrow(`create-chat:${request.headers.get("x-forwarded-for") || "local"}`, { limit: 18, windowSeconds: 60 });
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Rate limited" },
-        { status: 429 },
-      );
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
     }
 
     const prisma = getPrisma();
     const chat = await prisma.chat.create({
-      data: {
-        model: resolvedModel,
-        quality,
-        prompt,
-        title: "",
-        shadcn: true,
-      },
+      data: { model: resolvedModel, quality, prompt, title: "", shadcn: true },
     });
 
     let title = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
@@ -71,11 +56,7 @@ export async function POST(request: NextRequest) {
         temperature: 0.2,
         maxTokens: 80,
         messages: [
-          {
-            role: "system",
-            content:
-              "Create a succinct 3-5 word title for this app-building chat. Return only the title.",
-          },
+          { role: "system", content: "Create a succinct 3-5 word title for this app-building chat. Return only the title." },
           { role: "user", content: prompt },
         ],
       });
@@ -139,7 +120,7 @@ export async function POST(request: NextRequest) {
         messages: {
           createMany: {
             data: [
-              { role: "system", content: getMainCodingPrompt(mode, !!fullScreenshotDescription), position: 0 },
+              { role: "system", content: getMainCodingPrompt(mode, !!fullScreenshotDescription, false, prompt), position: 0 },
               { role: "user", content: userMessage, position: 1 },
             ],
           },
