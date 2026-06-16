@@ -13,6 +13,7 @@ import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { BuilderToggles } from "@/components/builder-toggles";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
+import { PlanModePanel } from "@/components/plan-mode-panel";
 
 const ghostTrigger =
   "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
@@ -271,19 +272,13 @@ export default function ChatBox({
   const canUndo = !!onUndo && versions.length > 1;
 
   const chatInfoBar =
-    mode === "plan"
+    mode === "ask"
       ? {
-          title: "Plan mode",
-          description: "Collect a focused brief before sending the patch.",
+          title: "Ask mode",
+          description: "Use this for targeted answers and smaller edits.",
           position: "bottom" as const,
         }
-      : mode === "ask"
-        ? {
-            title: "Ask mode",
-            description: "Use this for targeted answers and smaller edits.",
-            position: "bottom" as const,
-          }
-        : undefined;
+      : undefined;
 
   return (
     <TooltipProvider>
@@ -297,6 +292,8 @@ export default function ChatBox({
           ref={fileInputRef}
           disabled={!isScreenshotUploadAvailable}
         />
+
+        {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 
         <InputBar
           value={prompt}

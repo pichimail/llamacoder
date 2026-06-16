@@ -16,6 +16,7 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
+import { isPlanResponse, PlanResponseCard } from "@/components/plan-mode-panel";
 
 export default function ChatLog({
   chat,
@@ -104,19 +105,23 @@ export default function ChatLog({
           </Reasoning>
         )}
 
-        {streamText && (
-          <AssistantMessage
-            content={streamText}
-            version={
-              (chat.assistantMessagesCountBefore || 0) +
-              assistantMessages.length +
-              1
-            }
-            isActive={true}
-            previousMessage={assistantMessages.at(-1)}
-            isStreaming
-          />
-        )}
+        {streamText ? (
+          isPlanResponse(streamText) ? (
+            <PlanResponseCard content={streamText} isStreaming />
+          ) : (
+            <AssistantMessage
+              content={streamText}
+              version={
+                (chat.assistantMessagesCountBefore || 0) +
+                assistantMessages.length +
+                1
+              }
+              isActive={true}
+              previousMessage={assistantMessages.at(-1)}
+              isStreaming
+            />
+          )
+        ) : null}
       </StickToBottom.Content>
     </StickToBottom>
   );
@@ -222,11 +227,15 @@ function AssistantMessage({
         />
       </div>
     );
-  } else {
-    return (
-      <div className="typography typography-sm max-w-none text-foreground/90">
-        <Streamdown>{content}</Streamdown>
-      </div>
-    );
   }
+
+  if (isPlanResponse(content)) {
+    return <PlanResponseCard content={content} isStreaming={isStreaming} />;
+  }
+
+  return (
+    <div className="typography typography-sm max-w-none text-foreground/90">
+      <Streamdown>{content}</Streamdown>
+    </div>
+  );
 }

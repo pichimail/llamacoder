@@ -25,6 +25,7 @@ import { getVisibleModels, MODELS } from "@/lib/constants";
 import type { FeaturedApp } from "@/lib/featured-apps";
 import { BuilderToggles } from "@/components/builder-toggles";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
+import { PlanModePanel } from "@/components/plan-mode-panel";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
@@ -247,19 +248,13 @@ export default function Home() {
   };
 
   const homeInfoBar =
-    mode === "plan"
+    mode === "ask"
       ? {
-          title: "Plan mode",
-          description: "Use the helper question to capture scope before generation.",
+          title: "Ask mode",
+          description: "Best for questions, refinements, and targeted changes.",
           position: "bottom" as const,
         }
-      : mode === "ask"
-        ? {
-            title: "Ask mode",
-            description: "Best for questions, refinements, and targeted changes.",
-            position: "bottom" as const,
-          }
-        : undefined;
+      : undefined;
 
   const homeQuestionBar =
     mode === "plan"
@@ -467,6 +462,7 @@ export default function Home() {
             className="relative mt-7 w-full max-w-[760px]"
             style={{ ["--an-max-width" as any]: "760px" }}
           >
+            {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
             <InputBar
               value={prompt}
               onChange={setPrompt}
