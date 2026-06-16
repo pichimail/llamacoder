@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ImageIcon, Layers, MousePointer2, Palette, Redo2, RefreshCw, Save, Sparkles, Trash2, Type, Undo2, Eye } from 'lucide-react'
+import { ArrowUp, Check, ChevronRight, ImageIcon, Layers, MousePointer2, Palette, Redo2, RefreshCw, Save, Sparkles, Trash2, Type, Undo2, Eye } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import type { ArtifactFile, DesignToken } from '@/lib/artifact-analysis'
 import { applyTokenChange, detectDesignTokens, patchFileContent } from '@/lib/artifact-analysis'
+import {
+  detectElementTargets,
+  findElementParent,
+  patchElement,
+  refreshElementTarget,
+  replaceClassToken,
+  stripInspectorFromFiles,
+  updateElementClassName,
+  type ElementTarget,
+} from '@/lib/design-inspector'
 import { createMessage } from '@/app/(main)/actions'
 
 const DEFAULT_INSTRUCTION_CHIPS = ['/modern', '/contrast', '/spacious', '/simplify', '/readable', '/shadows', '/pop', '/hierarchy']
@@ -24,7 +34,16 @@ const glassOptions = [
 
 type SavedDesignMessage = Awaited<ReturnType<typeof createMessage>>
 type Snapshot = ArtifactFile[]
-type ElementTarget = { id: string; filePath: string; tag: string; className: string; text: string; match: string }
+
+const SPACING_PRESETS = ['p-0', 'p-2', 'p-4', 'p-6', 'p-8', 'gap-2', 'gap-4', 'gap-6', 'm-0', 'm-4']
+const LAYOUT_PRESETS = [
+  { label: 'Flex row', value: 'flex flex-row items-center' },
+  { label: 'Flex col', value: 'flex flex-col' },
+  { label: 'Grid 2', value: 'grid grid-cols-2 gap-4' },
+  { label: 'Centered', value: 'flex items-center justify-center' },
+  { label: 'Between', value: 'flex items-center justify-between' },
+  { label: 'Full width', value: 'w-full' },
+]
 
 interface ModeDesignProps {
   chatId: string
@@ -36,33 +55,23 @@ interface ModeDesignProps {
   inspectorActive?: boolean
   onInspectorActiveChange?: (active: boolean) => void
   onInspectorSelectionChange?: (selection: { tag: string; label: string } | null) => void
+  selectedElementId?: string
+  onSelectedElementIdChange?: (id: string) => void
 }
 
-function detectElementTargets(files: ArtifactFile[]): ElementTarget[] {
-  const targets: ElementTarget[] = []
-  for (const file of files.filter((item) => /\.(tsx|jsx)$/i.test(item.path))) {
-    const matches = file.code.match(/<([A-Za-z][A-Za-z0-9.]*)\b[^>]*?(?:\/>|>[^<]{0,140}<\/[A-Za-z][A-Za-z0-9.]*>)/g) || []
-    matches.slice(0, 96).forEach((chunk, index) => {
-      const tag = chunk.match(/^<([A-Za-z][A-Za-z0-9.]*)/)?.[1] || 'Element'
-      const className = chunk.match(/className="([^"]*)"/)?.[1] || ''
-      const text = chunk.match(/>([^<]{1,140})<\//)?.[1]?.trim() || ''
-      targets.push({ id: `${file.path}:${index}:${tag}`, filePath: file.path, tag, className, text, match: chunk })
-    })
-  }
-  return targets.slice(0, 160)
-}
-
-function patchElement(files: ArtifactFile[], target: ElementTarget, nextMatch: string) {
-  return files.map((file) => (file.path === target.filePath ? { ...file, code: file.code.replace(target.match, nextMatch) } : file))
-}
-
-function replaceClassToken(className: string, groups: string[], next: string) {
-  const tokens = className.split(/\s+/).filter(Boolean).filter((token) => !groups.some((prefix) => token === prefix || token.startsWith(`${prefix}-`) || token.startsWith(prefix)))
-  if (next) tokens.push(next)
-  return tokens.join(' ')
-}
-
-export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved, inspectorActive = true, onInspectorActiveChange, onInspectorSelectionChange }: ModeDesignProps) {
+export function ModeDesign({
+  chatId,
+  files = [],
+  saveRequest = 0,
+  onDirtyChange,
+  onPreviewFiles,
+  onSaved,
+  inspectorActive = true,
+  onInspectorActiveChange,
+  onInspectorSelectionChange,
+  selectedElementId: controlledSelectedElementId = '',
+  onSelectedElementIdChange,
+}: ModeDesignProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [workspaceFiles, setWorkspaceFiles] = useState(files)
@@ -71,7 +80,10 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
   const [historyIndex, setHistoryIndex] = useState(0)
   const [selectedTokenName, setSelectedTokenName] = useState('')
   const [selectedFilePath, setSelectedFilePath] = useState(files[0]?.path || '')
-  const [selectedElementId, setSelectedElementId] = useState('')
+  const [internalSelectedElementId, setInternalSelectedElementId] = useState('')
+  const selectedElementId = onSelectedElementIdChange ? controlledSelectedElementId : internalSelectedElementId
+  const setSelectedElementId = onSelectedElementIdChange ?? setInternalSelectedElementId
+  const layerListRef = useRef<HTMLDivElement | null>(null)
   const [dirty, setDirty] = useState(false)
   const [savedPulse, setSavedPulse] = useState(false)
   const [instructions, setInstructions] = useState('')
@@ -93,8 +105,18 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
   const elements = useMemo(() => detectElementTargets(workspaceFiles), [workspaceFiles])
   const selectedToken = tokens.find((token) => token.name === selectedTokenName) || tokens[0]
   const selectedFile = workspaceFiles.find((file) => file.path === selectedFilePath) || workspaceFiles[0]
-  const selectedElement = elements.find((element) => element.id === selectedElementId) || elements[0]
+  const selectedElement = selectedElementId
+    ? elements.find((element) => element.id === selectedElementId)
+    : undefined
+  const parentElement = selectedElement ? findElementParent(elements, selectedElement) : null
   const colorTokens = tokens.filter((token) => token.category === 'color')
+
+  useEffect(() => {
+    if (!selectedElementId) return
+    if (!elements.some((element) => element.id === selectedElementId)) {
+      setSelectedElementId('')
+    }
+  }, [elements, selectedElementId, setSelectedElementId])
 
   useEffect(() => {
     if (!inspectorActive) {
@@ -110,6 +132,12 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
       label: selectedElement.text || selectedElement.className || selectedElement.filePath,
     })
   }, [inspectorActive, onInspectorSelectionChange, selectedElement])
+
+  useEffect(() => {
+    if (!selectedElementId || !layerListRef.current) return
+    const node = layerListRef.current.querySelector(`[data-layer-id="${selectedElementId}"]`)
+    node?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedElementId])
   const typographyTokens = tokens.filter((token) => token.category === 'typography')
   const spacingTokens = tokens.filter((token) => token.category === 'spacing')
   const radiusTokens = tokens.filter((token) => token.category === 'radius')
@@ -137,10 +165,21 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
 
   const updateSelectedElementClass = (nextClassName: string) => {
     if (!selectedElement) return
-    const nextMatch = selectedElement.match.includes('className=')
-      ? selectedElement.match.replace(/className="([^"]*)"/, `className="${nextClassName}"`)
-      : selectedElement.match.replace(/^<([A-Za-z][A-Za-z0-9.]*)/, `<$1 className="${nextClassName}"`)
-    markDirty(patchElement(workspaceFiles, selectedElement, nextMatch))
+    const nextMatch = updateElementClassName(selectedElement, nextClassName)
+    const nextFiles = patchElement(workspaceFiles, selectedElement, nextMatch)
+    markDirty(nextFiles)
+    const refreshed = refreshElementTarget(nextFiles, selectedElement)
+    if (refreshed) setSelectedElementId(refreshed.id)
+  }
+
+  const selectElement = (element: ElementTarget) => {
+    setSelectedElementId(element.id)
+    setSelectedFilePath(element.filePath)
+  }
+
+  const selectParentElement = () => {
+    if (!parentElement) return
+    selectElement(parentElement)
   }
 
   const appendUtility = (utility: string) => {
@@ -221,13 +260,15 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
   const saveDesign = useCallback(() => {
     if (!workspaceFiles.length) return
     startTransition(async () => {
-      const content = 'Design edits saved from the visual artifact editor.\n\n' + workspaceFiles.map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``).join('\n\n')
-      const message = await createMessage(chatId, content, 'assistant', workspaceFiles)
+      const cleanedFiles = stripInspectorFromFiles(workspaceFiles)
+      const content = 'Design edits saved from the visual artifact editor.\n\n' + cleanedFiles.map((file) => `\`\`\`${file.language || 'tsx'}{path=${file.path}}\n${file.code}\n\`\`\``).join('\n\n')
+      const message = await createMessage(chatId, content, 'assistant', cleanedFiles)
       setDirty(false)
-      setInitialFiles(workspaceFiles)
+      setInitialFiles(cleanedFiles)
+      setWorkspaceFiles(cleanedFiles)
       onDirtyChange?.(false)
-      onPreviewFiles?.(workspaceFiles)
-      onSaved?.(message, workspaceFiles)
+      onPreviewFiles?.(cleanedFiles)
+      onSaved?.(message, cleanedFiles)
       setSavedPulse(true)
       window.setTimeout(() => setSavedPulse(false), 1200)
       router.refresh()
@@ -289,11 +330,37 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
 
         <ScrollArea className="min-h-0 flex-1">
           <TabsContent value="style" className="m-0 space-y-4 p-3">
+            {selectedElement ? (
+              <div className="flex items-center gap-1 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-[10px] text-muted-foreground">
+                <span className="truncate font-mono text-foreground">{selectedElement.filePath}</span>
+                <ChevronRight className="size-3 shrink-0" />
+                <span className="truncate font-mono text-primary">{selectedElement.tag}</span>
+                {selectedElement.line ? (
+                  <>
+                    <ChevronRight className="size-3 shrink-0" />
+                    <span>L{selectedElement.line}</span>
+                  </>
+                ) : null}
+              </div>
+            ) : (
+              <p className="rounded-md border border-dashed border-border/70 px-2 py-2 text-[11px] text-muted-foreground">
+                Click any element in the preview to start inspecting.
+              </p>
+            )}
+
             <div className="space-y-2">
-              <Label className="text-xs">Detected layers</Label>
-              <div className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-transparent p-1">
-                {elements.length ? elements.slice(0, 56).map((element) => (
-                  <button key={element.id} onClick={() => { setSelectedElementId(element.id); setSelectedFilePath(element.filePath) }} className={`block w-full rounded px-2 py-1.5 text-left transition hover:text-foreground ${selectedElement?.id === element.id ? 'shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]' : ''}`}>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Layers</Label>
+                <span className="text-[10px] text-muted-foreground">{elements.length} nodes</span>
+              </div>
+              <div ref={layerListRef} className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-transparent p-1">
+                {elements.length ? elements.slice(0, 64).map((element) => (
+                  <button
+                    key={element.id}
+                    data-layer-id={element.id}
+                    onClick={() => selectElement(element)}
+                    className={`block w-full rounded px-2 py-1.5 text-left transition hover:bg-accent/40 ${selectedElement?.id === element.id ? 'bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35)]' : ''}`}
+                  >
                     <p className="truncate font-mono text-[11px] text-foreground">{element.tag}</p>
                     <p className="truncate text-[10px] text-muted-foreground">{element.text || element.className || element.filePath}</p>
                   </button>
@@ -302,20 +369,41 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
             </div>
 
             {selectedElement && (
-              <div className="space-y-2 rounded-md border border-border/70 bg-transparent p-2">
+              <div className="space-y-3 rounded-md border border-border/70 bg-transparent p-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-xs">Selected element</Label>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 bg-transparent p-0 text-red-500" onClick={removeSelectedElement} aria-label="Remove selected element"><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 bg-transparent px-2 text-[11px]" onClick={selectParentElement} disabled={!parentElement} aria-label="Select parent element">
+                      <ArrowUp className="mr-1 h-3 w-3" />Parent
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 bg-transparent p-0 text-red-500" onClick={removeSelectedElement} aria-label="Remove selected element"><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
                 </div>
                 <Input value={selectedElement.tag} readOnly className="h-8 bg-transparent font-mono text-xs" />
-                <Label className="text-xs">Class utilities</Label>
+                <Label className="text-xs">Tailwind classes</Label>
                 <Textarea value={selectedElement.className} onChange={(event) => updateSelectedElementClass(event.target.value)} className="min-h-20 bg-transparent font-mono text-xs" aria-label="Edit selected element class utilities" />
+                <Label className="text-xs">Layout presets</Label>
                 <div className="grid grid-cols-2 gap-1">
-                  {['flex', 'grid', 'hidden', 'relative', 'absolute', 'overflow-hidden', 'rounded-none', 'border'].map((utility) => <Button key={utility} variant="outline" size="sm" className="bg-transparent text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>)}
+                  {LAYOUT_PRESETS.map((preset) => (
+                    <Button key={preset.label} variant="outline" size="sm" className="h-7 bg-transparent text-[11px]" onClick={() => updateSelectedElementClass(`${selectedElement.className} ${preset.value}`.trim())}>
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                <Label className="text-xs">Spacing</Label>
+                <div className="flex flex-wrap gap-1">
+                  {SPACING_PRESETS.map((utility) => (
+                    <Button key={utility} variant="outline" size="sm" className="h-6 bg-transparent px-2 text-[10px]" onClick={() => replaceUtility(['p-', 'px-', 'py-', 'pt-', 'pr-', 'pb-', 'pl-', 'm-', 'gap-'], utility)}>
+                      {utility}
+                    </Button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {['flex', 'grid', 'hidden', 'relative', 'absolute', 'overflow-hidden', 'rounded-lg', 'border', 'shadow-sm', 'opacity-80'].map((utility) => <Button key={utility} variant="outline" size="sm" className="bg-transparent text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>)}
                 </div>
                 {selectedElement.text && (
                   <>
-                    <Label className="text-xs">Text</Label>
+                    <Label className="text-xs">Text content</Label>
                     <Input value={selectedElement.text} onChange={(event) => updateSelectedElementText(event.target.value)} className="h-8 bg-transparent text-xs" aria-label="Edit selected element text" />
                   </>
                 )}

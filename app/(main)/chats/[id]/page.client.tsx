@@ -479,6 +479,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           }}
           saveRequest={designSaveRequest}
           previewMode={previewMode}
+          sandpackOptions={sandpackOptions}
         />
       );
     }

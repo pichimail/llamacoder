@@ -105,7 +105,10 @@ export default function ReactCodeRunner({
   onRefresh?: () => void;
   sandpackOptions?: SandpackBuildOptions;
 }) {
-  const filesKey = files.map((f) => f.path + f.content).join("") + JSON.stringify(extraDependencies || {});
+  const filesKey =
+    files.map((f) => f.path + f.content).join("") +
+    JSON.stringify(extraDependencies || {}) +
+    JSON.stringify(sandpackOptions || {});
   const [internalPreviewMode, setInternalPreviewMode] = useState<PreviewMode>("web");
   const [routeIndex, setRouteIndex] = useState(0);
   const [previewUrl, setPreviewUrl] = useState("https://sandbox.local");

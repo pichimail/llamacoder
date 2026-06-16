@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentProps, KeyboardEvent, MouseEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 
@@ -14,6 +14,8 @@ import {
   CursorProvider,
 } from '@/components/animate-ui/primitives/animate/cursor'
 import type { ArtifactFile } from '@/lib/artifact-analysis'
+import type { SandpackBuildOptions } from '@/lib/sandpack-config'
+import { DesignInspectorBridge } from './design-inspector-bridge'
 import { ModeDesign } from './mode-design'
 import type { PreviewMode } from '@/components/code-runner-react'
 
@@ -34,6 +36,7 @@ interface DesignWorkspaceProps {
   onSaved: (message?: SavedDesignMessage, files?: ArtifactFile[]) => void
   saveRequest?: number
   previewMode: PreviewMode
+  sandpackOptions?: SandpackBuildOptions
 }
 
 const MIN_INSPECTOR_WIDTH = 300
@@ -50,17 +53,31 @@ export function DesignWorkspace({
   onSaved,
   saveRequest = 0,
   previewMode,
+  sandpackOptions,
 }: DesignWorkspaceProps) {
   const [liveFiles, setLiveFiles] = useState(files)
   const [inspectorWidth, setInspectorWidth] = useState(400)
   const [inspectorActive, setInspectorActive] = useState(true)
+  const [selectedElementId, setSelectedElementId] = useState('')
+  const [hoverElementId, setHoverElementId] = useState<string | null>(null)
   const [inspectorSelection, setInspectorSelection] = useState<InspectorSelection | null>(null)
+  const previewContainerRef = useRef<HTMLElement | null>(null)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const filesKey = files.map((file) => `${file.path}:${file.code.length}`).join('|')
 
   useEffect(() => {
     setLiveFiles(files)
+    setSelectedElementId('')
+    setHoverElementId(null)
   }, [filesKey, files])
+
+  const previewSandpackOptions = useMemo<SandpackBuildOptions>(
+    () => ({
+      ...sandpackOptions,
+      designInspector: inspectorActive,
+    }),
+    [inspectorActive, sandpackOptions],
+  )
 
   const onSplitterMouseDown = (event: MouseEvent) => {
     event.preventDefault()
@@ -119,6 +136,10 @@ export function DesignWorkspace({
     [onSaved],
   )
 
+  const handleInspectorSelect = useCallback((id: string) => {
+    setSelectedElementId(id)
+  }, [])
+
   const previewFiles = liveFiles.map((file) => ({ path: file.path, content: file.code }))
   const previewRunner = (
     <CodeRunner
@@ -128,15 +149,25 @@ export function DesignWorkspace({
       onPreviewReady={onPreviewReady}
       showDeviceToggle={false}
       previewMode={previewMode}
+      sandpackOptions={previewSandpackOptions}
     />
   )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent xl:flex-row">
       <section
+        ref={previewContainerRef}
         className="relative min-h-0 flex-1 overflow-hidden bg-transparent"
         aria-label="Live design preview"
       >
+        <DesignInspectorBridge
+          enabled={inspectorActive && liveFiles.length > 0}
+          selectedElementId={selectedElementId}
+          onSelectElement={handleInspectorSelect}
+          onHoverElement={setHoverElementId}
+          containerRef={previewContainerRef}
+        />
+
         {liveFiles.length > 0 ? (
           inspectorActive ? (
             <CursorProvider global={false}>
@@ -147,10 +178,12 @@ export function DesignWorkspace({
               <CursorFollow className="bg-primary px-2 py-0.5 text-[11px] text-primary-foreground">
                 {inspectorSelection
                   ? `${inspectorSelection.tag}${inspectorSelection.label ? ` · ${inspectorSelection.label}` : ''}`
-                  : 'Inspector · pick a layer'}
+                  : hoverElementId
+                    ? 'Click to inspect'
+                    : 'Inspector · click any element'}
               </CursorFollow>
               <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-primary/30 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
-                Inspector active — edits update the live preview. Save to commit to code.
+                Click elements in the preview to inspect. Edits are live — save to write code.
               </div>
             </CursorProvider>
           ) : (
@@ -196,6 +229,8 @@ export function DesignWorkspace({
           inspectorActive={inspectorActive}
           onInspectorActiveChange={setInspectorActive}
           onInspectorSelectionChange={setInspectorSelection}
+          selectedElementId={selectedElementId}
+          onSelectedElementIdChange={setSelectedElementId}
         />
       </aside>
     </div>

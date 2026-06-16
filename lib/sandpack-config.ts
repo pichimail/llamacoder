@@ -1,9 +1,15 @@
 import * as shadcnComponents from "@/lib/shadcn";
+import { instrumentFileForInspector } from "@/lib/design-inspector";
+import {
+  DESIGN_INSPECTOR_RUNTIME_PATH,
+  DESIGN_INSPECTOR_RUNTIME_SOURCE,
+} from "@/lib/design-inspector-runtime";
 import { SANDBOX_GLOBALS_CSS, type SandboxTheme } from "@/lib/sandbox-theme";
 
 export type SandpackBuildOptions = {
   includeShadcn?: boolean;
   theme?: SandboxTheme;
+  designInspector?: boolean;
 };
 
 const FILE_EXTENSIONS = "tsx|ts|jsx|js|css|json|mjs|cjs|mdx|md|prisma";
@@ -121,6 +127,7 @@ export function getSandpackConfig(
 ) {
   const includeShadcn = options.includeShadcn !== false;
   const theme = options.theme ?? "light";
+  const designInspector = options.designInspector === true;
 
   const files: Array<{ path: string; content: string }> = (inputFiles || [])
     .filter((f) => f && typeof f.path === "string")
@@ -173,9 +180,16 @@ export function getSandpackConfig(
 
     const normalizedPath = normalizePreviewPath(inferPathFromContent(file.path, file.content));
     const sanitizedContent = sanitizePreviewContent(file.content);
+    const previewContent = designInspector
+      ? instrumentFileForInspector({ path: normalizedPath, code: sanitizedContent })
+      : sanitizedContent;
 
-    sandpackFiles[normalizedPath] = sanitizedContent;
-    previewUserFiles.push({ path: normalizedPath, content: sanitizedContent });
+    sandpackFiles[normalizedPath] = previewContent;
+    previewUserFiles.push({ path: normalizedPath, content: previewContent });
+  }
+
+  if (designInspector) {
+    sandpackFiles[DESIGN_INSPECTOR_RUNTIME_PATH] = DESIGN_INSPECTOR_RUNTIME_SOURCE;
   }
 
   if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
@@ -193,15 +207,22 @@ export function getSandpackConfig(
         .join("\n");
 
       const themeClass = theme === "dark" ? "dark" : "";
+      const inspectorImport = designInspector
+        ? `import { InspectorProvider } from '@/lib/design-inspector-runtime';\n`
+        : "";
+      const inspectorWrap = designInspector
+        ? (child: string) => `<InspectorProvider>${child}</InspectorProvider>`
+        : (child: string) => child;
+
       sandpackFiles["App.tsx"] = `import React from 'react';
 import './app/globals.css';
 ${cssImports}
-import MainComponent from '${toImportPath(mainFile.path)}';
+${inspectorImport}import MainComponent from '${toImportPath(mainFile.path)}';
 
 export default function App() {
   return (
     <div className="${themeClass} min-h-dvh bg-background text-foreground">
-      <MainComponent />
+      ${inspectorWrap("<MainComponent />")}
     </div>
   );
 }`;
