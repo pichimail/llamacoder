@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from "next/dynamic";
 import { detectArtifactRuntime } from "@/lib/artifact-runtime";
 import CodeRunnerReact from "./code-runner-react";
