@@ -2,6 +2,7 @@ import dynamic from "next/dynamic";
 import { detectArtifactRuntime } from "@/lib/artifact-runtime";
 import CodeRunnerReact from "./code-runner-react";
 import type { PreviewMode } from "./code-runner-react";
+import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 
 const PythonArtifactRunner = dynamic(
   () => import("./python-artifact-runner"),
@@ -19,6 +20,7 @@ export default function CodeRunner({
   previewMode,
   onPreviewModeChange,
   showDeviceToggle,
+  sandpackOptions,
 }: {
   language?: string;
   code?: string;
@@ -30,6 +32,7 @@ export default function CodeRunner({
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
   showDeviceToggle?: boolean;
+  sandpackOptions?: SandpackBuildOptions;
 }) {
   const actualFiles = (
     files || (code ? [{ path: "App.tsx", content: code }] : [])
@@ -57,6 +60,7 @@ export default function CodeRunner({
       previewMode={previewMode}
       onPreviewModeChange={onPreviewModeChange}
       showDeviceToggle={showDeviceToggle}
+      sandpackOptions={sandpackOptions}
     />
   );
 }

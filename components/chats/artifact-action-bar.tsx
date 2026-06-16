@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import { ChevronDown, Download, ExternalLink, GitPullRequest, KeyRound, MoreHorizontal, RefreshCw, Share2, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Tip } from "@/components/ui/tooltip";
+import { ShareDialog } from "@/components/dialogs/share-dialog";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 
 type WorkspaceState = {
@@ -39,6 +40,9 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [envKey, setEnvKey] = useState("");
   const [envValue, setEnvValue] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
+  const [duplicateProtected, setDuplicateProtected] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const canAct = !!activeMessageId && files.length > 0;
@@ -80,22 +84,25 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     });
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!activeMessageId) return;
-    startTransition(async () => {
-      const result = await workspaceRequest("publish", { messageId: activeMessageId, files });
-      const absoluteUrl = `${window.location.origin}${result.url}`;
-      await navigator.clipboard.writeText(absoluteUrl).catch(() => undefined);
+    const result = await workspaceRequest("publish", { messageId: activeMessageId, files });
+    const absoluteUrl = `${window.location.origin}${result.url}`;
+    setPublishedUrl(absoluteUrl);
+    setDuplicateProtected(Boolean(result.duplicateProtected));
+    await navigator.clipboard.writeText(absoluteUrl).catch(() => undefined);
+    if (result.duplicateProtected) {
+      toast({ title: "Already published", description: "Opening your existing public link." });
+    } else {
       toast({ title: "Published", description: "Live share link copied." });
-      window.open(absoluteUrl, "_blank", "noopener,noreferrer");
-    });
+    }
+    window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+    return result;
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
     if (!activeMessageId) return;
-    const url = `${window.location.origin}/share/v2/${activeMessageId}`;
-    await navigator.clipboard.writeText(url).catch(() => undefined);
-    toast({ title: "Share link copied", description: url });
+    setShareOpen(true);
   };
 
   const handleConnectGithub = () => {
@@ -143,8 +150,24 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     }
   };
 
+  const shareUrl = activeMessageId
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/v2/${activeMessageId}`
+    : "";
+
   return (
     <div className="relative flex min-w-0 items-center justify-end gap-1">
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={chatTitle}
+        messageId={activeMessageId}
+        shareUrl={shareUrl}
+        publishedUrl={publishedUrl}
+        isPublished={!!publishedUrl}
+        duplicateProtected={duplicateProtected}
+        publishing={isPending}
+        onPublish={handlePublish}
+      />
       {versions.length > 0 && (
         <label className="hidden items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground sm:flex">
           <span className="sr-only">Version</span>
@@ -159,7 +182,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
       <Tip label="Upload asset"><button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset"><Upload className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Export zip"><button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files"><Download className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
-      <Tip label="Publish site"><button type="button" onClick={handlePublish} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
+      <Tip label="Publish site"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
       {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
       <Tip label="More project actions"><button type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
 

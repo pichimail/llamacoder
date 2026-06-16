@@ -97,9 +97,14 @@ export function getMainCodingPrompt(
   hasImage: boolean = false,
   hasCodeFile: boolean = false,
   userPrompt: string = "",
+  useShadcn: boolean = true,
 ): string {
   if (mode === "agent") {
     let p = agentSystemPrompt;
+    if (!useShadcn) {
+      p +=
+        "\n\n**COMPONENT LIBRARY OFF**: Do not import @/components/ui/* or shadcn primitives. Build UI with plain React + Tailwind utility classes only.";
+    }
     const lower = userPrompt.toLowerCase();
     const isLanding = lower.includes("landing") || lower.includes("marketing") || lower.includes("website") || lower.includes("hero") || lower.includes("pricing");
 

@@ -1,4 +1,10 @@
 import * as shadcnComponents from "@/lib/shadcn";
+import { SANDBOX_GLOBALS_CSS, type SandboxTheme } from "@/lib/sandbox-theme";
+
+export type SandpackBuildOptions = {
+  includeShadcn?: boolean;
+  theme?: SandboxTheme;
+};
 
 const FILE_EXTENSIONS = "tsx|ts|jsx|js|css|json|mjs|cjs|mdx|md|prisma";
 
@@ -111,7 +117,11 @@ function toImportPath(path: string) {
 export function getSandpackConfig(
   inputFiles: Array<{ path: string; content?: string; code?: string }>,
   extraDependencies: Record<string, string> = {},
+  options: SandpackBuildOptions = {},
 ) {
+  const includeShadcn = options.includeShadcn !== false;
+  const theme = options.theme ?? "light";
+
   const files: Array<{ path: string; content: string }> = (inputFiles || [])
     .filter((f) => f && typeof f.path === "string")
     .map((f) => ({
@@ -124,8 +134,16 @@ export function getSandpackConfig(
             : "",
     }));
 
-  const sandpackFiles: Record<string, string> = { ...shadcnFiles };
+  const sandpackFiles: Record<string, string> = includeShadcn
+    ? { ...shadcnFiles }
+    : {
+        "/lib/utils.ts": shadcnComponents.utils,
+      };
   const previewUserFiles: Array<{ path: string; content: string }> = [];
+
+  if (!sandpackFiles["/app/globals.css"]) {
+    sandpackFiles["/app/globals.css"] = SANDBOX_GLOBALS_CSS;
+  }
 
   sandpackFiles["/tsconfig.json"] = `{
     "include": [
@@ -174,12 +192,18 @@ export function getSandpackConfig(
         .map((f) => `import './${f.path}';`)
         .join("\n");
 
+      const themeClass = theme === "dark" ? "dark" : "";
       sandpackFiles["App.tsx"] = `import React from 'react';
+import './app/globals.css';
 ${cssImports}
 import MainComponent from '${toImportPath(mainFile.path)}';
 
 export default function App() {
-  return <MainComponent />;
+  return (
+    <div className="${themeClass} min-h-dvh bg-background text-foreground">
+      <MainComponent />
+    </div>
+  );
 }`;
     }
   }

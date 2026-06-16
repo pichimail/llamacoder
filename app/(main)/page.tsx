@@ -23,6 +23,8 @@ import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { getVisibleModels, MODELS } from "@/lib/constants";
 import type { FeaturedApp } from "@/lib/featured-apps";
+import { BuilderToggles } from "@/components/builder-toggles";
+import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
@@ -161,6 +163,8 @@ export default function Home() {
     visibleModels.find((m) => !m.hidden)?.value || visibleModels[0]?.value || MODELS[0].value,
   );
   const [featuredApps, setFeaturedApps] = useState<FeaturedApp[] | null>(null);
+  const [shadcnEnabled, setShadcnEnabled] = useState(true);
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
   const [mode, setMode] = useState<Mode>("agent");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
     undefined,
@@ -365,6 +369,7 @@ export default function Home() {
             mode,
             screenshotUrl,
             attachments,
+            shadcn: shadcnEnabled,
           }),
         });
         if (!res.ok) {
@@ -381,7 +386,7 @@ export default function Home() {
 
         const streamPromise = fetch("/api/get-next-completion-stream-promise", {
           method: "POST",
-          body: JSON.stringify({ messageId: lastMessageId, model }),
+          body: JSON.stringify({ messageId: lastMessageId, model, reasoning: reasoningEnabled }),
         }).then(async (r) => {
           if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
           if (!r.body) throw new Error("No body on response");
@@ -522,18 +527,34 @@ export default function Home() {
                 />
               }
               rightActions={
-                <OptionDropdown
-                  value={model}
-                  onValueChange={setModel}
-                  aria-label="Select AI model"
-                  triggerLabel={getModelLabel(model)}
-                  triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
-                  contentClassName="max-h-[320px]"
-                  options={getVisibleModels().map((item) => ({
-                    value: item.value,
-                    label: item.label,
-                  }))}
-                />
+                <div className="flex items-center gap-2">
+                  <BuilderToggles
+                    compact
+                    shadcnEnabled={shadcnEnabled}
+                    onShadcnChange={setShadcnEnabled}
+                    reasoningEnabled={reasoningEnabled}
+                    onReasoningChange={setReasoningEnabled}
+                  />
+                  <PromptRewriteButton
+                    prompt={prompt}
+                    mode={mode}
+                    model={model}
+                    onRewrite={setPrompt}
+                    disabled={isSubmitting || screenshotLoading}
+                  />
+                  <OptionDropdown
+                    value={model}
+                    onValueChange={setModel}
+                    aria-label="Select AI model"
+                    triggerLabel={getModelLabel(model)}
+                    triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
+                    contentClassName="max-h-[320px]"
+                    options={getVisibleModels().map((item) => ({
+                      value: item.value,
+                      label: item.label,
+                    }))}
+                  />
+                </div>
               }
             />
             <input

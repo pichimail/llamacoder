@@ -11,6 +11,7 @@ import {
   type GenerationMessage,
 } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
+import { patchModeSystemHint } from "@/lib/code-patch";
 
 function optimizeMessagesForTokens(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
@@ -71,6 +72,7 @@ async function compressHistoryWithSmallModel(
 const requestSchema = z.object({
   messageId: z.string().min(1),
   model: z.string().min(1),
+  reasoning: z.boolean().optional().default(false),
 });
 
 function improveAutofixPrompt(messages: { role: "system" | "user" | "assistant"; content: string }[]) {
@@ -98,7 +100,7 @@ export async function POST(req: Request) {
 
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return new Response("Invalid request", { status: 400 });
-  const { messageId, model } = parsed.data;
+  const { messageId, model, reasoning } = parsed.data;
 
   try {
     await rateLimitOrThrow(`generation:${messageId}`, { limit: 20, windowSeconds: 60 });
@@ -181,6 +183,17 @@ export async function POST(req: Request) {
   }
 
   messages = improveAutofixPrompt(messages);
+
+  const hasPriorArtifact = messagesRes.some(
+    (m) => m.role === "assistant" && (m.content.includes("```") || Array.isArray(m.files)),
+  );
+  if (hasPriorArtifact && message.role === "user") {
+    messages = [
+      ...messages,
+      { role: "system" as const, content: patchModeSystemHint },
+    ];
+  }
+
   const requestedModel = resolveModel(model);
 
   logGeneration({
@@ -197,6 +210,7 @@ export async function POST(req: Request) {
       messages: messages.map((m) => ({ role: m.role, content: m.content })) as GenerationMessage[],
       temperature: 0.4,
       maxTokens: 9000,
+      reasoningEnabled: reasoning,
     });
     return new Response(result.stream, {
       headers: {

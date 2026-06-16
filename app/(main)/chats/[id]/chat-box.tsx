@@ -11,6 +11,8 @@ import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
+import { BuilderToggles } from "@/components/builder-toggles";
+import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 
 const ghostTrigger =
   "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
@@ -63,8 +65,19 @@ export default function ChatBox({
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
+  const [shadcnEnabled, setShadcnEnabled] = useState(chat.shadcn);
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
 
   const isScreenshotUploadAvailable = blobUploadConfigured === true;
+
+  const persistShadcn = async (enabled: boolean) => {
+    setShadcnEnabled(enabled);
+    await fetch(`/api/chats/${chat.id}/builder-settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shadcn: enabled }),
+    }).catch(() => undefined);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +231,7 @@ export default function ChatBox({
       const streamPromise = fetch("/api/get-next-completion-stream-promise", {
         method: "POST",
         signal: controller.signal,
-        body: JSON.stringify({ messageId: message.id, model }),
+        body: JSON.stringify({ messageId: message.id, model, reasoning: reasoningEnabled }),
       })
         .then(async (res) => {
           if (!res.ok)
@@ -326,6 +339,20 @@ export default function ChatBox({
           }
           rightActions={
             <div className="flex items-center gap-1">
+              <BuilderToggles
+                compact
+                shadcnEnabled={shadcnEnabled}
+                onShadcnChange={persistShadcn}
+                reasoningEnabled={reasoningEnabled}
+                onReasoningChange={setReasoningEnabled}
+              />
+              <PromptRewriteButton
+                prompt={prompt}
+                mode={mode}
+                model={model}
+                onRewrite={setPrompt}
+                disabled={disabled}
+              />
               <OptionDropdown
                 value={model}
                 onValueChange={setModel}

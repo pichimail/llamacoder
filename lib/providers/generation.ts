@@ -118,11 +118,13 @@ export async function createChatStream({
   messages,
   temperature = 0.4,
   maxTokens = 9000,
+  reasoningEnabled = false,
 }: {
   model: string;
   messages: GenerationMessage[];
   temperature?: number;
   maxTokens?: number;
+  reasoningEnabled?: boolean;
 }): Promise<{ stream: ReadableStream; model: string; provider: string }> {
   const config = getModelConfig(model);
   if (!providerConfigured(config)) throw new Error(providerMissingMessage(config));
@@ -147,7 +149,7 @@ export async function createChatStream({
   const together = getTogetherClient();
   const response = await together.chat.completions.create({
     model: resolveNativeModel(model),
-    reasoning: { enabled: false },
+    reasoning: { enabled: reasoningEnabled },
     messages: normalizeMessages(messages) as any,
     stream: true,
     temperature,
@@ -161,6 +163,7 @@ export async function createChatStreamWithFallback(args: {
   messages: GenerationMessage[];
   temperature?: number;
   maxTokens?: number;
+  reasoningEnabled?: boolean;
 }) {
   try {
     return await createChatStream(args);

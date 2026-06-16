@@ -1,9 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Copy, Check, Mail } from 'lucide-react';
-import clsx from 'clsx';
-
+import { useEffect, useState } from "react";
+import { Check, Copy, ExternalLink, Globe, Link2, Share2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -12,114 +10,164 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 
-interface ShareDialogProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-  chatId: string;
+export type ShareDialogProps = {
+  open: boolean;
+  onClose: () => void;
   title: string;
-}
+  messageId?: string;
+  shareUrl?: string;
+  publishedUrl?: string;
+  isPublished?: boolean;
+  duplicateProtected?: boolean;
+  onPublish?: () => Promise<void>;
+  publishing?: boolean;
+};
 
 export function ShareDialog({
-  isOpen = false,
+  open,
   onClose,
-  chatId,
   title,
+  messageId,
+  shareUrl: shareUrlProp,
+  publishedUrl,
+  isPublished = false,
+  duplicateProtected = false,
+  onPublish,
+  publishing = false,
 }: ShareDialogProps) {
-  const [copied, setCopied] = useState(false);
-  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${chatId}`;
+  const [copied, setCopied] = useState<"share" | "publish" | null>(null);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl =
+    shareUrlProp ||
+    (messageId ? `${origin}/share/v2/${messageId}` : "");
+  const liveUrl = publishedUrl || shareUrl;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    if (!open) setCopied(null);
+  }, [open]);
+
+  const copy = async (url: string, kind: "share" | "publish") => {
+    if (!url) return;
+    await navigator.clipboard.writeText(url).catch(() => undefined);
+    setCopied(kind);
+    toast({ title: "Link copied" });
+    setTimeout(() => setCopied(null), 2000);
   };
 
+  const tweetUrl = shareUrl
+    ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${title}" built with Chinna-Coder`)}&url=${encodeURIComponent(shareUrl)}`
+    : "";
+
   return (
-    <AlertDialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose?.();
-      }}
-    >
-      <AlertDialogContent className="max-w-md">
+    <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
-          <AlertDialogTitle>Share &ldquo;{title}&rdquo;</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Share2 className="size-4 text-emerald-500" aria-hidden="true" />
+            Share &ldquo;{title}&rdquo;
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            Copy a link or share this chat with others.
+            Anyone with the link can view a live preview of this generation.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-sm font-medium text-foreground">
-              Share Link
+            <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <Link2 className="size-3.5" aria-hidden="true" />
+              Preview link
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 readOnly
                 value={shareUrl}
-                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-sm text-muted-foreground"
+                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground"
               />
               <button
                 type="button"
-                onClick={handleCopy}
-                className={clsx(
-                  'rounded-lg px-3 py-2 transition-colors',
-                  copied
-                    ? 'bg-green-600 text-white'
-                    : 'bg-blue-600 text-white hover:bg-blue-700',
-                )}
+                onClick={() => copy(shareUrl, "share")}
+                disabled={!shareUrl}
+                className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-foreground transition hover:bg-accent disabled:opacity-40"
+                aria-label="Copy preview link"
               >
-                {copied ? (
-                  <Check className="h-4 w-4" />
+                {copied === "share" ? (
+                  <Check className="size-4 text-emerald-500" />
                 ) : (
-                  <Copy className="h-4 w-4" />
+                  <Copy className="size-4" />
                 )}
               </button>
+              {shareUrl ? (
+                <a
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-foreground transition hover:bg-accent"
+                  aria-label="Open preview in new tab"
+                >
+                  <ExternalLink className="size-4" />
+                </a>
+              ) : null}
             </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-foreground">
-              Share via Email
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter email address"
-                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground"
-              />
-              <button
-                type="button"
-                className="rounded-lg bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700"
-              >
-                <Mail className="h-4 w-4" />
-              </button>
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Globe className="size-3.5" aria-hidden="true" />
+                  Public publish
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isPublished || duplicateProtected
+                    ? "This version is already published. Share the link below."
+                    : "Publish creates a stable public URL for this app version."}
+                </p>
+              </div>
+              {onPublish && !isPublished && !duplicateProtected ? (
+                <button
+                  type="button"
+                  onClick={onPublish}
+                  disabled={publishing || !messageId}
+                  className="shrink-0 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40"
+                >
+                  {publishing ? "Publishing…" : "Publish"}
+                </button>
+              ) : null}
             </div>
+            {(isPublished || duplicateProtected) && liveUrl ? (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={liveUrl}
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground"
+                />
+                <button
+                  type="button"
+                  onClick={() => copy(liveUrl, "publish")}
+                  className="rounded-md border border-border px-2 py-1.5 text-xs hover:bg-accent"
+                >
+                  {copied === "publish" ? "Copied" : "Copy"}
+                </button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="border-t border-border pt-4">
-            <label className="mb-2 block text-sm font-medium text-foreground">
-              Privacy
-            </label>
-            <div className="space-y-2">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="radio" name="privacy" defaultChecked />
-                <span className="text-sm text-foreground">
-                  Private (shareable link only)
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="radio" name="privacy" />
-                <span className="text-sm text-foreground">
-                  Public (visible in gallery)
-                </span>
-              </label>
-            </div>
-          </div>
+          {tweetUrl ? (
+            <a
+              href={tweetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-xs text-muted-foreground transition hover:text-foreground"
+            >
+              Share on X / Twitter
+              <ExternalLink className="size-3" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
 
         <AlertDialogFooter>

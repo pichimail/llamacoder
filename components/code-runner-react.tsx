@@ -17,7 +17,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { getSandpackConfig } from "@/lib/sandpack-config";
+import { getSandpackConfig, type SandpackBuildOptions } from "@/lib/sandpack-config";
 
 export type PreviewMode = "web" | "mobile";
 
@@ -59,6 +59,7 @@ export default function ReactCodeRunner({
   previewMode,
   onPreviewModeChange,
   showDeviceToggle = false,
+  sandpackOptions,
 }: {
   files: Array<{ path: string; content: string }>;
   extraDependencies?: Record<string, string>;
@@ -68,6 +69,7 @@ export default function ReactCodeRunner({
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
   showDeviceToggle?: boolean;
+  sandpackOptions?: SandpackBuildOptions;
 }) {
   const filesKey = files.map((f) => f.path + f.content).join("") + JSON.stringify(extraDependencies || {});
   const [internalPreviewMode, setInternalPreviewMode] = useState<PreviewMode>("web");
@@ -92,7 +94,7 @@ export default function ReactCodeRunner({
       data-preview-mode={activePreviewMode}
       style={{ "--preview-viewport-width": activeModeConfig.viewportWidth } as CSSProperties}
       className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background"
-      {...getSandpackConfig(files, extraDependencies)}
+      {...getSandpackConfig(files, extraDependencies, sandpackOptions)}
     >
       {routes.length > 1 && (
         <ArtifactRouteControls

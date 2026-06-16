@@ -30,6 +30,7 @@ const createChatSchema = z.object({
     )
     .optional()
     .default([]),
+  shadcn: z.boolean().optional().default(true),
 });
 
 function attachmentContext(attachments: {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request body" }, { status: 400 });
     }
 
-    const { prompt, model, quality, screenshotUrl, mode, attachments } = parsed.data;
+    const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn } = parsed.data;
     const resolvedModel = resolveModel(model);
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const prisma = getPrisma();
     const chat = await prisma.chat.create({
-      data: { model: resolvedModel, quality, prompt, title: "", shadcn: true },
+      data: { model: resolvedModel, quality, prompt, title: "", shadcn },
     });
 
     let title = promptWithAttachments.trim().split(/\s+/).slice(0, 6).join(" ");
@@ -165,7 +166,8 @@ export async function POST(request: NextRequest) {
                   !!fullScreenshotDescription,
                   false,
                   promptWithAttachments,
-                ) + getShadcnFewShotPrompt(promptWithAttachments),
+                  shadcn,
+                ) + (shadcn ? getShadcnFewShotPrompt(promptWithAttachments) : ""),
               position: 0,
             },
             {

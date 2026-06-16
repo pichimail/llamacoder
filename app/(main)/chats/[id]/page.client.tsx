@@ -3,6 +3,10 @@
 import { createMessage } from "@/app/(main)/actions";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
+import { mergeArtifactFiles } from "@/lib/code-patch";
+import type { SandpackBuildOptions } from "@/lib/sandpack-config";
+import { ShareDialog } from "@/components/dialogs/share-dialog";
+import { useTheme } from "@/components/theme-provider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
@@ -56,6 +60,11 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const [streamPromise, setStreamPromise] = useState<Promise<ReadableStream> | undefined>(context.streamPromise);
   const [streamText, setStreamText] = useState("");
+  const [reasoningText, setReasoningText] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
+  const [duplicateProtected, setDuplicateProtected] = useState(false);
+  const { resolvedTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [builderMode, setBuilderMode] = useState<BuilderMode>("code");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
@@ -108,6 +117,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const activeVersion = useMemo(() => activeMessage ? assistantVersions.find((v) => v.id === activeMessage.id) : undefined, [activeMessage, assistantVersions]);
   const activeFileCount = useMemo(() => activeMessage ? getMessageFiles(activeMessage).length : 0, [activeMessage]);
+
+  const sandpackOptions = useMemo<SandpackBuildOptions>(
+    () => ({
+      includeShadcn: chat.shadcn,
+      theme: resolvedTheme === "dark" ? "dark" : "light",
+    }),
+    [chat.shadcn, resolvedTheme],
+  );
 
   const artifactFiles = useMemo(() => {
     const byPath = new Map<string, ArtifactFile>();
@@ -171,6 +188,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     try { abortControllerRef.current?.abort(); } catch {}
     abortControllerRef.current = null;
     setStreamText("");
+    setReasoningText("");
     setStreamPromise(undefined);
     isHandlingStreamRef.current = false;
     autoFixPendingRef.current = false;
@@ -185,7 +203,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     abortControllerRef.current = controller;
     const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
       method: "POST",
-      body: JSON.stringify({ messageId: message.id, model: chat.model }),
+      body: JSON.stringify({ messageId: message.id, model: chat.model, reasoning: false }),
       signal: controller.signal,
     }).then(async (res) => {
       if (!res.ok) throw new Error((await res.text()) || "Failed to start generation");
@@ -289,6 +307,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     async function readStream() {
       if (!streamPromise || isHandlingStreamRef.current) return;
       isHandlingStreamRef.current = true;
+      setReasoningText("");
       context.setStreamPromise(undefined);
       let stream: ReadableStream | null = null;
       try { stream = await streamPromise; }
@@ -296,8 +315,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       if (!stream) { isHandlingStreamRef.current = false; setStreamPromise(undefined); return; }
       let didPushToCode = false;
       try {
-        ChatCompletionStream.fromReadableStream(stream)
-          .on("content", (delta, content) => {
+        const completionStream = ChatCompletionStream.fromReadableStream(stream);
+        completionStream.on("content", (delta, content) => {
             if (!streamPromiseRef.current) return;
             setStreamText((text) => text + delta);
             if (!didPushToCode && parseReplySegments(content).some((seg) => seg.type === "file")) {
@@ -306,19 +325,25 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               setBuilderMode("code");
               setMobilePanel("code");
             }
-          })
-          .on("finalContent", async (finalText) => {
+          });
+        (completionStream as { on?: (event: string, cb: (delta: string) => void) => void }).on?.(
+          "reasoning",
+          (delta: string) => {
+            if (!streamPromiseRef.current) return;
+            setReasoningText((text) => text + delta);
+          },
+        );
+        completionStream.on("finalContent", async (finalText) => {
             abortControllerRef.current = null;
             startTransition(async () => {
               const previousFiles = chat.messages.filter((m) => m.role === "assistant" && extractAllCodeBlocks(m.content).length > 0).flatMap((m) => getMessageFiles(m));
               const currentFiles = extractAllCodeBlocks(finalText) as RawGeneratedFile[];
-              const fileMap = new Map<string, RawGeneratedFile>();
-              previousFiles.forEach((file) => fileMap.set(file.path, file));
-              currentFiles.forEach((file) => fileMap.set(file.path, file));
-              const message = await createMessage(chat.id, finalText, "assistant", Array.from(fileMap.values()));
+              const mergedFiles = mergeArtifactFiles(previousFiles, currentFiles);
+              const message = await createMessage(chat.id, finalText, "assistant", mergedFiles);
               startTransition(() => {
                 isHandlingStreamRef.current = false;
                 setStreamText("");
+                setReasoningText("");
                 setStreamPromise(undefined);
                 autoFixPendingRef.current = false;
                 if (autoFixEnabled) setAutoFixStatus("watching");
@@ -354,11 +379,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     void downloadFilesAsZip(files, chat.title || "app");
   }, [activeMessage, chat.title]);
 
-  const handleShareLink = useCallback(async () => {
+  const handleShareLink = useCallback(() => {
     if (!activeMessage?.id) return;
-    const url = `${window.location.origin}/share/v2/${activeMessage.id}`;
-    await navigator.clipboard.writeText(url).catch(() => undefined);
-    toast({ title: "Share link copied", description: url });
+    setShareOpen(true);
   }, [activeMessage?.id]);
 
   const handleCopyCurrentUrl = useCallback(async () => {
@@ -382,8 +405,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     try {
       const result = await workspaceRequest("publish", { messageId: activeMessage.id, files: artifactFiles });
       const absoluteUrl = `${window.location.origin}${result.url}`;
+      setPublishedUrl(absoluteUrl);
+      setDuplicateProtected(Boolean(result.duplicateProtected));
       await navigator.clipboard.writeText(absoluteUrl).catch(() => undefined);
-      toast({ title: "Published", description: "Live share link copied." });
+      if (result.duplicateProtected) {
+        toast({ title: "Already published", description: "Opening your existing public link." });
+      } else {
+        toast({ title: "Published", description: "Live share link copied." });
+      }
       window.open(absoluteUrl, "_blank", "noopener,noreferrer");
     } catch (error) {
       toast({ title: "Publish failed", description: error instanceof Error ? error.message : "Could not publish.", variant: "destructive" });
@@ -463,13 +492,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
         autoFixStatus={autoFixStatus}
         previewMode={previewMode}
         onPreviewModeChange={setPreviewMode}
+        sandpackOptions={sandpackOptions}
       />
     );
   };
 
   if (isFullscreenPreview) {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
-    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showDeviceToggle /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
+    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showDeviceToggle sandpackOptions={sandpackOptions} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
   }
 
   const nextPreviewMode = previewMode === "web" ? "mobile" : "web";
@@ -477,6 +507,17 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   return (
     <TooltipProvider>
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={chat.title}
+        messageId={activeMessage?.id}
+        shareUrl={activeMessage?.id ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/v2/${activeMessage.id}` : ""}
+        publishedUrl={publishedUrl}
+        isPublished={!!publishedUrl}
+        duplicateProtected={duplicateProtected}
+        onPublish={handlePublishMobile}
+      />
       <div className="flex h-dvh overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
         <Sidebar
           currentChatId={chat.id}
@@ -528,6 +569,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
               {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+              {reasoningText ? (
+                <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
+                  <details open>
+                    <summary className="cursor-pointer font-medium text-foreground">Model reasoning</summary>
+                    <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap">{reasoningText}</pre>
+                  </details>
+                </div>
+              ) : null}
               <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
               <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
             </section>

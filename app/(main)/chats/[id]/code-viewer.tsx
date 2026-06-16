@@ -48,6 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import BuilderTerminal from "@/components/builder-terminal";
 import type { PreviewMode } from "@/components/code-runner-react";
+import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), {
   ssr: false,
@@ -269,6 +270,7 @@ export default function CodeViewer({
   autoFixStatus,
   previewMode,
   onPreviewModeChange,
+  sandpackOptions,
 }: {
   chat: Chat;
   streamText: string;
@@ -285,6 +287,7 @@ export default function CodeViewer({
   autoFixStatus: AutoFixStatus;
   previewMode: PreviewMode;
   onPreviewModeChange: (mode: PreviewMode) => void;
+  sandpackOptions?: SandpackBuildOptions;
 }) {
   const streamAllFiles: ViewerFile[] = useMemo(
     () =>
@@ -839,6 +842,7 @@ export default function CodeViewer({
                     previewMode={previewMode}
                     onPreviewModeChange={onPreviewModeChange}
                     showDeviceToggle={false}
+                    sandpackOptions={sandpackOptions}
                   />
                 ) : (
                   <EmptyState isStreaming={isStreaming} />
@@ -863,7 +867,7 @@ export default function CodeViewer({
                             <LayoutPanelTop className="mr-2 size-3.5" aria-hidden="true" />
                             Live preview
                           </div>
-                          <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} />
+                          <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} />
                         </div>
                       )}
 

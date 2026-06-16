@@ -38,6 +38,16 @@ pnpm export:training
 - [x] Python / Streamlit preview path in the builder (`python-artifact-runner` + runtime detection)
 - [x] Motion template pack: curated prompts in `lib/motion-templates.ts` + gallery section
 - [x] Gallery filters: source, model, and min file count via URL params (`/gallery?source=motion`)
+- [x] Consistent shadcn component library in host app + Sandpack previews (toggle on/off per chat)
+- [x] Diff-style follow-ups: patch mode hints + file merge instead of full regeneration
+- [x] Screenshot / file upload to seed generations (homepage + chat composer)
+- [x] Prompt rewriter launched (`/api/rewrite-prompt` + Enhance button in composer)
+- [x] Share modal for public app links (`ShareDialog` with copy, publish, X share)
+- [x] Public sharing via `/share/v2/[messageId]` + workspace publish
+- [x] Theme CSS variables injected into sandbox previews (light/dark follows host theme)
+- [x] Dynamic OG images with prompt (+ optional Playwright capture via `pnpm capture:og`)
+- [x] Duplicate publish protection surfaced in UI (`duplicateProtected`)
+- [x] Experimental chain-of-thought reasoning toggle (Together `reasoning.enabled`)
 
 ### In progress / next up
 
