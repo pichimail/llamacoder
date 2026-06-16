@@ -11,16 +11,25 @@ import { Fragment } from "react";
 import { Streamdown } from "streamdown";
 import { StickToBottom } from "use-stick-to-bottom";
 import { AppVersionButton } from "@/components/app-version-button";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 
 export default function ChatLog({
   chat,
   activeMessage,
   streamText,
+  reasoningText = "",
+  isReasoningStreaming = false,
   onMessageClick,
 }: {
   chat: Chat;
   activeMessage?: Message;
   streamText: string;
+  reasoningText?: string;
+  isReasoningStreaming?: boolean;
   onMessageClick: (v: Message) => void;
 }) {
   const assistantMessages = chat.messages.filter(
@@ -86,6 +95,15 @@ export default function ChatLog({
           </Fragment>
         ))}
 
+        {(reasoningText || isReasoningStreaming) && (
+          <Reasoning isStreaming={isReasoningStreaming} className="mb-0">
+            <ReasoningTrigger />
+            {reasoningText ? (
+              <ReasoningContent>{reasoningText}</ReasoningContent>
+            ) : null}
+          </Reasoning>
+        )}
+
         {streamText && (
           <AssistantMessage
             content={streamText}
@@ -96,6 +114,7 @@ export default function ChatLog({
             }
             isActive={true}
             previousMessage={assistantMessages.at(-1)}
+            isStreaming
           />
         )}
       </StickToBottom.Content>

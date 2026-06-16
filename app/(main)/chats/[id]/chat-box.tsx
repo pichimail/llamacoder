@@ -38,7 +38,10 @@ export default function ChatBox({
   onInputFocused,
 }: {
   chat: Chat;
-  onNewStreamPromise: (v: Promise<ReadableStream>) => void;
+  onNewStreamPromise: (
+    v: Promise<ReadableStream>,
+    options?: { reasoning: boolean },
+  ) => void;
   onAbortController?: (c: AbortController | null) => void;
   isStreaming: boolean;
   onStop?: () => void;
@@ -253,7 +256,7 @@ export default function ChatBox({
           throw err;
         });
 
-      onNewStreamPromise(streamPromise);
+      onNewStreamPromise(streamPromise, { reasoning: reasoningEnabled });
       startTransition(() => {
         router.refresh();
         setPrompt("");

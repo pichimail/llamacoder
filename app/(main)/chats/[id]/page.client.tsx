@@ -61,6 +61,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [streamPromise, setStreamPromise] = useState<Promise<ReadableStream> | undefined>(context.streamPromise);
   const [streamText, setStreamText] = useState("");
   const [reasoningText, setReasoningText] = useState("");
+  const [streamReasoningEnabled, setStreamReasoningEnabled] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
@@ -126,6 +127,13 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     [chat.shadcn, resolvedTheme],
   );
 
+  const hasCodeInStream = useMemo(
+    () => parseReplySegments(streamText).some((segment) => segment.type === "file"),
+    [streamText],
+  );
+  const isReasoningStreaming =
+    !!streamPromise && streamReasoningEnabled && !hasCodeInStream;
+
   const artifactFiles = useMemo(() => {
     const byPath = new Map<string, ArtifactFile>();
     if (activeMessage) getMessageFiles(activeMessage).forEach((file) => {
@@ -189,6 +197,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     abortControllerRef.current = null;
     setStreamText("");
     setReasoningText("");
+    setStreamReasoningEnabled(false);
     setStreamPromise(undefined);
     isHandlingStreamRef.current = false;
     autoFixPendingRef.current = false;
@@ -343,8 +352,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               startTransition(() => {
                 isHandlingStreamRef.current = false;
                 setStreamText("");
-                setReasoningText("");
                 setStreamPromise(undefined);
+                setStreamReasoningEnabled(false);
                 autoFixPendingRef.current = false;
                 if (autoFixEnabled) setAutoFixStatus("watching");
                 setActiveMessage(message);
@@ -569,16 +578,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
               {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-              {reasoningText ? (
-                <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
-                  <details open>
-                    <summary className="cursor-pointer font-medium text-foreground">Model reasoning</summary>
-                    <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap">{reasoningText}</pre>
-                  </details>
-                </div>
-              ) : null}
-              <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
-              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise) => { setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+              <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
+              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
             </section>
 
             <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-px flex-shrink-0 cursor-col-resize bg-border/70 transition focus-visible:outline-none`} />
