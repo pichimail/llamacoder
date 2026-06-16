@@ -1,0 +1,11 @@
+{
+  "baseModel": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  "trainingFile": "data/training-export.jsonl",
+  "validationSplit": 0.1,
+  "notes": [
+    "1. Run `pnpm export:training` to build training-export.jsonl from successful generations.",
+    "2. Review and filter rows manually — keep only high-quality prompt/code pairs.",
+    "3. Upload JSONL to your fine-tuning provider (Together, OpenAI, etc.).",
+    "4. Point a new MODELS entry at the fine-tuned checkpoint when ready."
+  ]
+}

@@ -8,17 +8,40 @@ For simple fixes or small items on the roadmap below, feel free to submit a pull
 
 To run the repo locally, simply `npm install` to install dependencies and then `npm run dev` to run the app.
 
+Apply database migrations before first run or after pulling schema changes:
+
+```bash
+npx prisma migrate deploy
+```
+
+Export training data for fine-tuning experiments:
+
+```bash
+pnpm export:training
+```
+
 ## Roadmap
 
-- [ ] Add self-correcting to the app so it can fix its own errors
-- [ ] Compressing prompt: Use small model like llama 3.1 70B to retain what happened in the past, good memory management is key
-- [ ] Add evals with Braintrust to be able to measure how good the system is over time and when making new changes
-- [ ] Add more good examples to the shadcn-examples.ts file (single components that span a whole app and use shadcn)
-- [ ] Add dynamic OG images to the specific generations & include the prompt + a screenshot in the image
-- [ ] Show a "featured apps" section on /gallery (or have some at the bottom of the homepage as templates). Have a /id/${prompt} dynamic route that can display a bunch of nice example apps in the sandbox ready to go
-- [ ] Try finetuning a smaller model on good prompts from deepseek-v2 or o1/Claude
-- [ ] Add dark mode to the site overall, nice design change
-- [ ] Support more languages starting with Python (like streamlit) and see if I can run them on CSB SDK
+### Shipped
+
+- [x] Add self-correcting to the app so it can fix its own errors
+- [x] Compressing prompt: Use small model like Llama 3.3 70B to retain what happened in the past, good memory management is key
+- [x] Add more good examples to the `shadcn-examples.ts` file (single components that span a whole app and use shadcn)
+- [x] Add dynamic OG images to the specific generations & include the prompt + a screenshot in the image
+- [x] Show a "featured apps" section on `/gallery` (and on the homepage). `/id/[slug]` opens sandbox-ready template previews
+- [x] Finetuning scaffolding: `pnpm export:training` + `scripts/finetune-config.example.json`
+- [x] Add dark mode to the site overall, nice design change
+
+### In progress / next up
+
+- [ ] Add evals with Braintrust to measure generation quality over time and catch regressions
+- [ ] Admin UI to pin real generations as featured apps (`messageId` on `FEATURED_APPS`)
+- [ ] Cache compressed chat summaries in the database to avoid re-summarizing on every follow-up
+- [ ] Homepage template cards with live Sandpack thumbnails (not just OG placeholders)
+- [ ] Run a first fine-tune on exported JSONL and wire the checkpoint into `MODELS`
+- [ ] Support more languages starting with Python (like Streamlit) and see if I can run them on CSB SDK
+- [ ] Motion/animation template pack integration (curated prompts + preview assets)
+- [ ] Gallery filters: sort by model, file count, and featured vs community
 
 ## License
 

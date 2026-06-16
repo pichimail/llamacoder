@@ -20,7 +20,9 @@ import { Context } from "./providers";
 import { useTheme } from "@/components/theme-provider";
 
 import Header from "@/components/header";
+import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { MODELS } from "@/lib/constants";
+import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
 type Mode = "ask" | "plan" | "agent";
@@ -526,7 +528,26 @@ export default function Home() {
           </div>
         </div>
 
-        <footer id="examples" className="mt-auto flex w-full justify-center pb-6 text-xs text-muted-foreground">Chinna-Coder — Build production apps from a prompt</footer>
+        <section id="featured-templates" className="mt-14 w-full max-w-5xl px-4">
+          <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Open a sandbox preview, then remix in the builder.
+              </p>
+            </div>
+            <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">
+              View gallery
+            </Link>
+          </div>
+          <div className="mt-4">
+            <FeaturedAppsGrid limit={3} compact />
+          </div>
+        </section>
+
+        <footer id="examples" className="mt-auto flex w-full justify-center pb-6 pt-10 text-xs text-muted-foreground">
+          Chinna-Coder — Build production apps from a prompt
+        </footer>
       </div>
     </div>
     </HomeShell>

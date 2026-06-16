@@ -6,6 +6,7 @@ import Header from "@/components/header";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { ExternalLink, Hammer } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -66,9 +67,22 @@ export default async function GalleryPage() {
     <main className="min-h-dvh bg-background text-foreground">
       <Header />
       <div className="mx-auto max-w-5xl px-4 pb-16">
-        <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Gallery</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          One click drops the template into the builder.
+          Featured sandbox templates, quick-start prompts, and recent community builds.
+        </p>
+
+        <h2 className="mt-8 text-lg font-semibold tracking-tight">Featured apps</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Open a live sandbox preview, then remix any template in the builder.
+        </p>
+        <div className="mt-4">
+          <FeaturedAppsGrid limit={6} />
+        </div>
+
+        <h2 className="mt-10 text-lg font-semibold tracking-tight">Quick-start prompts</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          One click drops the prompt into the builder.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SUGGESTED_PROMPTS.map((t) => (

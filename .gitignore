@@ -18,6 +18,7 @@
 /build
 
 # misc
+/data/*.jsonl
 .DS_Store
 *.pem
 

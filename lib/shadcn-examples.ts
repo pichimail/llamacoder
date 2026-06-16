@@ -572,6 +572,298 @@ export default function WeatherDashboard() {
 \`\`\`
     `),
   },
+
+  "analytics dashboard": {
+    prompt: "Build an analytics dashboard with KPI cards, charts, and date filters using shadcn.",
+    response: dedent(`
+SaaS analytics dashboard with KPI cards, trend bars, and a date-range filter.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { ArrowDownRight, ArrowUpRight, BarChart3, Users } from "lucide-react";
+
+const metrics = [
+  { label: "MRR", value: "$48.2k", delta: 12.4, up: true },
+  { label: "Active users", value: "3,842", delta: 5.1, up: true },
+  { label: "Churn", value: "2.1%", delta: 0.4, up: false },
+  { label: "NPS", value: "61", delta: 3, up: true },
+];
+
+export default function AnalyticsDashboard() {
+  const [range, setRange] = useState("30d");
+  const bars = useMemo(() => Array.from({ length: 12 }, (_, i) => 35 + ((i * 17) % 55)), [range]);
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
+            <p className="text-sm text-muted-foreground">Revenue, retention, and growth at a glance.</p>
+          </div>
+          <Select value={range} onValueChange={setRange}>
+            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </header>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {metrics.map((metric) => (
+            <Card key={metric.label}>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">{metric.label}</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">{metric.value}</div>
+                <div className="mt-2 flex items-center gap-1 text-xs">
+                  {metric.up ? <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" /> : <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />}
+                  <span className={metric.up ? "text-emerald-600" : "text-rose-600"}>{metric.delta}%</span>
+                  <span className="text-muted-foreground">vs prior period</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4" />Revenue trend</CardTitle>
+              <Badge variant="secondary">{range}</Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="flex h-40 items-end gap-2">
+                {bars.map((height, index) => (
+                  <div key={index} className="flex-1 rounded-t-md bg-primary/80" style={{ height: \`\${height}%\` }} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4" />Activation</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div><div className="mb-1 flex justify-between text-xs"><span>Onboarding</span><span>78%</span></div><Progress value={78} /></div>
+              <div><div className="mb-1 flex justify-between text-xs"><span>First project</span><span>64%</span></div><Progress value={64} /></div>
+              <Button className="w-full" variant="outline">Export report</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+\`\`\`
+    `),
+  },
+
+  "ecommerce storefront": {
+    prompt: "Create an e-commerce storefront with product grid, cart, and filters using shadcn.",
+    response: dedent(`
+Minimal storefront with filters, product cards, and a cart summary sheet.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ShoppingBag, Search } from "lucide-react";
+
+const products = [
+  { id: "1", name: "Linen Overshirt", price: 89, category: "Apparel", tag: "New" },
+  { id: "2", name: "Ceramic Mug Set", price: 42, category: "Home", tag: "Bestseller" },
+  { id: "3", name: "Trail Runner", price: 128, category: "Footwear", tag: "Limited" },
+  { id: "4", name: "Canvas Tote", price: 34, category: "Accessories", tag: "Eco" },
+];
+
+export default function Storefront() {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("All");
+  const [cart, setCart] = useState<typeof products>([]);
+
+  const filtered = useMemo(() => products.filter((p) => (category === "All" || p.category === category) && p.name.toLowerCase().includes(query.toLowerCase())), [query, category]);
+  const total = cart.reduce((sum, item) => sum + item.price, 0);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <h1 className="text-xl font-semibold tracking-tight">Atelier Market</h1>
+          <div className="relative hidden flex-1 max-w-sm md:block"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search products" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+          <Sheet>
+            <SheetTrigger asChild><Button variant="outline"><ShoppingBag className="mr-2 h-4 w-4" />Cart ({cart.length})</Button></SheetTrigger>
+            <SheetContent><SheetHeader><SheetTitle>Your cart</SheetTitle></SheetHeader>
+              <div className="mt-4 space-y-3">{cart.map((item) => <div key={item.id} className="flex justify-between text-sm"><span>{item.name}</span><span>\${item.price}</span></div>)}</div>
+              <div className="mt-6 border-t border-border pt-4 text-sm font-medium">Total: \${total}</div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mb-4 flex flex-wrap gap-2">{["All", "Apparel", "Home", "Footwear", "Accessories"].map((item) => <Button key={item} size="sm" variant={category === item ? "default" : "outline"} onClick={() => setCategory(item)}>{item}</Button>)}</div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {filtered.map((product) => (
+            <Card key={product.id}>
+              <CardHeader><Badge variant="secondary">{product.tag}</Badge><CardTitle className="text-base">{product.name}</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-semibold">\${product.price}</p></CardContent>
+              <CardFooter><Button className="w-full" onClick={() => setCart((prev) => [...prev, product])}>Add to cart</Button></CardFooter>
+            </Card>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+\`\`\`
+    `),
+  },
+
+  "booking calendar": {
+    prompt: "Build a booking calendar with availability, time slots, and confirmation using shadcn.",
+    response: dedent(`
+Appointment booking flow with day picker, slots, and confirmation card.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Check, Clock } from "lucide-react";
+
+const days = ["Mon 12", "Tue 13", "Wed 14", "Thu 15", "Fri 16"];
+const slots = ["9:00 AM", "10:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
+
+export default function BookingCalendar() {
+  const [day, setDay] = useState(days[0]);
+  const [slot, setSlot] = useState<string | null>(null);
+  const [booked, setBooked] = useState(false);
+  const unavailable = useMemo(() => new Set([slots[1], slots[4]]), []);
+
+  if (booked && slot) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader><CardTitle className="flex items-center gap-2"><Check className="h-5 w-5 text-emerald-500" />Booking confirmed</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p><b className="text-foreground">{day}</b> at <b className="text-foreground">{slot}</b></p>
+            <p>We'll send a calendar invite within a few minutes.</p>
+            <Button className="mt-4" variant="outline" onClick={() => { setBooked(false); setSlot(null); }}>Book another</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-[1fr_320px]">
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-4 w-4" />Select a day</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap gap-2">{days.map((item) => <Button key={item} variant={day === item ? "default" : "outline"} onClick={() => setDay(item)}>{item}</Button>)}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" />Time slots</CardTitle></CardHeader>
+          <CardContent className="grid gap-2">{slots.map((item) => {
+            const taken = unavailable.has(item);
+            return <Button key={item} variant={slot === item ? "default" : "outline"} disabled={taken} onClick={() => setSlot(item)}>{item}{taken ? <Badge className="ml-2" variant="secondary">Taken</Badge> : null}</Button>;
+          })}</CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+            <p className="text-sm text-muted-foreground">{slot ? <>Selected: <b className="text-foreground">{day} · {slot}</b></> : "Pick a day and time to continue."}</p>
+            <Button disabled={!slot} onClick={() => setBooked(true)}>Confirm booking</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+\`\`\`
+    `),
+  },
+
+  "auth onboarding": {
+    prompt: "Create an auth and onboarding flow with sign-in, sign-up, and steps using shadcn.",
+    response: dedent(`
+Auth shell with sign-in/sign-up tabs and a three-step onboarding wizard.
+
+\`\`\`tsx{path=src/App.tsx}
+"use client";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { CheckCircle2 } from "lucide-react";
+
+const steps = ["Workspace", "Team", "Preferences"];
+
+export default function AuthOnboarding() {
+  const [mode, setMode] = useState<"auth" | "onboarding">("auth");
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({ email: "", password: "", workspace: "", team: "", theme: "dark" });
+
+  if (mode === "onboarding") {
+    const progress = ((step + 1) / steps.length) * 100;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle>Set up {steps[step]}</CardTitle>
+            <CardDescription>Step {step + 1} of {steps.length}</CardDescription>
+            <Progress value={progress} className="mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {step === 0 && <div className="space-y-2"><Label>Workspace name</Label><Input value={form.workspace} onChange={(e) => setForm({ ...form, workspace: e.target.value })} placeholder="Acme Studio" /></div>}
+            {step === 1 && <div className="space-y-2"><Label>Invite teammates</Label><Input value={form.team} onChange={(e) => setForm({ ...form, team: e.target.value })} placeholder="alex@acme.com, sam@acme.com" /></div>}
+            {step === 2 && <div className="space-y-2"><Label>Theme</Label><Input value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value })} placeholder="dark or light" /></div>}
+            <div className="flex justify-between gap-2">
+              <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>Back</Button>
+              {step < steps.length - 1 ? <Button onClick={() => setStep((s) => s + 1)}>Continue</Button> : <Button onClick={() => setMode("auth")}><CheckCircle2 className="mr-2 h-4 w-4" />Finish</Button>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader><CardTitle>Welcome back</CardTitle><CardDescription>Sign in or create an account to continue.</CardDescription></CardHeader>
+        <CardContent>
+          <Tabs defaultValue="signin">
+            <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="signin">Sign in</TabsTrigger><TabsTrigger value="signup">Sign up</TabsTrigger></TabsList>
+            <TabsContent value="signin" className="space-y-3 pt-4">
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Password</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+              <Button className="w-full" onClick={() => setMode("onboarding")}>Continue</Button>
+            </TabsContent>
+            <TabsContent value="signup" className="space-y-3 pt-4">
+              <div className="space-y-2"><Label>Work email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Create password</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+              <Button className="w-full" onClick={() => setMode("onboarding")}>Create account</Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+\`\`\`
+    `),
+  },
 };
 
 const exampleMatchers: Array<{ key: keyof typeof examples; patterns: RegExp }> = [
@@ -583,6 +875,10 @@ const exampleMatchers: Array<{ key: keyof typeof examples; patterns: RegExp }> =
   { key: "weather dashboard", patterns: /weather|forecast|climate/i },
   { key: "workspace crm", patterns: /contact|crm|customer|client/i },
   { key: "settings console", patterns: /settings|preferences|profile|account/i },
+  { key: "analytics dashboard", patterns: /analytics|kpi|metrics|revenue|dashboard/i },
+  { key: "ecommerce storefront", patterns: /e-?commerce|storefront|shop|cart|product/i },
+  { key: "booking calendar", patterns: /booking|appointment|schedule|calendar|availability/i },
+  { key: "auth onboarding", patterns: /auth|sign[\s-]?in|sign[\s-]?up|onboarding|login/i },
   { key: "kanban board", patterns: /task|todo|to-do|checklist/i },
 ];
 
