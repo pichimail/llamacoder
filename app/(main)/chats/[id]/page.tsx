@@ -136,4 +136,5 @@ export type Chat = NonNullable<Awaited<ReturnType<typeof getChatById>>>;
 export type Message = Chat["messages"][number];
 export type SidebarChat = Awaited<ReturnType<typeof getSidebarChats>>[number];
 
+export const runtime = "nodejs";
 export const maxDuration = 45;
