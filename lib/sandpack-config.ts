@@ -202,7 +202,7 @@ export function getSandpackConfig(
 
     if (mainFile) {
       const cssImports = previewUserFiles
-        .filter((f) => f.path.endsWith(".css"))
+        .filter((f) => f.path.endsWith(".css") && f.path !== "app/globals.css")
         .map((f) => `import './${f.path}';`)
         .join("\n");
 
@@ -229,14 +229,20 @@ export default function App() {
     }
   }
 
+  for (const [path, content] of Object.entries(sandpackFiles)) {
+    if (!path || path === "null" || path === "undefined") {
+      throw new Error(`Invalid Sandpack file path: ${String(path)}`);
+    }
+
+    if (typeof content !== "string") {
+      sandpackFiles[path] = "";
+    }
+  }
+
   return {
     template: "react-ts" as const,
     files: sandpackFiles,
-    options: {
-      externalResources: [
-        "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4",
-      ],
-    },
+    options: {},
     customSetup: {
       dependencies: { ...dependencies, ...extraDependencies },
     },
@@ -400,7 +406,6 @@ const shadcnFiles = {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Document</title>
-      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     </head>
     <body>
       <div id="root"></div>
