@@ -594,5 +594,4 @@ export default function Home() {
   );
 }
 
-export const runtime = "edge";
 export const maxDuration = 60;
