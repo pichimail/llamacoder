@@ -31,17 +31,20 @@ pnpm export:training
 - [x] Show a "featured apps" section on `/gallery` (and on the homepage). `/id/[slug]` opens sandbox-ready template previews
 - [x] Finetuning scaffolding: `pnpm export:training` + `scripts/finetune-config.example.json`
 - [x] Add dark mode to the site overall, nice design change
+- [x] Admin featured pinning: `/admin` Featured section + `FeaturedPin` table + `/api/admin/featured`
+- [x] Compression caching: `Chat.historySummary` keyed by middle message ids in the completion route
+- [x] Live Sandpack thumbnails on featured/gallery cards (`FeaturedSandboxThumb` + `/api/featured/sandbox`)
+- [x] First fine-tune run script: `pnpm run:finetune` + `FINETUNED_MODEL_ID` wired via `getVisibleModels()`
+- [x] Python / Streamlit preview path in the builder (`python-artifact-runner` + runtime detection)
+- [x] Motion template pack: curated prompts in `lib/motion-templates.ts` + gallery section
+- [x] Gallery filters: source, model, and min file count via URL params (`/gallery?source=motion`)
 
 ### In progress / next up
 
 - [ ] Add evals with Braintrust to measure generation quality over time and catch regressions
-- [ ] Admin UI to pin real generations as featured apps (`messageId` on `FEATURED_APPS`)
-- [ ] Cache compressed chat summaries in the database to avoid re-summarizing on every follow-up
-- [ ] Homepage template cards with live Sandpack thumbnails (not just OG placeholders)
-- [ ] Run a first fine-tune on exported JSONL and wire the checkpoint into `MODELS`
-- [ ] Support more languages starting with Python (like Streamlit) and see if I can run them on CSB SDK
-- [ ] Motion/animation template pack integration (curated prompts + preview assets)
-- [ ] Gallery filters: sort by model, file count, and featured vs community
+- [ ] Run a first fine-tune on exported JSONL and promote the checkpoint in production env
+- [ ] Execute Python/Streamlit in a real sandbox (CSB SDK or Vercel Sandbox) instead of simulated preview
+- [ ] Motion template pack: licensed third-party prompt library integration (avoid DMCA-blocked sources)
 
 ## License
 

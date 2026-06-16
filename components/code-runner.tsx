@@ -1,5 +1,12 @@
+import dynamic from "next/dynamic";
+import { detectArtifactRuntime } from "@/lib/artifact-runtime";
 import CodeRunnerReact from "./code-runner-react";
 import type { PreviewMode } from "./code-runner-react";
+
+const PythonArtifactRunner = dynamic(
+  () => import("./python-artifact-runner"),
+  { ssr: false },
+);
 
 export default function CodeRunner({
   language,
@@ -35,6 +42,11 @@ export default function CodeRunner({
           ? f.code
           : "",
   }));
+  const runtime = detectArtifactRuntime(actualFiles);
+  if (runtime === "python" || runtime === "streamlit") {
+    return <PythonArtifactRunner files={actualFiles} runtime={runtime} />;
+  }
+
   return (
     <CodeRunnerReact
       files={actualFiles}

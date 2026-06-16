@@ -4,10 +4,9 @@ import { useState, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Palette, Type, Grid2x2, Radius, Eye, RotateCcw, Check } from 'lucide-react'
+import { Eye, RotateCcw, Check } from 'lucide-react'
 
 interface DesignModeProps {
   chatId: string
@@ -20,37 +19,6 @@ interface SelectedElement {
   tagName: string
   classes: string[]
   styles: Record<string, string>
-}
-
-const designTokens = {
-  colors: {
-    primary: '#000000',
-    secondary: '#666666',
-    accent: '#0066cc',
-    background: '#ffffff',
-    foreground: '#000000',
-    muted: '#f5f5f5',
-    border: '#e0e0e0',
-  },
-  typography: {
-    heading: 'Inter, sans-serif',
-    body: 'Inter, sans-serif',
-    mono: 'Fira Code, monospace',
-  },
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-  },
-  radius: {
-    none: '0px',
-    sm: '4px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-  },
 }
 
 const aiPromptChips = [
@@ -113,7 +81,9 @@ export function DesignMode({ chatId, projectId, messages = [] }: DesignModeProps
       <div className="flex-1 flex overflow-hidden">
         {/* Preview Area */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 bg-white overflow-hidden">
+          <div
+            className={`flex-1 bg-white overflow-hidden ${previewActive ? "ring-2 ring-blue-500 ring-inset" : ""}`}
+          >
             {selectedElement ? (
               <div className="p-8 bg-white h-full overflow-auto flex items-center justify-center text-muted-foreground">
                 <div className="text-center">

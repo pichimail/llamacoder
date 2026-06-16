@@ -31,6 +31,9 @@ model Chat {
   project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   isPinned          Boolean   @default(false)
   isArchived        Boolean   @default(false)
+  historySummary    String?
+  historySummaryKey String?
+  historySummaryAt  DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -164,6 +167,21 @@ model ProjectMember {
   @@index([projectId])
   @@index([userId])
   @@unique([projectId, userId])
+}
+
+// ===== Admin-curated featured gallery pins =====
+model FeaturedPin {
+  id          String   @id @default(nanoid(12))
+  slug        String   @unique
+  messageId   String   @unique
+  title       String
+  description String   @default("")
+  prompt      String   @default("")
+  tags        Json?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([sortOrder, createdAt])
 }
 
 // ===== App settings / feature flags (admin-controlled) =====

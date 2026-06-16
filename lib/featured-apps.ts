@@ -8,6 +8,9 @@ export type FeaturedApp = {
   exampleKey?: string;
   /** Optional live generation from the database */
   messageId?: string;
+  pinned?: boolean;
+  pinId?: string;
+  source?: "template" | "pinned" | "motion";
 };
 
 export const FEATURED_APPS: FeaturedApp[] = [

@@ -128,8 +128,43 @@ export async function POST(req: Request) {
     const systemMsg = messages[0];
     const firstUser = messages[1];
     const recent = messages.slice(-6);
-    const toCompress = messages.slice(2, -6).filter((m) => m.role === "user" || m.role === "assistant");
-    const compressedSummary = toCompress.length > 0 ? await compressHistoryWithSmallModel(toCompress as any) : "";
+    const middleMessages = messagesRes.slice(2, -6);
+    const toCompress = messages
+      .slice(2, -6)
+      .filter((m) => m.role === "user" || m.role === "assistant");
+    const summaryKey = middleMessages.map((m) => m.id).join("|");
+
+    let compressedSummary = "";
+    if (toCompress.length > 0) {
+      const chat = await prisma.chat.findUnique({
+        where: { id: message.chatId },
+        select: {
+          historySummary: true,
+          historySummaryKey: true,
+        },
+      });
+
+      if (
+        chat?.historySummary &&
+        chat.historySummaryKey === summaryKey &&
+        chat.historySummary.trim().length > 0
+      ) {
+        compressedSummary = chat.historySummary;
+      } else {
+        compressedSummary = await compressHistoryWithSmallModel(toCompress as any);
+        await prisma.chat
+          .update({
+            where: { id: message.chatId },
+            data: {
+              historySummary: compressedSummary,
+              historySummaryKey: summaryKey,
+              historySummaryAt: new Date(),
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
+
     messages = [
       systemMsg,
       firstUser,

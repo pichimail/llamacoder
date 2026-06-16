@@ -13,6 +13,8 @@ import {
   LogOut,
   Loader2,
   ArrowLeft,
+  Pin,
+  Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -31,8 +33,25 @@ const SECTIONS = [
   { id: "flags", label: "Feature Flags", icon: Flag },
   { id: "users", label: "Users & Plans", icon: Users },
   { id: "models", label: "Model Catalog", icon: Cpu },
+  { id: "featured", label: "Featured", icon: Pin },
   { id: "deploy", label: "Deployment", icon: Rocket },
 ] as const;
+
+type FeaturedCandidate = {
+  messageId: string;
+  chatId: string;
+  title: string;
+  prompt: string;
+  model: string;
+  fileCount: number;
+};
+
+type FeaturedPinRow = {
+  pinId?: string;
+  slug: string;
+  title: string;
+  messageId?: string;
+};
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -75,6 +94,9 @@ export default function AdminPage() {
   const [section, setSection] =
     useState<(typeof SECTIONS)[number]["id"]>("overview");
   const [refreshing, setRefreshing] = useState(false);
+  const [featuredPins, setFeaturedPins] = useState<FeaturedPinRow[]>([]);
+  const [featuredCandidates, setFeaturedCandidates] = useState<FeaturedCandidate[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -119,6 +141,56 @@ export default function AdminPage() {
     } finally {
       setLoggingIn(false);
     }
+  };
+
+  const loadFeatured = useCallback(async () => {
+    setFeaturedLoading(true);
+    try {
+      const res = await fetch("/api/admin/featured", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setFeaturedPins(data.pins ?? []);
+      setFeaturedCandidates(data.candidates ?? []);
+    } finally {
+      setFeaturedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authed && section === "featured") {
+      loadFeatured();
+    }
+  }, [authed, section, loadFeatured]);
+
+  const pinFeatured = async (messageId: string) => {
+    const res = await fetch("/api/admin/featured", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast({
+        title: "Could not pin",
+        description: data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Pinned to featured gallery" });
+    await loadFeatured();
+  };
+
+  const unpinFeatured = async (id: string) => {
+    const res = await fetch(`/api/admin/featured?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      toast({ title: "Could not unpin", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Removed from featured" });
+    await loadFeatured();
   };
 
   const setFlag = async (key: string, on: boolean) => {
@@ -336,6 +408,114 @@ export default function AdminPage() {
                 mode). Run <code>npx prisma db push</code> once to create the
                 User/Account/Session tables.
               </p>
+            </section>
+          )}
+
+          {section === "featured" && (
+            <section aria-label="Featured pinning">
+              <p className="text-sm text-muted-foreground">
+                Pin community generations to the gallery. Pinned apps override static
+                templates with the same slug and appear with a live sandbox preview.
+              </p>
+
+              {featuredLoading ? (
+                <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Loading featured pins…
+                </div>
+              ) : (
+                <>
+                  <h2 className="mt-6 text-sm font-medium">Pinned apps</h2>
+                  <div className="mt-2 divide-y divide-border rounded-lg border border-border bg-card text-sm">
+                    {featuredPins.length === 0 ? (
+                      <div className="p-4 text-xs text-muted-foreground">
+                        No pinned apps yet. Pin a recent generation below.
+                      </div>
+                    ) : (
+                      featuredPins.map((pin) => (
+                        <div
+                          key={pin.pinId ?? pin.slug}
+                          className="flex items-center justify-between gap-4 px-4 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{pin.title}</div>
+                            <div className="font-mono text-[11px] text-muted-foreground">
+                              /id/{pin.slug}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <a
+                              href={`/id/${pin.slug}`}
+                              className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                            >
+                              Preview
+                            </a>
+                            {pin.pinId ? (
+                              <button
+                                type="button"
+                                onClick={() => unpinFeatured(pin.pinId!)}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3" aria-hidden="true" />
+                                Unpin
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <h2 className="mt-6 text-sm font-medium">Recent generations</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Latest assistant messages with generated files. Click Pin to feature
+                    in the gallery.
+                  </p>
+                  <div className="mt-2 divide-y divide-border rounded-lg border border-border bg-card text-sm">
+                    {featuredCandidates.length === 0 ? (
+                      <div className="p-4 text-xs text-muted-foreground">
+                        No pin candidates yet. Generate apps in the builder first.
+                      </div>
+                    ) : (
+                      featuredCandidates.map((candidate) => (
+                        <div
+                          key={candidate.messageId}
+                          className="flex items-center justify-between gap-4 px-4 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {candidate.title}
+                            </div>
+                            <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                              {candidate.prompt}
+                            </div>
+                            <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                              {candidate.model.split("/").pop()} · {candidate.fileCount}{" "}
+                              files
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <a
+                              href={`/chats/${candidate.chatId}`}
+                              className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                            >
+                              Open chat
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => pinFeatured(candidate.messageId)}
+                              className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary/90"
+                            >
+                              <Pin className="size-3" aria-hidden="true" />
+                              Pin
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </section>
           )}
 

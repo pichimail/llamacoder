@@ -1,12 +1,19 @@
-import { getPrisma } from "@/lib/prisma";
+import { Suspense } from "react";
 import { getSettings } from "@/lib/settings";
 import { SUGGESTED_PROMPTS } from "@/lib/constants";
 import { buildOgImagePath } from "@/lib/og-shared";
+import { getMergedFeaturedApps } from "@/lib/featured-apps-server";
+import {
+  getGalleryCommunityBuilds,
+  type GalleryFilters as GalleryFilterParams,
+} from "@/lib/gallery-query";
+import { MOTION_TEMPLATES } from "@/lib/motion-templates";
 import Header from "@/components/header";
+import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
+import { GalleryFilters as GalleryFiltersPanel } from "@/components/gallery-filters";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { ExternalLink, Hammer } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -17,7 +24,26 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function GalleryPage() {
+function parseFilters(
+  searchParams: Record<string, string | string[] | undefined>,
+): GalleryFilterParams {
+  const source = typeof searchParams.source === "string" ? searchParams.source : "all";
+  const model = typeof searchParams.model === "string" ? searchParams.model : undefined;
+  const minFilesRaw =
+    typeof searchParams.minFiles === "string" ? Number(searchParams.minFiles) : 0;
+
+  return {
+    source: source as GalleryFilterParams["source"],
+    model,
+    minFiles: Number.isFinite(minFilesRaw) ? minFilesRaw : 0,
+  };
+}
+
+export default async function GalleryPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const settings = await getSettings();
   if (settings.gallery === "off") {
     return (
@@ -30,38 +56,21 @@ export default async function GalleryPage() {
     );
   }
 
-  const prisma = getPrisma();
-  // Real data: latest chats that actually produced files, with their newest shareable version
-  const chats = await prisma.chat
-    .findMany({
-      orderBy: { createdAt: "desc" },
-      take: 24,
-      select: {
-        id: true,
-        title: true,
-        model: true,
-        createdAt: true,
-        messages: {
-          where: { role: "assistant" },
-          orderBy: { position: "desc" },
-          take: 1,
-          select: { id: true, files: true },
-        },
-      },
-    })
-    .catch(() => []);
+  const params = await searchParams;
+  const filters = parseFilters(params);
+  const source = filters.source ?? "all";
 
-  const builds = chats
-    .map((c) => ({
-      id: c.id,
-      title: c.title || "Untitled build",
-      model: c.model.split("/").pop() || c.model,
-      shareMessageId: c.messages[0]?.id,
-      fileCount: Array.isArray(c.messages[0]?.files)
-        ? (c.messages[0]!.files as any[]).length
-        : 0,
-    }))
-    .filter((b) => b.shareMessageId);
+  const [featuredApps, communityBuilds] = await Promise.all([
+    getMergedFeaturedApps(),
+    source === "all" || source === "community"
+      ? getGalleryCommunityBuilds(filters)
+      : Promise.resolve([]),
+  ]);
+
+  const showFeatured = source === "all" || source === "featured";
+  const showMotion = source === "all" || source === "motion";
+  const showTemplates = source === "all" || source === "templates";
+  const showCommunity = source === "all" || source === "community";
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -69,99 +78,127 @@ export default async function GalleryPage() {
       <div className="mx-auto max-w-5xl px-4 pb-16">
         <h1 className="text-2xl font-semibold tracking-tight">Gallery</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Featured sandbox templates, quick-start prompts, and recent community builds.
+          Featured sandbox templates, motion prompts, quick-starts, and community builds.
         </p>
 
-        <h2 className="mt-8 text-lg font-semibold tracking-tight">Featured apps</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Open a live sandbox preview, then remix any template in the builder.
-        </p>
-        <div className="mt-4">
-          <FeaturedAppsGrid limit={6} />
-        </div>
+        <Suspense fallback={null}>
+          <GalleryFiltersPanel />
+        </Suspense>
 
-        <h2 className="mt-10 text-lg font-semibold tracking-tight">Quick-start prompts</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          One click drops the prompt into the builder.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SUGGESTED_PROMPTS.map((t) => (
-            <Link
-              key={t.title}
-              href={`/?prompt=${encodeURIComponent(t.description)}`}
-              className="group rounded-xl border border-border/70 bg-card/50 p-4 transition hover:border-ring/40 hover:bg-card"
-            >
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Hammer
-                  className="size-3.5 text-emerald-500"
-                  aria-hidden="true"
-                />
-                {t.title}
-              </div>
-              <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                {t.description}
-              </p>
-            </Link>
-          ))}
-        </div>
+        {showFeatured ? (
+          <>
+            <h2 className="mt-8 text-lg font-semibold tracking-tight">Featured apps</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Curated templates and admin-pinned generations with live sandbox previews.
+            </p>
+            <div className="mt-4">
+              <FeaturedAppsGrid apps={featuredApps} limit={source === "featured" ? undefined : 6} />
+            </div>
+          </>
+        ) : null}
 
-        <h2 className="mt-10 text-2xl font-semibold tracking-tight">
-          Recent builds
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Live apps generated on this instance.
-        </p>
-        {builds.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Nothing here yet — be the first to build something.
-          </p>
-        ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {builds.map((b) => (
-              <div
-                key={b.id}
-                className="overflow-hidden rounded-xl border border-border/70 bg-card/50"
-              >
-                {b.shareMessageId ? (
-                  <div className="relative aspect-[1200/630] border-b border-border/70 bg-muted/40">
-                    <Image
-                      src={buildOgImagePath({
-                        prompt: b.title,
-                        messageId: b.shareMessageId,
-                      })}
-                      alt={`Preview card for ${b.title}`}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+        {showMotion ? (
+          <>
+            <h2 className="mt-10 text-lg font-semibold tracking-tight">Motion templates</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Animation-forward landing prompts for Framer Motion + shadcn builds.
+            </p>
+            <div className="mt-4">
+              <FeaturedAppsGrid
+                apps={MOTION_TEMPLATES}
+                limit={source === "motion" ? undefined : 3}
+              />
+            </div>
+          </>
+        ) : null}
+
+        {showTemplates ? (
+          <>
+            <h2 className="mt-10 text-lg font-semibold tracking-tight">Quick-start prompts</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              One click drops the prompt into the builder.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {SUGGESTED_PROMPTS.map((template) => (
+                <Link
+                  key={template.title}
+                  href={`/?prompt=${encodeURIComponent(template.description)}`}
+                  className="group rounded-xl border border-border/70 bg-card/50 p-4 transition hover:border-ring/40 hover:bg-card"
+                >
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Hammer className="size-3.5 text-emerald-500" aria-hidden="true" />
+                    {template.title}
                   </div>
-                ) : null}
-                <div className="p-4">
-                <div className="truncate text-sm font-medium">{b.title}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  {b.model} · {b.fileCount} files
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-xs">
-                  <a
-                    href={`/share/v2/${b.shareMessageId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                  <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                    {template.description}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {showCommunity ? (
+          <>
+            <h2 className="mt-10 text-2xl font-semibold tracking-tight">Recent builds</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Live apps generated on this instance
+              {filters.model ? ` · model contains “${filters.model}”` : ""}
+              {filters.minFiles ? ` · ${filters.minFiles}+ files` : ""}.
+            </p>
+            {communityBuilds.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                No builds match these filters yet.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {communityBuilds.map((build) => (
+                  <div
+                    key={build.id}
+                    className="overflow-hidden rounded-xl border border-border/70 bg-card/50"
                   >
-                    <ExternalLink className="size-3" aria-hidden="true" /> Live
-                  </a>
-                  <Link
-                    href={`/chats/${b.id}`}
-                    className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                  >
-                    Open in builder
-                  </Link>
-                </div>
-                </div>
+                    {build.shareMessageId ? (
+                      <div className="relative aspect-[1200/630] border-b border-border/70 bg-muted/40">
+                        <Image
+                          src={buildOgImagePath({
+                            prompt: build.title,
+                            messageId: build.shareMessageId,
+                          })}
+                          alt={`Preview card for ${build.title}`}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : null}
+                    <div className="p-4">
+                      <div className="truncate text-sm font-medium">{build.title}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {build.model} · {build.fileCount} files
+                      </div>
+                      <div className="mt-3 flex items-center gap-2 text-xs">
+                        <a
+                          href={`/share/v2/${build.shareMessageId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                        >
+                          <ExternalLink className="size-3" aria-hidden="true" /> Live
+                        </a>
+                        <Link
+                          href={`/chats/${build.id}`}
+                          className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                        >
+                          Open in builder
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </>
+        ) : null}
       </div>
     </main>
   );

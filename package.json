@@ -9,7 +9,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "tsc --noEmit --noUnusedLocals",
-    "export:training": "npx tsx scripts/export-training-data.ts"
+    "export:training": "npx tsx scripts/export-training-data.ts",
+    "run:finetune": "npx tsx scripts/run-finetune.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

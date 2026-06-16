@@ -21,7 +21,8 @@ import { useTheme } from "@/components/theme-provider";
 
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
-import { MODELS } from "@/lib/constants";
+import { getVisibleModels, MODELS } from "@/lib/constants";
+import type { FeaturedApp } from "@/lib/featured-apps";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
@@ -155,9 +156,11 @@ export default function Home() {
   }, []);
 
   const [prompt, setPrompt] = useState("");
+  const visibleModels = getVisibleModels();
   const [model, setModel] = useState(
-    MODELS.find((m) => !m.hidden)?.value || MODELS[0].value,
+    visibleModels.find((m) => !m.hidden)?.value || visibleModels[0]?.value || MODELS[0].value,
   );
+  const [featuredApps, setFeaturedApps] = useState<FeaturedApp[] | null>(null);
   const [mode, setMode] = useState<Mode>("agent");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
     undefined,
@@ -186,6 +189,22 @@ export default function Home() {
           if (!cancelled) setBlobUploadConfigured(!!data.configured);
         }
       } catch { if (!cancelled) setBlobUploadConfigured(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/featured", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setFeaturedApps(data.apps ?? []);
+        }
+      } catch {
+        if (!cancelled) setFeaturedApps([]);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -510,7 +529,7 @@ export default function Home() {
                   triggerLabel={getModelLabel(model)}
                   triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
                   contentClassName="max-h-[320px]"
-                  options={MODELS.filter((item) => !item.hidden).map((item) => ({
+                  options={getVisibleModels().map((item) => ({
                     value: item.value,
                     label: item.label,
                   }))}
@@ -541,7 +560,11 @@ export default function Home() {
             </Link>
           </div>
           <div className="mt-4">
-            <FeaturedAppsGrid limit={3} compact />
+            <FeaturedAppsGrid
+              apps={featuredApps ?? undefined}
+              limit={3}
+              compact
+            />
           </div>
         </section>
 

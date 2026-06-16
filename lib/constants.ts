@@ -162,8 +162,27 @@ export function getFallbackModel(): ModelConfig {
   return getModelConfig(WORKING_FALLBACK_MODEL);
 }
 
+export function getFinetunedModelConfig(): ModelConfig | null {
+  const id =
+    process.env.NEXT_PUBLIC_FINETUNED_MODEL_ID || process.env.FINETUNED_MODEL_ID;
+  if (!id?.trim()) return null;
+
+  return {
+    label: "Chinna Coder (fine-tuned)",
+    value: id.trim(),
+    nativeModel: id.trim(),
+    provider: "together",
+    status: "experimental",
+    description: "Fine-tuned on exported high-quality generations",
+  };
+}
+
 export function getVisibleModels() {
-  return MODELS.filter((model) => !model.hidden);
+  const finetuned = getFinetunedModelConfig();
+  return [
+    ...MODELS.filter((model) => !model.hidden),
+    ...(finetuned ? [finetuned] : []),
+  ];
 }
 
 export const SUGGESTED_PROMPTS = [
@@ -196,5 +215,10 @@ export const SUGGESTED_PROMPTS = [
     title: "Calculator",
     description:
       "Make a beautiful scientific calculator with a history panel that shows past calculations. Support basic arithmetic, percentages, parentheses, and common functions like square root and exponents. Style it with a modern glassmorphism design.",
+  },
+  {
+    title: "Streamlit Dashboard",
+    description:
+      "Build a Streamlit-style Python dashboard with st.title, st.metric cards for KPIs, st.sidebar filters, and st.button actions. Use sample analytics data and a clean layout.",
   },
 ];
