@@ -41,6 +41,13 @@ import {
   FileTreeName,
 } from "@/components/ai-elements/file-tree";
 import {
+  Snippet,
+  SnippetAddon,
+  SnippetCopyButton,
+  SnippetInput,
+  SnippetText,
+} from "@/components/ai-elements/snippet";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -606,7 +613,7 @@ export default function CodeViewer({
 
                 {explorerPanel === "extensions" ? (
                   <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2 text-xs">
-                    <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Component library</p><div className="space-y-1">{["button", "input", "card", "dialog", "sheet", "dropdown-menu"].map((name) => <button key={name} className="flex w-full items-center justify-between rounded-md border border-border/70 px-2 py-1.5 text-left hover:border-foreground/30" onClick={() => navigator.clipboard.writeText(`components/ui/${name}`).catch(() => undefined)}><span className="font-mono">{name}</span><Copy className="size-3 text-muted-foreground" aria-hidden="true" /></button>)}</div></div>
+                    <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Component library</p><div className="space-y-1.5">{["button", "input", "card", "dialog", "sheet", "dropdown-menu"].map((name) => { const importPath = `components/ui/${name}`; return <Snippet key={name} code={importPath} className="h-8 text-[11px]"><SnippetText className="pl-1.5 text-[10px]">@/</SnippetText><SnippetInput className="text-[11px]" aria-label={`Import path for ${name}`} /><SnippetAddon align="inline-end"><SnippetCopyButton onCopy={() => toast({ title: "Path copied" })} /></SnippetAddon></Snippet>; })}</div></div>
                     <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Add preview dependency</p><div className="space-y-1">{["framer-motion", "lucide-react", "recharts", "date-fns", "clsx"].map((pkg) => <button key={pkg} className="flex w-full items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left hover:border-foreground/30" onClick={() => installDependency(pkg)}><PackagePlus className="size-3.5 text-muted-foreground" aria-hidden="true" /><span className="font-mono">{pkg}</span></button>)}</div></div>
                     <div className="border-t border-border/70 pt-2"><p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground">Installed in preview</p>{Object.keys(extraDeps).length ? Object.entries(extraDeps).map(([name, version]) => <p key={name} className="truncate font-mono text-[11px] text-foreground">{name}@{version}</p>) : <p className="text-[11px] text-muted-foreground">No extra dependencies added.</p>}</div>
                   </div>
@@ -630,7 +637,15 @@ export default function CodeViewer({
                   {selectedFile ? (
                     <>
                       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs"><span className="truncate font-mono text-muted-foreground">{selectedFile.path}</span>{dirty.has(selectedFile.path) ? <span className="text-amber-500">●</span> : null}</div>
+                        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs">
+                          <Snippet code={selectedFile.path} className="min-w-0 flex-1 border-0 bg-transparent shadow-none">
+                            <SnippetInput className="truncate text-xs text-muted-foreground" aria-label="Active file path" />
+                            <SnippetAddon align="inline-end">
+                              <SnippetCopyButton onCopy={() => toast({ title: "Path copied" })} />
+                            </SnippetAddon>
+                          </Snippet>
+                          {dirty.has(selectedFile.path) ? <span className="shrink-0 text-amber-500">●</span> : null}
+                        </div>
                         <CodeEditor path={selectedFile.path} value={selectedFile.code} onChange={(value) => updateFile(selectedFile.path, value)} onEditorReady={(api) => (editorApiRef.current = api)} showMinimap={showMinimap} wordWrap={wordWrap} />
                       </div>
                       {codeLayout === "split-preview" ? <div className="hidden min-w-0 flex-1 flex-col overflow-hidden border-l border-border/70 lg:flex"><div className="flex h-8 shrink-0 items-center border-b border-border/70 px-3 text-xs text-muted-foreground"><LayoutPanelTop className="mr-2 size-3.5" aria-hidden="true" />Live preview</div><CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} /></div> : null}
