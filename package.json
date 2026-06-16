@@ -50,6 +50,7 @@
     "@vercel/blob": "^2.4.0",
     "@vercel/og": "^0.8.6",
     "ai": "^6.0.204",
+    "ansi-to-react": "^6.2.6",
     "braintrust": "^3.17.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Terminal,
+  TerminalActions,
+  TerminalClearButton,
+  TerminalContent,
+  TerminalCopyButton,
+  TerminalHeader,
+  TerminalTitle,
+} from "@/components/ai-elements/terminal";
 
 type Line = { kind: "in" | "out" | "err"; text: string };
 
@@ -28,6 +37,16 @@ export default function BuilderTerminal({
   const [histIdx, setHistIdx] = useState(-1);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const outputText = useMemo(
+    () =>
+      lines
+        .map((line) =>
+          line.kind === "in" ? `➜ ${line.text}` : line.text,
+        )
+        .join("\n"),
+    [lines],
+  );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -141,38 +160,47 @@ export default function BuilderTerminal({
   };
 
   return (
-    <div
-      className="flex h-full flex-col bg-background font-mono text-[12px]"
+    <Terminal
+      output={outputText}
+      onClear={() => setLines([])}
+      className="h-full rounded-none border-0 border-t border-zinc-800"
       onClick={() => inputRef.current?.focus()}
       role="region"
       aria-label="Workspace terminal"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-        {lines.map((l, i) => (
+      <TerminalHeader className="border-zinc-800 bg-zinc-950 px-3 py-1.5">
+        <TerminalTitle className="text-xs">Workspace shell</TerminalTitle>
+        <TerminalActions>
+          <TerminalCopyButton />
+          <TerminalClearButton />
+        </TerminalActions>
+      </TerminalHeader>
+      <TerminalContent className="max-h-none min-h-0 flex-1 px-3 py-2 text-[12px]">
+        {lines.map((line, index) => (
           <div
-            key={i}
+            key={index}
             className={
-              l.kind === "in"
-                ? "text-foreground"
-                : l.kind === "err"
-                  ? "whitespace-pre-wrap text-red-500"
-                  : "whitespace-pre-wrap text-muted-foreground"
+              line.kind === "in"
+                ? "text-zinc-100"
+                : line.kind === "err"
+                  ? "whitespace-pre-wrap text-red-400"
+                  : "whitespace-pre-wrap text-zinc-400"
             }
           >
-            {l.kind === "in" ? (
+            {line.kind === "in" ? (
               <span>
-                <span className="text-emerald-500">➜ </span>
-                {l.text}
+                <span className="text-emerald-400">➜ </span>
+                {line.text}
               </span>
             ) : (
-              l.text
+              line.text
             )}
           </div>
         ))}
         <div ref={endRef} />
-      </div>
-      <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5">
-        <span className="text-emerald-500">➜</span>
+      </TerminalContent>
+      <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800 bg-zinc-950 px-3 py-1.5">
+        <span className="text-emerald-400">➜</span>
         <input
           ref={inputRef}
           value={input}
@@ -197,12 +225,12 @@ export default function BuilderTerminal({
           }}
           placeholder="help"
           aria-label="Terminal command input"
-          className="w-full bg-transparent text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          className="w-full bg-transparent text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
         />
       </div>
-    </div>
+    </Terminal>
   );
 }

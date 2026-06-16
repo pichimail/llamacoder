@@ -22,7 +22,7 @@ import {
   RefreshCw,
   Save,
   Search,
-  TerminalSquare,
+  Terminal as TerminalIconLucide,
   Trash2,
   Undo2,
   Wand2,
@@ -535,7 +535,7 @@ export default function CodeViewer({
                 {hasUnsaved ? <Tip label="Save changes as new version (⌘S)"><button onClick={saveAll} className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-transparent px-2 text-xs font-medium text-foreground transition hover:border-foreground/30" aria-label="Save changes"><Save className="size-3.5" aria-hidden="true" /> Save</button></Tip> : null}
                 <Tip label="Undo (⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.undo()} aria-label="Undo"><Undo2 className="size-3.5" aria-hidden="true" /></button></Tip>
                 <Tip label="Redo (⇧⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.redo()} aria-label="Redo"><Redo2 className="size-3.5" aria-hidden="true" /></button></Tip>
-                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "text-foreground" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalSquare className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "text-foreground" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
               </>
             ) : null}
             <Tip label="Refresh preview"><button className={iconBtn} onClick={() => setRefresh((value) => value + 1)} aria-label="Refresh preview"><RefreshCw className="size-3.5" aria-hidden="true" /></button></Tip>
