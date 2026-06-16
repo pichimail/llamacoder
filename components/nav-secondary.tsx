@@ -14,20 +14,32 @@ import {
 
 function NavLink({
   href,
+  label,
   children,
 }: {
   href: string
+  label: string
   children: ReactNode
 }) {
   if (href.startsWith("http")) {
     return (
-      <a href={href} target="_blank" rel="noreferrer">
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={label}
+        title={label}
+      >
         {children}
       </a>
     )
   }
 
-  return <Link href={href}>{children}</Link>
+  return (
+    <Link href={href} aria-label={label} title={label}>
+      {children}
+    </Link>
+  )
 }
 
 export function NavSecondary({
@@ -43,13 +55,18 @@ export function NavSecondary({
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="flex-row gap-0.5 px-1">
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild size="sm">
-                <NavLink href={item.url}>
+            <SidebarMenuItem key={item.title} className="w-auto">
+              <SidebarMenuButton
+                asChild
+                size="sm"
+                tooltip={item.title}
+                className="size-7 w-7 justify-center p-0 [&>svg]:!size-3"
+              >
+                <NavLink href={item.url} label={item.title}>
                   <item.icon />
-                  <span>{item.title}</span>
+                  <span className="sr-only">{item.title}</span>
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
