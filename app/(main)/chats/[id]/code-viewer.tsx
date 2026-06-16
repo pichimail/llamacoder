@@ -545,7 +545,9 @@ export default function CodeViewer({
                 <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "text-foreground" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
               </>
             ) : null}
-            <Tip label="Refresh preview"><button className={iconBtn} onClick={() => setRefresh((value) => value + 1)} aria-label="Refresh preview"><RefreshCw className="size-3.5" aria-hidden="true" /></button></Tip>
+            {activeTab === "code" ? (
+              <Tip label="Refresh preview"><button className={iconBtn} onClick={() => setRefresh((value) => value + 1)} aria-label="Refresh preview"><RefreshCw className="size-3.5" aria-hidden="true" /></button></Tip>
+            ) : null}
           </div>
         </div>
 
@@ -629,7 +631,24 @@ export default function CodeViewer({
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             {activeTab === "preview" ? (
               <div role="tabpanel" aria-label="Live preview" className="min-h-0 flex-1 overflow-hidden">
-                {runnerFiles.length > 0 ? <CodeRunner key={`${refresh}-${previewMode}`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} /> : <EmptyState isStreaming={isStreaming} />}
+                {runnerFiles.length > 0 ? (
+                  <CodeRunner
+                    key={`${refresh}-${previewMode}`}
+                    files={runnerFiles}
+                    extraDependencies={extraDeps}
+                    onRequestFix={onRequestFix}
+                    onPreviewError={onPreviewError}
+                    onPreviewReady={onPreviewReady}
+                    previewMode={previewMode}
+                    onPreviewModeChange={onPreviewModeChange}
+                    showWebPreviewChrome
+                    showDeviceToggle
+                    onRefresh={() => setRefresh((value) => value + 1)}
+                    sandpackOptions={sandpackOptions}
+                  />
+                ) : (
+                  <EmptyState isStreaming={isStreaming} />
+                )}
               </div>
             ) : (
               <div role="tabpanel" aria-label="Code editor" className="flex min-h-0 flex-1 flex-col overflow-hidden">

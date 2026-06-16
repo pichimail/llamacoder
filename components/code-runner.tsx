@@ -20,6 +20,8 @@ export default function CodeRunner({
   previewMode,
   onPreviewModeChange,
   showDeviceToggle,
+  showWebPreviewChrome,
+  onRefresh,
   sandpackOptions,
 }: {
   language?: string;
@@ -32,6 +34,8 @@ export default function CodeRunner({
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
   showDeviceToggle?: boolean;
+  showWebPreviewChrome?: boolean;
+  onRefresh?: () => void;
   sandpackOptions?: SandpackBuildOptions;
 }) {
   const actualFiles = (
@@ -60,6 +64,8 @@ export default function CodeRunner({
       previewMode={previewMode}
       onPreviewModeChange={onPreviewModeChange}
       showDeviceToggle={showDeviceToggle}
+      showWebPreviewChrome={showWebPreviewChrome}
+      onRefresh={onRefresh}
       sandpackOptions={sandpackOptions}
     />
   );

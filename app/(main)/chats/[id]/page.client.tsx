@@ -508,7 +508,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   if (isFullscreenPreview) {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
-    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showDeviceToggle sandpackOptions={sandpackOptions} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
+    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showWebPreviewChrome showDeviceToggle sandpackOptions={sandpackOptions} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
   }
 
   const nextPreviewMode = previewMode === "web" ? "mobile" : "web";

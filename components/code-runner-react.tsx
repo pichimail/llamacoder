@@ -16,10 +16,23 @@ import {
   Smartphone,
   Wand2,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  WebPreview,
+  WebPreviewConsole,
+  WebPreviewNavigation,
+  WebPreviewNavigationButton,
+  WebPreviewUrl,
+} from "@/components/ai-elements/web-preview";
 import { getSandpackConfig, type SandpackBuildOptions } from "@/lib/sandpack-config";
 
 export type PreviewMode = "web" | "mobile";
+
+type ConsoleLog = {
+  level: "log" | "warn" | "error";
+  message: string;
+  timestamp: Date;
+};
 
 const previewModes: Array<{
   value: PreviewMode;
@@ -50,6 +63,23 @@ function inferArtifactRoutes(files: Array<{ path: string; content: string }>) {
   return Array.from(routes).map((route) => route || "/").sort((a, b) => (a === "/" ? -1 : b === "/" ? 1 : a.localeCompare(b)));
 }
 
+function routeToPreviewUrl(route: string) {
+  return `https://sandbox.local${route === "/" ? "" : route}`;
+}
+
+function previewUrlToRoute(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return "/";
+  try {
+    const parsed = trimmed.includes("://") ? new URL(trimmed) : new URL(trimmed, "https://sandbox.local");
+    const path = parsed.pathname || "/";
+    return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path || "/";
+  } catch {
+    const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+  }
+}
+
 export default function ReactCodeRunner({
   files,
   extraDependencies,
@@ -59,6 +89,8 @@ export default function ReactCodeRunner({
   previewMode,
   onPreviewModeChange,
   showDeviceToggle = false,
+  showWebPreviewChrome = false,
+  onRefresh,
   sandpackOptions,
 }: {
   files: Array<{ path: string; content: string }>;
@@ -69,11 +101,15 @@ export default function ReactCodeRunner({
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
   showDeviceToggle?: boolean;
+  showWebPreviewChrome?: boolean;
+  onRefresh?: () => void;
   sandpackOptions?: SandpackBuildOptions;
 }) {
   const filesKey = files.map((f) => f.path + f.content).join("") + JSON.stringify(extraDependencies || {});
   const [internalPreviewMode, setInternalPreviewMode] = useState<PreviewMode>("web");
   const [routeIndex, setRouteIndex] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState("https://sandbox.local");
+  const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const activePreviewMode = previewMode ?? internalPreviewMode;
   const handlePreviewModeChange = onPreviewModeChange ?? setInternalPreviewMode;
   const routes = useMemo(() => inferArtifactRoutes(files), [filesKey]);
@@ -83,12 +119,47 @@ export default function ReactCodeRunner({
     [activePreviewMode],
   );
   const Preview = SandpackPreview as unknown as React.ComponentType<any>;
+  const nextPreviewMode = activePreviewMode === "web" ? "mobile" : "web";
+  const PreviewModeIcon = activePreviewMode === "web" ? Smartphone : Monitor;
+
+  const appendLog = useCallback((level: ConsoleLog["level"], message: string) => {
+    setConsoleLogs((logs) => [
+      ...logs.slice(-49),
+      { level, message, timestamp: new Date() },
+    ]);
+  }, []);
+
+  const navigateToRoute = useCallback(
+    (route: string) => {
+      const normalized = route || "/";
+      const index = routes.indexOf(normalized);
+      if (index >= 0) {
+        setRouteIndex(index);
+        setPreviewUrl(routeToPreviewUrl(normalized));
+      }
+    },
+    [routes],
+  );
+
+  const handleUrlChange = useCallback(
+    (url: string) => {
+      setPreviewUrl(url);
+      navigateToRoute(previewUrlToRoute(url));
+    },
+    [navigateToRoute],
+  );
 
   useEffect(() => {
     setRouteIndex(0);
-  }, [filesKey]);
+    setConsoleLogs([]);
+    setPreviewUrl(routeToPreviewUrl(routes[0] || "/"));
+  }, [filesKey, routes]);
 
-  return (
+  useEffect(() => {
+    setPreviewUrl(routeToPreviewUrl(activeRoute));
+  }, [activeRoute]);
+
+  const sandpackContent = (
     <SandpackProvider
       key={`${filesKey}:${activeRoute}`}
       data-preview-mode={activePreviewMode}
@@ -96,14 +167,14 @@ export default function ReactCodeRunner({
       className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background"
       {...getSandpackConfig(files, extraDependencies, sandpackOptions)}
     >
-      {routes.length > 1 && (
+      {!showWebPreviewChrome && routes.length > 1 ? (
         <ArtifactRouteControls
           routes={routes}
           activeRoute={activeRoute}
           onPrevious={() => setRouteIndex((index) => (index - 1 + routes.length) % routes.length)}
           onNext={() => setRouteIndex((index) => (index + 1) % routes.length)}
         />
-      )}
+      ) : null}
       <Preview
         startRoute={activeRoute}
         showNavigator={false}
@@ -111,11 +182,84 @@ export default function ReactCodeRunner({
         showRefreshButton={false}
         showRestartButton={false}
         showOpenNewtab={false}
-        actionsChildren={showDeviceToggle ? <PreviewModeSwitcher activeMode={activePreviewMode} onChange={handlePreviewModeChange} /> : undefined}
+        actionsChildren={
+          !showWebPreviewChrome && showDeviceToggle ? (
+            <PreviewModeSwitcher activeMode={activePreviewMode} onChange={handlePreviewModeChange} />
+          ) : undefined
+        }
         className="h-full w-full"
       />
-      <PreviewStatusMonitor onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} />
+      <PreviewStatusMonitor
+        onRequestFix={onRequestFix}
+        onPreviewError={onPreviewError}
+        onPreviewReady={onPreviewReady}
+        onLog={showWebPreviewChrome ? appendLog : undefined}
+        captureConsole={showWebPreviewChrome}
+        useConsoleOverlay={!showWebPreviewChrome}
+      />
     </SandpackProvider>
+  );
+
+  if (!showWebPreviewChrome) {
+    return sandpackContent;
+  }
+
+  return (
+    <WebPreview
+      defaultUrl={previewUrl}
+      onUrlChange={handleUrlChange}
+      className="h-full rounded-none border-0 bg-transparent"
+    >
+      <WebPreviewNavigation className="border-border/70 bg-background px-2 py-1.5">
+        <WebPreviewNavigationButton
+          tooltip="Previous page"
+          aria-label="Previous page"
+          disabled={routes.length <= 1}
+          onClick={() => setRouteIndex((index) => (index - 1 + routes.length) % routes.length)}
+        >
+          <ChevronLeft className="size-4" />
+        </WebPreviewNavigationButton>
+        <WebPreviewNavigationButton
+          tooltip="Next page"
+          aria-label="Next page"
+          disabled={routes.length <= 1}
+          onClick={() => setRouteIndex((index) => (index + 1) % routes.length)}
+        >
+          <ChevronRight className="size-4" />
+        </WebPreviewNavigationButton>
+        <WebPreviewNavigationButton
+          tooltip="Refresh preview"
+          aria-label="Refresh preview"
+          onClick={() => onRefresh?.()}
+        >
+          <RefreshCw className="size-4" />
+        </WebPreviewNavigationButton>
+        <WebPreviewUrl
+          value={previewUrl}
+          onChange={(event) => setPreviewUrl(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              handleUrlChange((event.target as HTMLInputElement).value);
+            }
+          }}
+          aria-label="Preview route"
+          className="font-mono text-xs"
+        />
+        {showDeviceToggle ? (
+          <WebPreviewNavigationButton
+            tooltip={`Switch to ${nextPreviewMode} preview`}
+            aria-label={`Switch to ${nextPreviewMode} preview`}
+            onClick={() => handlePreviewModeChange(nextPreviewMode)}
+          >
+            <PreviewModeIcon className="size-4" />
+          </WebPreviewNavigationButton>
+        ) : null}
+      </WebPreviewNavigation>
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/20">
+        {sandpackContent}
+      </div>
+      <WebPreviewConsole logs={consoleLogs} />
+    </WebPreview>
   );
 }
 
@@ -153,10 +297,16 @@ function PreviewStatusMonitor({
   onRequestFix,
   onPreviewError,
   onPreviewReady,
+  onLog,
+  captureConsole,
+  useConsoleOverlay,
 }: {
   onRequestFix?: (e: string) => void;
   onPreviewError?: (e: string) => void;
   onPreviewReady?: () => void;
+  onLog?: (level: ConsoleLog["level"], message: string) => void;
+  captureConsole?: boolean;
+  useConsoleOverlay?: boolean;
 }) {
   const { sandpack, listen } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
@@ -166,9 +316,26 @@ function PreviewStatusMonitor({
     if (sandpack.error) {
       const message = sandpack.error.message;
       setLastRuntimeError(message);
+      onLog?.("error", message);
       onPreviewError?.(message);
     }
-  }, [sandpack.error, onPreviewError]);
+  }, [sandpack.error, onLog, onPreviewError]);
+
+  useEffect(() => {
+    if (!captureConsole || !onLog) return;
+    const unsubscribe = listen((message) => {
+      if (message.type === "console") {
+        const payload = message as { data?: Array<{ data?: string[]; method?: string }> };
+        for (const entry of payload.data ?? []) {
+          const text = entry.data?.map((item) => String(item)).join(" ") ?? "";
+          if (!text) continue;
+          const level = entry.method === "error" ? "error" : entry.method === "warn" ? "warn" : "log";
+          onLog(level, text);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [captureConsole, listen, onLog]);
 
   useEffect(() => {
     let readyTimer: number | undefined;
@@ -182,6 +349,7 @@ function PreviewStatusMonitor({
         if (compileError) {
           const errorText = typeof compileError === "string" ? compileError : JSON.stringify(compileError, null, 2);
           setLastRuntimeError(errorText);
+          onLog?.("error", errorText);
           onPreviewError?.(errorText);
           window.clearTimeout(readyTimer);
           return;
@@ -203,10 +371,10 @@ function PreviewStatusMonitor({
       window.clearTimeout(readyTimer);
       unsubscribe();
     };
-  }, [listen, onPreviewError, onPreviewReady, sandpack.error]);
+  }, [listen, onLog, onPreviewError, onPreviewReady, sandpack.error]);
 
   const errorMessage = sandpack.error?.message || lastRuntimeError;
-  if (!errorMessage) return null;
+  if (!errorMessage || !useConsoleOverlay) return null;
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/55 p-4 text-base backdrop-blur-sm" role="alert">
