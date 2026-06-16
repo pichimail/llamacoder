@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback, useRef, useEffect } from "react";
+import { memo, useState, useCallback, useEffect } from "react";
 import type { ChatStatus } from "ai";
 import { cn } from "./utils/cn";
 
@@ -16,15 +16,38 @@ const DEFAULT_INPUT_CONFIG: InputConfig = {
   attachmentPreviewStyle: "thumbnail",
 };
 
+function PromptInputControlledSync({ value }: { value: string }) {
+  const controller = usePromptInputController();
+
+  useEffect(() => {
+    if (controller.textInput.value !== value) {
+      controller.textInput.setInput(value);
+    }
+  }, [controller, value]);
+
+  return null;
+}
+
 import {
   IconChevronDown,
   IconChevronUp,
   IconMessageCircleQuestion,
   IconX,
 } from "@tabler/icons-react";
-import { SendButton } from "./input/send-button";
-import { AttachmentButton } from "./input/attachment-button";
 import { FileAttachment } from "./input/file-attachment";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputHeader,
+  PromptInputProvider,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  usePromptInputController,
+} from "@/components/ai-elements/prompt-input";
+import { Paperclip } from "lucide-react";
 import { useInputTyping } from "./input/input-typing";
 import { QuestionPrompt } from "./question/question-prompt";
 import { Suggestions, type SuggestionItem } from "./input/suggestions";
@@ -167,7 +190,6 @@ export const InputBar = memo(function InputBar({
     },
     [isControlled, controlledOnChange],
   );
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const config = DEFAULT_INPUT_CONFIG;
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -185,28 +207,15 @@ export const InputBar = memo(function InputBar({
   const showAttach = Boolean(onAttach);
   const attachRight = config.attachmentButtonPosition === "right";
 
-  // Auto-resize textarea
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "0";
-    const nextHeight = Math.min(el.scrollHeight, 120);
-    el.style.height = `${nextHeight}px`;
-    el.style.overflowY = el.scrollHeight > 120 ? "auto" : "hidden";
-    el.style.overflowX = "hidden";
-  }, [input]);
-
-  useEffect(() => {
-    if (!autoFocus) return;
-    textareaRef.current?.focus();
-  }, [autoFocus]);
-
-  const handleSubmit = useCallback(() => {
-    const trimmed = input.trim();
-    if (!trimmed || isStreaming || disabled) return;
-    onSend({ role: "user", content: trimmed });
-    setInput("");
-  }, [input, isStreaming, disabled, onSend, setInput]);
+  const handleSubmit = useCallback(
+    (content: string) => {
+      const trimmed = content.trim();
+      if (!trimmed || isStreaming || disabled) return;
+      onSend({ role: "user", content: trimmed });
+      setInput("");
+    },
+    [isStreaming, disabled, onSend, setInput],
+  );
 
   const handleInfoBarClose = useCallback(() => {
     setIsInfoBarOpen(false);
@@ -369,31 +378,12 @@ export const InputBar = memo(function InputBar({
       </div>
     ) : null;
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit],
-  );
-
   const hasInput = input.trim().length > 0;
   const hasContextItems = attachedImages.length > 0 || attachedFiles.length > 0;
   const showContextItems =
     hasContextItems && config.attachmentPreviewStyle !== "hidden";
   const imageDisplayMode =
     config.attachmentPreviewStyle === "thumbnail" ? "image-only" : "chip";
-
-  const handleContainerClick = useCallback((e: React.MouseEvent) => {
-    if (
-      e.target === e.currentTarget ||
-      !(e.target as HTMLElement).closest("button, textarea")
-    ) {
-      textareaRef.current?.focus();
-    }
-  }, []);
 
   const handleSuggestionSelect = useCallback(
     (item: SuggestionItem) => {
@@ -403,13 +393,6 @@ export const InputBar = memo(function InputBar({
         return;
       }
       setInput(item.value ?? item.label);
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (!el) return;
-        el.focus();
-        const end = el.value.length;
-        el.setSelectionRange(end, end);
-      });
     },
     [disabled, isStreaming, onSuggestionSelect, setInput],
   );
@@ -437,134 +420,112 @@ export const InputBar = memo(function InputBar({
         >
           {infoBarPosition === "top" && infoBarNode}
           {questionBarNode}
-          <div
-            className={cn(
-              "relative cursor-text rounded-an-input-border-radius border border-an-input-border-color/80 bg-an-input-background",
-              isDragOver && "border-an-primary-color/50",
-            )}
-            onClick={handleContainerClick}
-          >
-            {/* Context items (attached images/files) */}
-            <div
+          <PromptInputProvider initialInput={input}>
+            <PromptInputControlledSync value={input} />
+            <PromptInput
               className={cn(
-                "grid transition-[grid-template-rows] duration-200 ease-out grid-rows-[0fr]",
-                showContextItems && "grid-rows-[1fr]",
+                "rounded-an-input-border-radius border-an-input-border-color/80 bg-an-input-background shadow-none",
+                isDragOver && "border-an-primary-color/50",
               )}
+              onSubmit={(message) => {
+                handleSubmit(message.text);
+              }}
             >
-              <div className="overflow-hidden">
-                {showContextItems && (
-                  <div className="flex flex-wrap items-center gap-[6px] px-an-context-padding pt-an-context-padding pb-0.5">
-                    {attachedImages.map((img) => (
-                      <FileAttachment
-                        key={img.id}
-                        id={img.id}
-                        filename={img.filename}
-                        size={img.size}
-                        isImage
-                        url={img.url}
-                        display={imageDisplayMode}
-                        enableImagePreview={enableImagePreview}
-                        onRemove={
-                          onRemoveImage
-                            ? () => onRemoveImage(img.id)
-                            : undefined
-                        }
+              {showContextItems ? (
+                <PromptInputHeader className="gap-[6px] px-an-context-padding pt-an-context-padding pb-0.5">
+                  {attachedImages.map((img) => (
+                    <FileAttachment
+                      key={img.id}
+                      id={img.id}
+                      filename={img.filename}
+                      size={img.size}
+                      isImage
+                      url={img.url}
+                      display={imageDisplayMode}
+                      enableImagePreview={enableImagePreview}
+                      onRemove={
+                        onRemoveImage ? () => onRemoveImage(img.id) : undefined
+                      }
+                    />
+                  ))}
+                  {attachedFiles.map((file) => (
+                    <FileAttachment
+                      key={file.id}
+                      id={file.id}
+                      filename={file.filename}
+                      size={file.size}
+                      onRemove={
+                        onRemoveFile ? () => onRemoveFile(file.id) : undefined
+                      }
+                    />
+                  ))}
+                </PromptInputHeader>
+              ) : null}
+
+              <PromptInputBody>
+                {isTyping && typingAnimation?.image && showImage ? (
+                  <div className="flex flex-wrap gap-2 px-3 pt-3">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md">
+                      <img
+                        src={typingAnimation.image}
+                        alt=""
+                        className="h-full w-full object-cover"
                       />
-                    ))}
-                    {attachedFiles.map((file) => (
-                      <FileAttachment
-                        key={file.id}
-                        id={file.id}
-                        filename={file.filename}
-                        size={file.size}
-                        onRemove={
-                          onRemoveFile ? () => onRemoveFile(file.id) : undefined
-                        }
-                      />
-                    ))}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                ) : null}
 
-            {/* Typing animation image */}
-            {isTyping && typingAnimation?.image && showImage && (
-              <div className="flex gap-2 flex-wrap px-3 pt-3">
-                <div className="relative overflow-hidden shrink-0 w-16 h-16 rounded-md">
-                  <img
-                    src={typingAnimation.image}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Text input or typing animation text */}
-            <div className="pt-3 pb-0 pr-3 pl-3.5 min-h-[44px]">
-              {isTyping ? (
-                <div className="w-full text-[14px] leading-[1.6] text-an-foreground-muted">
-                  <span>{displayedText}</span>
-                  <span className="inline-block w-[2px] h-[1em] ml-px align-text-bottom bg-an-foreground animate-an-blink" />
-                </div>
-              ) : (
-                <>
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onPaste={onPaste}
+                {isTyping ? (
+                  <div className="min-h-16 px-3.5 py-3 text-[14px] leading-[1.6] text-an-foreground-muted">
+                    <span>{displayedText}</span>
+                    <span className="ml-px inline-block h-[1em] w-[2px] animate-an-blink bg-an-foreground align-text-bottom" />
+                  </div>
+                ) : (
+                  <PromptInputTextarea
                     placeholder={effectivePlaceholder}
                     disabled={disabled}
-                    rows={1}
-                    className={cn(
-                      "w-full resize-none border-0 bg-transparent text-[14px] leading-[1.6] text-an-foreground outline-none placeholder:text-an-input-placeholder-color",
-                      "overflow-hidden focus-visible:outline-none focus-visible:ring-0",
-                      disabled && "cursor-not-allowed opacity-50",
-                    )}
+                    autoFocus={autoFocus}
+                    onPaste={onPaste}
+                    onChange={(event) => setInput(event.currentTarget.value)}
+                    className="min-h-11 border-0 bg-transparent px-3.5 py-3 text-[14px] leading-[1.6] text-an-foreground shadow-none placeholder:text-an-input-placeholder-color focus-visible:ring-0"
                   />
-                </>
-              )}
-            </div>
+                )}
+              </PromptInputBody>
 
-            {/* Toolbar */}
-            <div className="flex items-center justify-between gap-3 px-2 pt-1 pb-2">
-              <div className="flex items-center gap-1 min-w-0">
-                {!attachRight && showAttach && onAttach && (
-                  <AttachmentButton onClick={onAttach} />
-                )}
-                {leftActions}
-              </div>
-              <div className="flex items-center gap-1">
-                {rightActions}
-                {attachRight && showAttach && onAttach && (
-                  <AttachmentButton onClick={onAttach} />
-                )}
-                {/* Send / Stop button */}
-                <div
-                  onClick={() => {
-                    if (isStreaming) {
-                      onStop();
-                    } else if (hasInput) {
-                      handleSubmit();
-                    }
-                  }}
-                  className="cursor-pointer"
-                >
-                  <SendButton
-                    state={
-                      isStreaming
-                        ? "streaming"
-                        : hasInput && !disabled
-                          ? "typing"
-                          : "idle"
-                    }
+              <PromptInputFooter className="px-2 pb-2 pt-1">
+                <PromptInputTools className="min-w-0">
+                  {!attachRight && showAttach && onAttach ? (
+                    <PromptInputButton
+                      aria-label="Attach file"
+                      onClick={onAttach}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Paperclip className="size-4" />
+                    </PromptInputButton>
+                  ) : null}
+                  {leftActions}
+                </PromptInputTools>
+                <PromptInputTools>
+                  {rightActions}
+                  {attachRight && showAttach && onAttach ? (
+                    <PromptInputButton
+                      aria-label="Attach file"
+                      onClick={onAttach}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Paperclip className="size-4" />
+                    </PromptInputButton>
+                  ) : null}
+                  <PromptInputSubmit
+                    status={status}
+                    onStop={onStop}
+                    disabled={disabled || (!hasInput && !isStreaming)}
+                    className="bg-an-primary-color text-an-send-button-color hover:bg-an-primary-color/90"
                   />
-                </div>
-              </div>
-            </div>
-          </div>
+                </PromptInputTools>
+              </PromptInputFooter>
+            </PromptInput>
+          </PromptInputProvider>
           {suggestionItems.length > 0 && (
             <Suggestions
               items={suggestionItems}
