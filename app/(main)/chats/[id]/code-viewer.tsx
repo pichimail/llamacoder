@@ -7,16 +7,12 @@ import {
   Loader2,
   Eye,
   FileCode2,
-  Folder,
-  FolderOpen,
   FilePlus2,
   FolderPlus,
   Save,
   Undo2,
   Redo2,
   TerminalSquare,
-  ChevronRight,
-  ChevronDown,
   Search,
   Copy,
   Download,
@@ -40,8 +36,16 @@ import {
   useMemo,
   useCallback,
   useRef,
-  Fragment,
+  type ReactNode,
 } from "react";
+import {
+  FileTree,
+  FileTreeActions,
+  FileTreeFile,
+  FileTreeFolder,
+  FileTreeIcon,
+  FileTreeName,
+} from "@/components/ai-elements/file-tree";
 import type { Chat, Message } from "./page";
 import dynamic from "next/dynamic";
 import { Switch } from "@/components/ui/switch";
@@ -153,105 +157,70 @@ function buildTree(paths: string[]): TreeNode {
   return root;
 }
 
-function Tree({
-  node,
-  depth,
-  selected,
-  dirty,
-  streamingPath,
-  collapsed,
-  onToggle,
-  onSelect,
-  onMenu,
-}: {
-  node: TreeNode;
-  depth: number;
-  selected: string | null;
-  dirty: Set<string>;
-  streamingPath?: string | null;
-  collapsed: Set<string>;
-  onToggle: (p: string) => void;
-  onSelect: (p: string) => void;
-  onMenu: (path: string) => void;
-}) {
-  const entries = node.children
-    ? Array.from(node.children.values()).sort((a, b) =>
-        a.isFile === b.isFile ? a.name.localeCompare(b.name) : a.isFile ? 1 : -1,
-      )
-    : [];
-  return (
-    <>
-      {entries.map((child) =>
-        child.isFile ? (
-          child.name === ".gitkeep" ? null : (
-            <div
-              key={child.path}
-              className={`group flex items-center pr-1 transition ${
-                selected === child.path
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-              }`}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                onMenu(child.path);
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => onSelect(child.path)}
-                aria-current={selected === child.path ? "true" : undefined}
-                style={{ paddingLeft: 10 + depth * 12 }}
-                className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-              >
-                <FileCode2 className="size-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
-                <span className="truncate font-mono text-[11px]">{child.name}</span>
-                {dirty.has(child.path) && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-amber-400" aria-label="Unsaved changes" />}
-                {streamingPath === child.path && <Loader2 className="ml-auto size-3 shrink-0 animate-spin text-amber-500" aria-label="Writing file" />}
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onMenu(child.path);
-                }}
-                className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-background/70 hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-                aria-label={`Open actions for ${child.path}`}
-              >
-                <MoreHorizontal className="size-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          )
-        ) : (
-          <Fragment key={child.path}>
+function sortTreeNodes(nodes: TreeNode[]) {
+  return nodes.sort((a, b) =>
+    a.isFile === b.isFile ? a.name.localeCompare(b.name) : a.isFile ? 1 : -1,
+  );
+}
+
+function renderAiFileTree(
+  node: TreeNode,
+  options: {
+    dirty: Set<string>;
+    streamingPath?: string | null;
+    onMenu: (path: string) => void;
+  },
+): ReactNode {
+  const entries = node.children ? sortTreeNodes(Array.from(node.children.values())) : [];
+
+  return entries.map((child) => {
+    if (child.isFile) {
+      if (child.name === ".gitkeep") return null;
+      return (
+        <FileTreeFile
+          key={child.path}
+          path={child.path}
+          name={child.name}
+          className="group pr-1"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            options.onMenu(child.path);
+          }}
+        >
+          <span className="size-4 shrink-0" aria-hidden="true" />
+          <FileTreeIcon>
+            <FileCode2 className="size-3.5 text-emerald-500" aria-hidden="true" />
+          </FileTreeIcon>
+          <FileTreeName className="font-mono text-[11px]">{child.name}</FileTreeName>
+          {options.dirty.has(child.path) ? (
+            <span className="ml-1 size-1.5 shrink-0 rounded-full bg-amber-400" aria-label="Unsaved changes" />
+          ) : null}
+          {options.streamingPath === child.path ? (
+            <Loader2 className="ml-1 size-3 shrink-0 animate-spin text-amber-500" aria-label="Writing file" />
+          ) : null}
+          <FileTreeActions className="opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
             <button
               type="button"
-              onClick={() => onToggle(child.path)}
-              aria-expanded={!collapsed.has(child.path)}
-              style={{ paddingLeft: 10 + depth * 12 }}
-              className="flex w-full items-center gap-1.5 py-1 pr-2 text-left text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
+              onClick={(event) => {
+                event.stopPropagation();
+                options.onMenu(child.path);
+              }}
+              className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground"
+              aria-label={`Open actions for ${child.path}`}
             >
-              {collapsed.has(child.path) ? <ChevronRight className="size-3 shrink-0" aria-hidden="true" /> : <ChevronDown className="size-3 shrink-0" aria-hidden="true" />}
-              {collapsed.has(child.path) ? <Folder className="size-3.5 shrink-0" aria-hidden="true" /> : <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />}
-              <span className="truncate text-[11px] font-medium">{child.name}</span>
+              <MoreHorizontal className="size-3.5" aria-hidden="true" />
             </button>
-            {!collapsed.has(child.path) && (
-              <Tree
-                node={child}
-                depth={depth + 1}
-                selected={selected}
-                dirty={dirty}
-                streamingPath={streamingPath}
-                collapsed={collapsed}
-                onToggle={onToggle}
-                onSelect={onSelect}
-                onMenu={onMenu}
-              />
-            )}
-          </Fragment>
-        ),
-      )}
-    </>
-  );
+          </FileTreeActions>
+        </FileTreeFile>
+      );
+    }
+
+    return (
+      <FileTreeFolder key={child.path} path={child.path} name={child.name}>
+        {renderAiFileTree(child, options)}
+      </FileTreeFolder>
+    );
+  });
 }
 
 export default function CodeViewer({
@@ -323,7 +292,7 @@ export default function CodeViewer({
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [extraDeps, setExtraDeps] = useState<Record<string, string>>({});
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(180);
@@ -485,6 +454,21 @@ export default function CodeViewer({
   const isStreaming = !!streamText;
   const streamingPath =
     draft.find((file) => file.isPartial)?.path ?? streamAllFiles.at(-1)?.path;
+
+  useEffect(() => {
+    if (!streamingPath) return;
+    const parts = streamingPath.split("/").filter(Boolean);
+    if (parts.length <= 1) return;
+    let acc = "";
+    setExpandedPaths((current) => {
+      const next = new Set(current);
+      parts.slice(0, -1).forEach((part) => {
+        acc = acc ? `${acc}/${part}` : part;
+        next.add(acc);
+      });
+      return next;
+    });
+  }, [streamingPath]);
 
   const searchResults = useMemo(() => {
     const query = matchCase ? searchQuery : searchQuery.toLowerCase();
@@ -701,24 +685,20 @@ export default function CodeViewer({
                         />
                       </form>
                     )}
-                    <div className="min-h-0 flex-1 overflow-y-auto pb-2 text-xs">
-                      <Tree
-                        node={tree}
-                        depth={0}
-                        selected={selectedPath}
-                        dirty={dirty}
-                        streamingPath={streamingPath}
-                        collapsed={collapsed}
-                        onToggle={(p) =>
-                          setCollapsed((s) => {
-                            const n = new Set(s);
-                            n.has(p) ? n.delete(p) : n.add(p);
-                            return n;
-                          })
-                        }
+                    <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2 text-xs">
+                      <FileTree
+                        className="h-full rounded-none border-0 bg-transparent text-xs"
+                        selectedPath={selectedPath ?? undefined}
                         onSelect={setSelectedPath}
-                        onMenu={openFileMenu}
-                      />
+                        expanded={expandedPaths}
+                        onExpandedChange={setExpandedPaths}
+                      >
+                        {renderAiFileTree(tree, {
+                          dirty,
+                          streamingPath,
+                          onMenu: openFileMenu,
+                        })}
+                      </FileTree>
                     </div>
 
                     {fileMenuPath && (
