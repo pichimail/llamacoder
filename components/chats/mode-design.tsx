@@ -35,6 +35,7 @@ interface ModeDesignProps {
   onSaved?: (message?: SavedDesignMessage, files?: ArtifactFile[]) => void
   inspectorActive?: boolean
   onInspectorActiveChange?: (active: boolean) => void
+  onInspectorSelectionChange?: (selection: { tag: string; label: string } | null) => void
 }
 
 function detectElementTargets(files: ArtifactFile[]): ElementTarget[] {
@@ -61,7 +62,7 @@ function replaceClassToken(className: string, groups: string[], next: string) {
   return tokens.join(' ')
 }
 
-export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved, inspectorActive = true, onInspectorActiveChange }: ModeDesignProps) {
+export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange, onPreviewFiles, onSaved, inspectorActive = true, onInspectorActiveChange, onInspectorSelectionChange }: ModeDesignProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [workspaceFiles, setWorkspaceFiles] = useState(files)
@@ -94,6 +95,21 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
   const selectedFile = workspaceFiles.find((file) => file.path === selectedFilePath) || workspaceFiles[0]
   const selectedElement = elements.find((element) => element.id === selectedElementId) || elements[0]
   const colorTokens = tokens.filter((token) => token.category === 'color')
+
+  useEffect(() => {
+    if (!inspectorActive) {
+      onInspectorSelectionChange?.(null)
+      return
+    }
+    if (!selectedElement) {
+      onInspectorSelectionChange?.(null)
+      return
+    }
+    onInspectorSelectionChange?.({
+      tag: selectedElement.tag,
+      label: selectedElement.text || selectedElement.className || selectedElement.filePath,
+    })
+  }, [inspectorActive, onInspectorSelectionChange, selectedElement])
   const typographyTokens = tokens.filter((token) => token.category === 'typography')
   const spacingTokens = tokens.filter((token) => token.category === 'spacing')
   const radiusTokens = tokens.filter((token) => token.category === 'radius')
@@ -386,6 +402,17 @@ export function ModeDesign({ chatId, files = [], saveRequest = 0, onDirtyChange,
           <span>{workspaceFiles.length} files</span>
           <span>{[...spacingTokens, ...radiusTokens].length} layout tokens</span>
         </div>
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3 h-9 w-full bg-emerald-600 text-xs font-medium text-white hover:bg-emerald-500"
+          onClick={saveDesign}
+          disabled={!dirty || isPending}
+          aria-label="Save design changes to code"
+        >
+          {savedPulse ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+          {isPending ? 'Saving…' : dirty ? 'Save changes to code' : 'Saved'}
+        </Button>
       </div>
     </div>
   )

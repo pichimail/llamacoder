@@ -5,9 +5,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ComponentProps, KeyboardEvent, MouseEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 
+import {
+  Cursor,
+  CursorFollow,
+} from '@/components/animate-ui/components/animate/cursor'
+import {
+  CursorContainer,
+  CursorProvider,
+} from '@/components/animate-ui/primitives/animate/cursor'
 import type { ArtifactFile } from '@/lib/artifact-analysis'
 import { ModeDesign } from './mode-design'
 import type { PreviewMode } from '@/components/code-runner-react'
+
+type InspectorSelection = { tag: string; label: string }
 
 const CodeRunner = dynamic(() => import('@/components/code-runner'), { ssr: false })
 
@@ -44,6 +54,7 @@ export function DesignWorkspace({
   const [liveFiles, setLiveFiles] = useState(files)
   const [inspectorWidth, setInspectorWidth] = useState(400)
   const [inspectorActive, setInspectorActive] = useState(true)
+  const [inspectorSelection, setInspectorSelection] = useState<InspectorSelection | null>(null)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const filesKey = files.map((file) => `${file.path}:${file.code.length}`).join('|')
 
@@ -108,28 +119,43 @@ export function DesignWorkspace({
     [onSaved],
   )
 
+  const previewFiles = liveFiles.map((file) => ({ path: file.path, content: file.code }))
+  const previewRunner = (
+    <CodeRunner
+      files={previewFiles}
+      onRequestFix={onRequestFix}
+      onPreviewError={onPreviewError}
+      onPreviewReady={onPreviewReady}
+      showDeviceToggle={false}
+      previewMode={previewMode}
+    />
+  )
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent xl:flex-row">
       <section
-        className={`relative min-h-0 flex-1 overflow-hidden bg-transparent ${inspectorActive ? 'cursor-crosshair' : ''}`}
+        className="relative min-h-0 flex-1 overflow-hidden bg-transparent"
         aria-label="Live design preview"
       >
         {liveFiles.length > 0 ? (
-          <>
-            <CodeRunner
-              files={liveFiles.map((file) => ({ path: file.path, content: file.code }))}
-              onRequestFix={onRequestFix}
-              onPreviewError={onPreviewError}
-              onPreviewReady={onPreviewReady}
-              showDeviceToggle={false}
-              previewMode={previewMode}
-            />
-            {inspectorActive && (
-              <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border/70 bg-transparent px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
-                Inspector active. Select JSX layers from the right panel.
+          inspectorActive ? (
+            <CursorProvider global={false}>
+              <CursorContainer className="relative h-full w-full">
+                {previewRunner}
+              </CursorContainer>
+              <Cursor className="size-5 text-primary" />
+              <CursorFollow className="bg-primary px-2 py-0.5 text-[11px] text-primary-foreground">
+                {inspectorSelection
+                  ? `${inspectorSelection.tag}${inspectorSelection.label ? ` · ${inspectorSelection.label}` : ''}`
+                  : 'Inspector · pick a layer'}
+              </CursorFollow>
+              <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-primary/30 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
+                Inspector active — edits update the live preview. Save to commit to code.
               </div>
-            )}
-          </>
+            </CursorProvider>
+          ) : (
+            previewRunner
+          )
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             {isStreaming && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
@@ -169,6 +195,7 @@ export function DesignWorkspace({
           saveRequest={saveRequest}
           inspectorActive={inspectorActive}
           onInspectorActiveChange={setInspectorActive}
+          onInspectorSelectionChange={setInspectorSelection}
         />
       </aside>
     </div>

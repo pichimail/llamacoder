@@ -464,10 +464,13 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           onPreviewError={handlePreviewError}
           onPreviewReady={handlePreviewReady}
           onDirtyChange={setDesignDirty}
-          onSaved={(message) => {
+          onSaved={(message, savedFiles) => {
             setDesignDirty(false);
             setShowUnsavedOverlay(false);
             if (message) setActiveMessage(message as Message);
+            else if (savedFiles?.length) {
+              setActiveMessage((current) => (current ? { ...current, files: savedFiles } as Message : current));
+            }
             if (pendingMode) {
               applyMode(pendingMode);
               setPendingMode(null);
