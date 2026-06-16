@@ -25,6 +25,7 @@ export default function CodeRunner({
   showWebPreviewChrome,
   onRefresh,
   sandpackOptions,
+  hiddenValidation,
 }: {
   language?: string;
   code?: string;
@@ -39,6 +40,7 @@ export default function CodeRunner({
   showWebPreviewChrome?: boolean;
   onRefresh?: () => void;
   sandpackOptions?: SandpackBuildOptions;
+  hiddenValidation?: boolean;
 }) {
   const actualFiles = (
     files || (code ? [{ path: "App.tsx", content: code }] : [])
@@ -69,6 +71,7 @@ export default function CodeRunner({
       showWebPreviewChrome={showWebPreviewChrome}
       onRefresh={onRefresh}
       sandpackOptions={sandpackOptions}
+      hiddenValidation={hiddenValidation}
     />
   );
 }

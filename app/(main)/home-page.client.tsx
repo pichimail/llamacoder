@@ -1,25 +1,20 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { hyperspeedPresets } from "@/components/HyperSpeedPresets";
-
-const Hyperspeed = dynamic(() => import("@/components/Hyperspeed"), { ssr: false });
-const LiquidEther = dynamic(() => import("@/components/LiquidEther"), { ssr: false });
 import { HomeShell } from "@/components/home/home-shell";
-import BlurText from "@/components/BlurText";
-import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
-import type { QuestionAnswer } from "@/components/agent-elements/question/question-prompt";
+import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   use,
   useState,
-  useRef,
   useTransition,
   useEffect,
+  useMemo,
+  useRef,
+  useCallback,
 } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Context } from "./providers";
-import { useTheme } from "@/components/theme-provider";
 
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
@@ -146,9 +141,95 @@ const PROMPT_CHIP_GROUPS = [
   },
 ];
 
-const PROMPT_GROUP_BY_TITLE = new Map(
-  PROMPT_CHIP_GROUPS.map((group) => [group.title, group] as const),
+const PRESET_PROMPTS = new Set(
+  PROMPT_CHIP_GROUPS.flatMap((group) => group.prompts),
 );
+
+function PresetChipsScroller({
+  groups,
+  activeTitles,
+  onSelect,
+}: {
+  groups: typeof PROMPT_CHIP_GROUPS;
+  activeTitles: Record<string, number>;
+  onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number]) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const observer = new ResizeObserver(updateScrollState);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      observer.disconnect();
+    };
+  }, [updateScrollState, groups.length]);
+
+  const scrollBy = (direction: -1 | 1) => {
+    scrollRef.current?.scrollBy({ left: direction * 168, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative mx-auto w-full max-w-[34.5rem]">
+      {canScrollLeft ? (
+        <button
+          type="button"
+          onClick={() => scrollBy(-1)}
+          aria-label="Scroll presets left"
+          className="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border/40 bg-background/80 text-muted-foreground/50 shadow-sm backdrop-blur-sm transition hover:text-muted-foreground"
+        >
+          <ChevronLeft className="size-3.5" />
+        </button>
+      ) : null}
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto px-7 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maxWidth: "100%" }}
+      >
+        {groups.map((group) => {
+          const isActive = typeof activeTitles[group.title] === "number";
+          return (
+            <button
+              key={group.title}
+              type="button"
+              onClick={() => onSelect(group)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
+                isActive
+                  ? "border-foreground/25 bg-accent text-foreground"
+                  : "border-border/60 bg-background/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+              }`}
+            >
+              {group.title}
+            </button>
+          );
+        })}
+      </div>
+      {canScrollRight ? (
+        <button
+          type="button"
+          onClick={() => scrollBy(1)}
+          aria-label="Scroll presets right"
+          className="absolute right-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border/40 bg-background/80 text-muted-foreground/50 shadow-sm backdrop-blur-sm transition hover:text-muted-foreground"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export default function HomePageClient() {
   const router = useRouter();
@@ -176,10 +257,7 @@ export default function HomePageClient() {
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
-  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
@@ -223,15 +301,12 @@ export default function HomePageClient() {
     return () => clearInterval(interval);
   }, []);
 
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  const showHyperspeed = mounted && resolvedTheme === "dark";
-  const showLiquidEther = mounted && resolvedTheme === "light";
-
   const isUploadAvailable = blobUploadConfigured === true;
+
+  const showEnhance = useMemo(
+    () => prompt.trim().length > 0 && !PRESET_PROMPTS.has(prompt),
+    [prompt],
+  );
 
   const getModelLabel = (val: string) => MODELS.find(x => x.value === val)?.label || val;
 
@@ -249,122 +324,66 @@ export default function HomePageClient() {
     setPrompt(group.prompts[nextIndex]);
   };
 
-  const homeInfoBar =
-    mode === "ask"
-      ? {
-          title: "Ask mode",
-          description: "Best for questions, refinements, and targeted changes.",
-          position: "bottom" as const,
-        }
-      : undefined;
-
-  const homeQuestionBar =
-    mode === "plan"
-      ? {
-          id: "home-plan-helper",
-          questions: [
-            {
-              kind: "text" as const,
-              title: "Plan the build",
-              description: "Add one extra constraint or must-have before sending.",
-              placeholder: "e.g. include auth, billing, and an admin dashboard",
-            },
-          ],
-          submitLabel: "Add to prompt",
-          allowSkip: true,
-          onSubmit: (answer: QuestionAnswer) => {
-            if (answer.kind !== "text") return;
-            const planText = answer.text?.trim();
-            if (!planText) return;
-            setPrompt((current) => {
-              const next = current.trim();
-              return next
-                ? `${next}\n\nPlan note: ${planText}`
-                : planText;
-            });
-          },
-        }
-      : undefined;
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !isUploadAvailable) return;
+  const uploadAttachment = async (file: File) => {
+    if (!isUploadAvailable) {
+      toast({ title: "Upload unavailable", description: "Blob storage is not configured.", variant: "destructive" });
+      return undefined;
+    }
     setScreenshotLoading(true);
     try {
-      const fd = new FormData(); fd.append("file", file);
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await fetch("/api/blob-upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (file.type.startsWith("image/")) {
-        const nextImage: AttachedImage = {
-          id: crypto.randomUUID(),
-          filename: file.name || "attachment.png",
-          url: data.url,
-          size: file.size,
-        };
-        setAttachedImages([nextImage]);
-        setAttachedFiles([]);
-        setScreenshotUrl(data.url);
-      } else {
-        const nextFile: AttachedFile = {
-          id: crypto.randomUUID(),
-          filename: file.name || "attachment",
-          size: file.size,
-        };
-        setAttachedFiles([nextFile]);
-        setAttachedImages([]);
-        setScreenshotUrl(data.url);
-      }
-      if (!prompt.trim()) setPrompt("Build this from the attached file");
-    } catch { toast({ title: "Upload failed", variant: "destructive" }); }
-    finally { setScreenshotLoading(false); }
-  };
-
-  const handleImagePaste = async (event: React.ClipboardEvent) => {
-    if (!isUploadAvailable) return;
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
-      if (!item.type.startsWith("image/")) continue;
-      const file = item.getAsFile();
-      if (!file) continue;
-      event.preventDefault();
-      await handleFileUpload({
-        target: { files: [file] },
-      } as unknown as React.ChangeEvent<HTMLInputElement>);
-      break;
+      return {
+        url: data.url as string,
+        kind: file.type.startsWith("image/") ? ("image" as const) : ("file" as const),
+        filename: file.name || "attachment",
+        size: file.size,
+      };
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+      return undefined;
+    } finally {
+      setScreenshotLoading(false);
     }
   };
 
-  const handleAttachClick = () => fileInputRef.current?.click();
-
-  const handleSend = async ({ content }: { role: "user"; content: string }) => {
-    if (!content.trim()) return;
+  const handlePromptSend = async (content: string, files?: File[]) => {
+    if (!content.trim() && !files?.length) return;
     setIsSubmitting(true);
     startTransition(async () => {
       try {
-        const attachments: ComposerAttachment[] = [
-          ...attachedImages.map((image) => ({
-            kind: "image" as const,
-            filename: image.filename,
-            url: image.url,
-            size: image.size,
-          })),
-          ...attachedFiles.map((file) => ({
-            kind: "file" as const,
-            filename: file.filename,
-            url: screenshotUrl,
-            size: file.size,
-          })),
-        ];
+        let nextScreenshotUrl = screenshotUrl;
+        const attachments: ComposerAttachment[] = [];
+
+        if (files?.[0]) {
+          const uploaded = await uploadAttachment(files[0]);
+          if (!uploaded) {
+            setIsSubmitting(false);
+            return;
+          }
+          nextScreenshotUrl = uploaded.url;
+          attachments.push({
+            kind: uploaded.kind,
+            filename: uploaded.filename,
+            url: uploaded.url,
+            size: uploaded.size,
+          });
+        }
+
+        const promptText =
+          content.trim() || (files?.length ? "Build this from the attached file" : "");
+
         const res = await fetch("/api/create-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: content,
+            prompt: promptText,
             model,
             mode,
-            screenshotUrl,
+            screenshotUrl: nextScreenshotUrl,
             attachments,
             shadcn: shadcnEnabled,
           }),
@@ -392,10 +411,7 @@ export default function HomePageClient() {
 
         context.setStreamPromise(streamPromise);
         setPrompt("");
-        setAttachedImages([]);
-        setAttachedFiles([]);
         setScreenshotUrl(undefined);
-        if (fileInputRef.current) fileInputRef.current.value = "";
         router.push(`/chats/${chatId}`);
       } finally {
         setIsSubmitting(false);
@@ -405,168 +421,117 @@ export default function HomePageClient() {
 
   return (
     <HomeShell>
-    <div className="relative flex min-h-dvh grow flex-col bg-background text-foreground">
-      {showHyperspeed && (
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <Hyperspeed
-            effectOptions={hyperspeedPresets.four}
-            interactive={true}
-            interactiveScope="page"
-          />
-        </div>
-      )}
+      <div className="flex min-h-dvh flex-col bg-background text-foreground">
+        <section
+          id="hero"
+          className="relative flex min-h-dvh flex-col bg-gradient-to-b from-muted/40 via-background to-background dark:from-muted/20"
+        >
+          <Header hideLogo showSidebarTrigger />
 
-      {showLiquidEther && (
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <LiquidEther
-            colors={["#5227FF", "#FF9FFC", "#B497CF"]}
-            mouseForce={4}
-            cursorSize={190}
-            isViscous={false}
-            viscous={1}
-            iterationsViscous={1}
-            iterationsPoisson={1}
-            resolution={0.2}
-            isBounce={false}
-            autoDemo={true}
-            autoSpeed={0.85}
-            autoIntensity={0.5}
-            takeoverDuration={0.25}
-            autoResumeDelay={3000}
-            autoRampDuration={0.6}
-            style={{ pointerEvents: "none" }}
-          />
-        </div>
-      )}
+          <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
+            <div className="flex w-full max-w-[760px] flex-col items-center">
+              <h1
+                id="hero-headline"
+                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-foreground md:min-h-[5.25rem] md:text-6xl"
+              >
+                {HEADLINES[headlineIndex]}
+              </h1>
 
-      <div className="relative z-10 isolate flex h-full grow flex-col">
-        <Header hideLogo showSidebarTrigger />
-
-        <div className="mt-8 flex grow flex-col items-center px-4 lg:mt-14">
-          <h1
-            id="hero-headline"
-            className="text-balance text-center text-4xl font-semibold tracking-tight md:text-6xl min-h-[4.25rem] md:min-h-[5.25rem]"
-          >
-            <BlurText
-              key={headlineIndex}
-              text={HEADLINES[headlineIndex]}
-              animateBy="words"
-              direction="top"
-              delay={110}
-              stepDuration={0.4}
-              threshold={0.05}
-              className="hyperspeed-gradient-text"
-            />
-          </h1>
-
-          <div
-            id="prompt-composer"
-            className="relative mt-7 w-full max-w-[760px]"
-            style={{ ["--an-max-width" as any]: "760px" }}
-          >
-            {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-            <InputBar
-              value={prompt}
-              onChange={setPrompt}
-              onSend={handleSend}
-              onStop={() => {}}
-              status={isSubmitting ? "submitted" : "ready"}
-              placeholder="Describe what to build"
-              autoFocus
-              disabled={isSubmitting || screenshotLoading}
-              onAttach={handleAttachClick}
-              onPaste={handleImagePaste}
-              attachedImages={attachedImages}
-              attachedFiles={attachedFiles}
-              onRemoveImage={() => {
-                setAttachedImages([]);
-                setScreenshotUrl(undefined);
-              }}
-              onRemoveFile={() => {
-                setAttachedFiles([]);
-                setScreenshotUrl(undefined);
-              }}
-              infoBar={homeInfoBar}
-              questionBar={homeQuestionBar}
-              suggestions={{
-                className: "max-md:-mx-3 max-md:px-3",
-                items: PROMPT_CHIP_GROUPS.map((group) => ({
-                  id: group.title,
-                  label: group.title,
-                  className:
-                    typeof promptChipIndexes[group.title] === "number"
-                      ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
-                      : undefined,
-                })),
-              }}
-              onSuggestionSelect={(item) => {
-                const group = PROMPT_GROUP_BY_TITLE.get(item.id);
-                if (group) handlePromptChipClick(group);
-              }}
-              leftActions={
-                <OptionDropdown
-                  value={mode}
-                  onValueChange={(value) => setMode(value as Mode)}
-                  aria-label="Select mode"
-                  triggerLabel={
-                    <span>
-                      {currentMode.icon} {currentMode.label}
-                    </span>
+              <div
+                id="prompt-composer"
+                className="relative mt-8 w-full"
+                style={{ ["--an-max-width" as any]: "760px" }}
+              >
+                {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
+                <PromptInputBox
+                  value={prompt}
+                  onValueChange={setPrompt}
+                  onSend={handlePromptSend}
+                  isLoading={isSubmitting}
+                  disabled={isSubmitting || screenshotLoading}
+                  placeholder="Describe what to build"
+                  thinkEnabled={reasoningEnabled}
+                  onThinkChange={setReasoningEnabled}
+                  accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+                  toolbarEnd={
+                    showEnhance ? (
+                      <PromptRewriteButton
+                        prompt={prompt}
+                        mode={mode}
+                        model={model}
+                        onRewrite={setPrompt}
+                        disabled={isSubmitting || screenshotLoading}
+                        iconOnly
+                      />
+                    ) : null
                   }
-                  triggerClassName="h-8 px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
-                  options={modes.map((item) => ({
-                    value: item.value,
-                    label: (
-                      <span>
-                        {item.icon} {item.label}
-                      </span>
-                    ),
-                  }))}
                 />
-              }
-              rightActions={
-                <div className="flex items-center gap-2">
-                  <BuilderToggles
-                    compact
-                    shadcnEnabled={shadcnEnabled}
-                    onShadcnChange={setShadcnEnabled}
-                    reasoningEnabled={reasoningEnabled}
-                    onReasoningChange={setReasoningEnabled}
-                  />
-                  <PromptRewriteButton
-                    prompt={prompt}
-                    mode={mode}
-                    model={model}
-                    onRewrite={setPrompt}
-                    disabled={isSubmitting || screenshotLoading}
-                  />
-                  <OptionDropdown
-                    value={model}
-                    onValueChange={setModel}
-                    aria-label="Select AI model"
-                    triggerLabel={getModelLabel(model)}
-                    triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-zinc-800 hover:text-foreground"
-                    contentClassName="max-h-[320px]"
-                    options={getVisibleModels().map((item) => ({
-                      value: item.value,
-                      label: item.label,
-                    }))}
+
+                <div className="mt-4">
+                  <PresetChipsScroller
+                    groups={PROMPT_CHIP_GROUPS}
+                    activeTitles={promptChipIndexes}
+                    onSelect={handlePromptChipClick}
                   />
                 </div>
-              }
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={!isUploadAvailable || isSubmitting || screenshotLoading}
-            />
-          </div>
-        </div>
 
-        <section id="featured-templates" className="mt-14 w-full max-w-5xl px-4">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <OptionDropdown
+                    value={mode}
+                    onValueChange={(value) => setMode(value as Mode)}
+                    aria-label="Select mode"
+                    triggerLabel={
+                      <span>
+                        {currentMode.icon} {currentMode.label}
+                      </span>
+                    }
+                    triggerClassName="h-8 px-2.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    options={modes.map((item) => ({
+                      value: item.value,
+                      label: (
+                        <span>
+                          {item.icon} {item.label}
+                        </span>
+                      ),
+                    }))}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <BuilderToggles
+                      compact
+                      shadcnEnabled={shadcnEnabled}
+                      onShadcnChange={setShadcnEnabled}
+                      reasoningEnabled={reasoningEnabled}
+                      onReasoningChange={setReasoningEnabled}
+                    />
+                    <OptionDropdown
+                      value={model}
+                      onValueChange={setModel}
+                      aria-label="Select AI model"
+                      triggerLabel={getModelLabel(model)}
+                      triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                      contentClassName="max-h-[320px]"
+                      options={getVisibleModels().map((item) => ({
+                        value: item.value,
+                        label: item.label,
+                      }))}
+                    />
+                  </div>
+                </div>
+
+                {mode === "ask" ? (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Ask mode — best for questions, refinements, and targeted changes.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="featured-templates"
+          className="mx-auto w-full max-w-5xl border-t border-border/50 px-4 py-14"
+        >
           <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
@@ -583,15 +548,18 @@ export default function HomePageClient() {
               apps={featuredApps ?? undefined}
               limit={3}
               compact
+              liveThumbs={false}
             />
           </div>
         </section>
 
-        <footer id="examples" className="mt-auto flex w-full justify-center pb-6 pt-10 text-xs text-muted-foreground">
+        <footer
+          id="examples"
+          className="flex w-full justify-center border-t border-border/40 px-4 py-8 text-xs text-muted-foreground"
+        >
           Chinna-Coder — Build production apps from a prompt
         </footer>
       </div>
-    </div>
     </HomeShell>
   );
 }

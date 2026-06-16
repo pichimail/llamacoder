@@ -92,6 +92,7 @@ export default function ReactCodeRunner({
   showWebPreviewChrome = false,
   onRefresh,
   sandpackOptions,
+  hiddenValidation = false,
 }: {
   files: Array<{ path: string; content: string }>;
   extraDependencies?: Record<string, string>;
@@ -104,6 +105,7 @@ export default function ReactCodeRunner({
   showWebPreviewChrome?: boolean;
   onRefresh?: () => void;
   sandpackOptions?: SandpackBuildOptions;
+  hiddenValidation?: boolean;
 }) {
   const filesKey =
     files.map((f) => f.path + f.content).join("") +
@@ -167,10 +169,10 @@ export default function ReactCodeRunner({
       key={`${filesKey}:${activeRoute}`}
       data-preview-mode={activePreviewMode}
       style={{ "--preview-viewport-width": activeModeConfig.viewportWidth } as CSSProperties}
-      className="relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background"
+      className={`relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background ${hiddenValidation ? "pointer-events-none opacity-0" : ""}`}
       {...getSandpackConfig(files, extraDependencies, sandpackOptions)}
     >
-      {!showWebPreviewChrome && routes.length > 1 ? (
+      {!hiddenValidation && !showWebPreviewChrome && routes.length > 1 ? (
         <ArtifactRouteControls
           routes={routes}
           activeRoute={activeRoute}

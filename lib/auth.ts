@@ -8,6 +8,7 @@ import { getPrisma } from "@/lib/prisma";
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   adapter: PrismaAdapter(getPrisma() as any),
   session: { strategy: "database" },
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "chinna-coder-dev-secret",
   trustHost: true,
   providers: [
     Google({

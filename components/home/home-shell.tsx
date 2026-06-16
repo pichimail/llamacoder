@@ -19,7 +19,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
         isAuthenticated={isAuthenticated}
         loading={loading}
       />
-      <SidebarInset className="min-h-dvh overflow-hidden">
+      <SidebarInset className="min-h-dvh overflow-x-hidden overflow-y-auto">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/60 px-4 md:hidden">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />

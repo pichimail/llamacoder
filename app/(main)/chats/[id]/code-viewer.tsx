@@ -86,6 +86,7 @@ type ExplorerPanel = "files" | "search" | "extensions";
 type CodeLayout = "editor" | "split-preview" | "split-editor";
 
 export type AutoFixStatus = "idle" | "watching" | "fixing" | "fallback" | "ready";
+export type BuilderStatus = "generating" | "validating" | "fixing" | "rebuilding" | "ready" | "failed";
 
 export async function downloadFilesAsZip(files: Array<{ path: string; code: string }>, zipName: string) {
   if (files.length === 0) {
@@ -244,6 +245,7 @@ export default function CodeViewer({
   onAutoFixEnabledChange,
   autoFixAttempt,
   autoFixStatus,
+  builderStatus,
   previewMode,
   onPreviewModeChange,
   sandpackOptions,
@@ -261,6 +263,7 @@ export default function CodeViewer({
   onAutoFixEnabledChange: (enabled: boolean) => void;
   autoFixAttempt: number;
   autoFixStatus: AutoFixStatus;
+  builderStatus: BuilderStatus;
   previewMode: PreviewMode;
   onPreviewModeChange: (mode: PreviewMode) => void;
   sandpackOptions?: SandpackBuildOptions;
@@ -689,7 +692,7 @@ export default function CodeViewer({
           {hasUnsaved ? <span className="text-amber-500">● unsaved</span> : null}
           {Object.keys(extraDeps).length > 0 ? <span>+{Object.keys(extraDeps).length} deps</span> : null}
           <div className="flex-1" />
-          <span className={isStreaming ? "text-amber-500" : "text-emerald-500"} aria-live="polite">● {isStreaming ? "Generating" : "Live"}</span>
+          <BuilderStatusText status={isStreaming ? "generating" : builderStatus} />
         </div>
 
         <AlertDialog open={Boolean(renamePath)} onOpenChange={(open) => { if (!open) setRenamePath(null); }}>
@@ -741,4 +744,21 @@ function AutoFixStatusBadge({ status, attempt }: { status: AutoFixStatus; attemp
   } as const;
   const config = map[status];
   return <span className={`hidden items-center gap-1 text-[11px] font-medium md:inline-flex ${config.cls}`} role="status" aria-live="polite">{config.icon}{config.label}</span>;
+}
+
+function BuilderStatusText({ status }: { status: BuilderStatus }) {
+  const labels: Record<BuilderStatus, { label: string; cls: string }> = {
+    generating: { label: "Generating", cls: "text-amber-500" },
+    validating: { label: "Validating preview", cls: "text-sky-500" },
+    fixing: { label: "Auto-fixing", cls: "text-amber-500" },
+    rebuilding: { label: "Rebuilding", cls: "text-orange-500" },
+    ready: { label: "Preview ready", cls: "text-emerald-500" },
+    failed: { label: "Needs review", cls: "text-red-500" },
+  };
+  const config = labels[status];
+  return (
+    <span className={config.cls} aria-live="polite">
+      ● {config.label}
+    </span>
+  );
 }

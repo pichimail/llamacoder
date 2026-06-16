@@ -11,6 +11,7 @@ type PromptRewriteButtonProps = {
   onRewrite: (next: string) => void;
   disabled?: boolean;
   className?: string;
+  iconOnly?: boolean;
 };
 
 export function PromptRewriteButton({
@@ -19,8 +20,12 @@ export function PromptRewriteButton({
   model,
   onRewrite,
   disabled,
-  className = "inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40",
+  iconOnly = false,
+  className,
 }: PromptRewriteButtonProps) {
+  const defaultClassName = iconOnly
+    ? "inline-flex h-8 w-8 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB] disabled:opacity-40"
+    : "inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40";
   const [loading, setLoading] = useState(false);
 
   const handleRewrite = async () => {
@@ -59,15 +64,16 @@ export function PromptRewriteButton({
       type="button"
       onClick={handleRewrite}
       disabled={disabled || loading || !prompt.trim()}
-      className={className}
+      className={className ?? defaultClassName}
       aria-label="Enhance prompt with AI"
+      title="Enhance prompt"
     >
       {loading ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
       ) : (
         <Sparkles className="size-3.5" aria-hidden="true" />
       )}
-      Enhance
+      {iconOnly ? <span className="sr-only">Enhance</span> : "Enhance"}
     </button>
   );
 }

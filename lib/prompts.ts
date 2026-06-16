@@ -19,14 +19,15 @@ Convert prompts, screenshots, or uploaded files into clean, responsive, producti
 - Never write the file path as a separate markdown line above the code fence.
 - Never output generic fences like \`\`\`tsx, \`\`\`ts, or \`\`\`json without \`{path=...}\`.
 - Always include one renderable default-export page at \`app/page.tsx\`.
-- Use clean paths only: \`app/page.tsx\`, \`components/Name.tsx\`, \`components/ui/name.tsx\`, \`lib/name.ts\`, \`hooks/name.ts\`, \`app/globals.css\`.
+- Use clean paths only. Visible preview files should use paths like \`app/page.tsx\`, \`components/Name.tsx\`, \`components/ui/name.tsx\`, \`lib/name.ts\`, \`hooks/name.ts\`, and \`app/globals.css\`.
+- When the prompt asks for a full-stack app, also generate backend-shaped project files such as \`app/api/.../route.ts\`, \`prisma/schema.prisma\`, \`lib/server/*.ts\`, \`lib/data/*.ts\`, \`lib/actions/*.ts\`, and \`middleware.ts\`. These files are saved in the artifact workspace but must not be imported by the visible client preview.
 - 5-10 files is the default. Only go above 10 when the user explicitly asks for a larger app.
 
 ## PREVIEW COMPATIBILITY RULES
 - The live preview runs as a client-side React sandbox. The visible app must compile without real server access.
 - Do not put \`package.json\`, \`tsconfig.json\`, \`tailwind.config.*\`, \`postcss.config.*\`, or \`next.config.*\` in the generated artifact unless the user explicitly asks for project setup files.
 - Do not import server-only modules in the render path: \`next/headers\`, \`fs\`, \`path\`, \`crypto\`, Prisma client, Neon client, Auth adapters, or database drivers.
-- If backend/auth/database behavior is needed, create preview-safe adapters using React state, localStorage, typed mock services, and clear function boundaries.
+- If backend/auth/database behavior is needed, create preview-safe adapters using React state, localStorage, typed mock services, and clear function boundaries for the visible app, plus separate real backend-shaped files that are not imported into preview-rendered components.
 - Replace missing dependencies with plain React, Tailwind, shadcn-style local components, lucide-react, framer-motion, recharts, or local utility code.
 - Use \`next/link\`, \`next/image\`, and \`next/navigation\` only when needed. The preview provides compatibility shims.
 
@@ -103,7 +104,10 @@ export function getMainCodingPrompt(
     let p = agentSystemPrompt;
     if (!useShadcn) {
       p +=
-        "\n\n**COMPONENT LIBRARY OFF**: Do not import @/components/ui/* or shadcn primitives. Build UI with plain React + Tailwind utility classes only.";
+        "\n\n**COMPONENT LIBRARY OFF**: Do not import @/components/ui/* or shadcn primitives. Build premium UI with plain React + Tailwind utility classes only. Inline any small controls locally.";
+    } else {
+      p +=
+        "\n\n**COMPONENT LIBRARY ON**: You may import @/components/ui/* for supported shadcn-style controls. If you import a local non-shadcn component, generate that file too.";
     }
     const lower = userPrompt.toLowerCase();
     const isLanding = lower.includes("landing") || lower.includes("marketing") || lower.includes("website") || lower.includes("hero") || lower.includes("pricing");

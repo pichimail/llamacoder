@@ -9,8 +9,6 @@ import {
   ExternalLink,
   Monitor,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
   Smartphone,
   Share2,
 } from 'lucide-react'
@@ -23,7 +21,9 @@ import { ModeCode } from './mode-code'
 import { ModeSwitcher, type ChatMode } from './mode-switcher'
 import { SettingsPanel } from './settings-panel'
 import { SharePanel } from './share-panel'
-import { Sidebar } from './sidebar'
+import { ChatsAppSidebar } from './app-sidebar'
+import { useHomeSidebarData } from '@/components/home/use-home-sidebar-data'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { ArtifactPreview } from './artifact-preview'
 import { WorkspaceProvider, type WorkspacePreviewMode } from './workspace-context'
 import type { ArtifactFile } from '@/lib/artifact-analysis'
@@ -49,8 +49,7 @@ export function EnhancedPage({
   const [currentMode, setCurrentMode] = useState<ChatMode>('preview')
   const [pendingMode, setPendingMode] = useState<ChatMode | null>(null)
   const [rightPanel, setRightPanel] = useState<'share' | 'settings' | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const { user, authEnabled, isAuthenticated } = useHomeSidebarData()
   const [designDirty, setDesignDirty] = useState(false)
   const [requestDesignSave, setRequestDesignSave] = useState(0)
   const [previewMode, setPreviewMode] = useState<WorkspacePreviewMode>('web')
@@ -92,11 +91,6 @@ export function EnhancedPage({
       const mod = event.metaKey || event.ctrlKey
       const target = event.target as HTMLElement | null
       const isTyping = target?.matches('input, textarea, select, [contenteditable="true"]')
-
-      if (mod && event.key.toLowerCase() === 'b') {
-        event.preventDefault()
-        setSidebarCollapsed((value) => !value)
-      }
 
       if (mod && event.key.toLowerCase() === 'k') {
         event.preventDefault()
@@ -212,32 +206,20 @@ export function EnhancedPage({
   return (
     <WorkspaceProvider value={{ mode: currentMode, previewMode, hideNestedChrome: true, latestMessageId }}>
       <TooltipProvider>
-        <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
-          <div className="flex h-full overflow-hidden">
-            <Sidebar
-              currentChatId={chatId}
-              chats={[]}
-              collapsed={sidebarCollapsed}
-              mobileOpen={mobileSidebarOpen}
-              onMobileOpenChange={setMobileSidebarOpen}
-              onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
-            />
-
-            <main className="flex min-w-0 flex-1 flex-col overflow-hidden" aria-label="Artifact workspace">
+        <SidebarProvider defaultOpen={false} className="h-dvh overflow-hidden">
+          <ChatsAppSidebar
+            currentChatId={chatId}
+            chats={[]}
+            user={user}
+            authEnabled={authEnabled}
+            isAuthenticated={isAuthenticated}
+          />
+          <SidebarInset className="min-h-0 overflow-hidden">
+            <main className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden" aria-label="Artifact workspace">
               <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border bg-background px-2 text-sm">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 md:hidden" onClick={() => setMobileSidebarOpen(true)} aria-label="Open sidebar">
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="hidden h-8 w-8 p-0 md:inline-flex"
-                    onClick={() => setSidebarCollapsed((value) => !value)}
-                    aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                  >
-                    {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-                  </Button>
+                  <SidebarTrigger className="md:hidden" />
+                  <SidebarTrigger className="hidden md:inline-flex" />
                   <div className="min-w-0 truncate text-sm">
                     <span className="font-semibold text-foreground">Hyperspeed</span>
                     <span className="mx-2 text-muted-foreground">/</span>
@@ -308,7 +290,6 @@ export function EnhancedPage({
                 )}
               </div>
             </main>
-          </div>
 
           {rightPanel && (
             <div className="fixed inset-x-0 bottom-0 z-40 max-h-[70dvh] rounded-t-xl border border-border bg-card shadow-2xl lg:hidden" role="dialog" aria-label="Workspace side panel">
@@ -340,7 +321,8 @@ export function EnhancedPage({
               </div>
             </div>
           )}
-        </div>
+        </SidebarInset>
+        </SidebarProvider>
       </TooltipProvider>
     </WorkspaceProvider>
   )

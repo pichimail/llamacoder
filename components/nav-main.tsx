@@ -19,6 +19,28 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
+function NavSubLink({
+  title,
+  url,
+}: {
+  title: string
+  url: string
+}) {
+  if (url.startsWith("http") || url.startsWith("#")) {
+    return (
+      <a href={url} target={url.startsWith("http") ? "_blank" : undefined} rel={url.startsWith("http") ? "noreferrer" : undefined}>
+        <span>{title}</span>
+      </a>
+    )
+  }
+
+  return (
+    <Link href={url}>
+      <span>{title}</span>
+    </Link>
+  )
+}
+
 export function NavMain({
   items,
 }: {
@@ -57,15 +79,7 @@ export function NavMain({
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
-                        {subItem.url.startsWith("http") ? (
-                          <a href={subItem.url} target="_blank" rel="noreferrer">
-                            <span>{subItem.title}</span>
-                          </a>
-                        ) : (
-                          <Link href={subItem.url}>
-                            <span>{subItem.title}</span>
-                          </Link>
-                        )}
+                        <NavSubLink title={subItem.title} url={subItem.url} />
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

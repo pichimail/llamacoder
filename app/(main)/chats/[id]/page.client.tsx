@@ -14,18 +14,20 @@ import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
-import CodeViewer, { downloadFilesAsZip } from "./code-viewer";
+import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewer";
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, Menu, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
+import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
-import { Sidebar } from "@/components/chats/sidebar";
+import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
+import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 import type { PreviewMode } from "@/components/code-runner-react";
 
@@ -70,18 +72,18 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [builderMode, setBuilderMode] = useState<BuilderMode>("code");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [appSidebarCollapsed, setAppSidebarCollapsed] = useState(true);
-  const [mobileAppMenuOpen, setMobileAppMenuOpen] = useState(false);
   const [mobileOptionsOpen, setMobileOptionsOpen] = useState(false);
+  const { user, authEnabled, isAuthenticated } = useHomeSidebarData();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [designDirty, setDesignDirty] = useState(false);
   const [designSaveRequest, setDesignSaveRequest] = useState(0);
   const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
   const [showUnsavedOverlay, setShowUnsavedOverlay] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
-  const [autoFixEnabled, setAutoFixEnabled] = useState(false);
+  const [autoFixEnabled, setAutoFixEnabled] = useState(true);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
+  const [builderStatus, setBuilderStatus] = useState<BuilderStatus>(context.streamPromise ? "generating" : "ready");
   const [activeMessage, setActiveMessage] = useState(chat.messages.filter((m) => m.role === "assistant" && extractFirstCodeBlock(m.content)).at(-1));
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
   const [chatPanelWidth, setChatPanelWidth] = useState(420);
@@ -95,6 +97,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const autoFixPendingRef = useRef(false);
   const lastAutoFixErrorRef = useRef("");
   const lastAutoFixAtRef = useRef(0);
+  const hasAutoSwitchedPreviewRef = useRef(false);
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
@@ -103,10 +106,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     fetch("/api/public-settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.autoFixDefault) {
-          setAutoFixEnabled(true);
-          setAutoFixStatus("watching");
-        }
+        if (typeof d?.autoFixDefault === "boolean") setAutoFixEnabled(d.autoFixDefault);
+        setAutoFixStatus(d?.autoFixDefault === false ? "idle" : "watching");
       })
       .catch(() => undefined);
   }, []);
@@ -192,6 +193,22 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     if (target) handleSwitchVersion(target.id);
   }, [targetMessageId, chat.messages, handleSwitchVersion]);
 
+  useEffect(() => {
+    if (!activeMessage) {
+      setBuilderStatus("ready");
+      return;
+    }
+    if (streamPromiseRef.current || streamTextRef.current) return;
+    hasAutoSwitchedPreviewRef.current = false;
+    autoFixPendingRef.current = false;
+    autoFixAttemptRef.current = 0;
+    lastAutoFixErrorRef.current = "";
+    lastAutoFixAtRef.current = 0;
+    setAutoFixAttempt(0);
+    setAutoFixStatus(autoFixEnabled ? "watching" : "idle");
+    setBuilderStatus("validating");
+  }, [activeMessage?.id, autoFixEnabled]);
+
   const stopStreaming = useCallback(() => {
     try { abortControllerRef.current?.abort(); } catch {}
     abortControllerRef.current = null;
@@ -202,11 +219,34 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     isHandlingStreamRef.current = false;
     autoFixPendingRef.current = false;
     setAutoFixStatus(autoFixEnabled ? "watching" : "idle");
-  }, [autoFixEnabled]);
+    setBuilderStatus(activeMessage ? "validating" : "ready");
+  }, [activeMessage, autoFixEnabled]);
+
+  const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
+    const response = await fetch(`/api/workspace/${chat.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok && !data.reason) throw new Error(data.error || "Workspace request failed");
+    return data as any;
+  }, [chat.id]);
+
+  const syncWorkspaceFiles = useCallback(async (files: RawGeneratedFile[]) => {
+    const normalizedFiles = files.map(normalizeFile).filter((file) => file.path && file.code);
+    if (normalizedFiles.length === 0) return;
+    try {
+      await workspaceRequest("sync", { files: normalizedFiles });
+    } catch (error) {
+      console.warn("Failed to sync generated workspace files:", error);
+    }
+  }, [workspaceRequest]);
 
   const requestFix = useCallback(async ({ error, auto, attempt, fallback }: { error: string; auto: boolean; attempt: number; fallback: boolean }) => {
     const prefix = auto ? (fallback ? "Rebuild the generated app cleanly. Fix this preview error and return the full working files." : "Apply a minimal patch to fix this preview error and return only changed files.") : "The code is not working. Fix it.";
-    const text = `${prefix}\n\nAttempt: ${attempt}\n\n${error.trimStart()}`;
+    const fileManifest = artifactFiles.map((file) => `- ${file.path}`).join("\n");
+    const text = `${prefix}\n\nAttempt: ${attempt}\n\nCurrent artifact files:\n${fileManifest || "- no files parsed"}\n\nPreview error:\n${error.trimStart()}`;
     const message = await createMessage(chat.id, text, "user");
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -220,9 +260,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       return res.body;
     });
     setStreamPromise(nextStreamPromise);
+    setBuilderStatus(fallback ? "rebuilding" : "fixing");
     setMobilePanel("code");
     router.refresh();
-  }, [chat.id, chat.model, router]);
+  }, [artifactFiles, chat.id, chat.model, router]);
 
   const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
     setAutoFixEnabled(enabled);
@@ -232,37 +273,63 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     lastAutoFixAtRef.current = 0;
     setAutoFixAttempt(0);
     setAutoFixStatus(enabled ? "watching" : "idle");
-  }, []);
+    if (enabled && activeMessage) setBuilderStatus("validating");
+  }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    if (!autoFixEnabled || streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
+    if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
+    if (!autoFixEnabled) {
+      lastAutoFixErrorRef.current = error.trim();
+      setBuilderStatus("failed");
+      return;
+    }
     const normalized = error.trim();
     const now = Date.now();
     const same = normalized === lastAutoFixErrorRef.current;
     if (same && now - lastAutoFixAtRef.current < 4500) return;
     if (!same) autoFixAttemptRef.current = 0;
     const nextAttempt = autoFixAttemptRef.current + 1;
-    const fallback = nextAttempt > 3;
+    if (nextAttempt > 4) {
+      autoFixAttemptRef.current = nextAttempt;
+      setAutoFixAttempt(4);
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      autoFixPendingRef.current = false;
+      return;
+    }
+    const fallback = nextAttempt === 4;
     autoFixAttemptRef.current = nextAttempt;
     autoFixPendingRef.current = true;
     lastAutoFixErrorRef.current = normalized;
     lastAutoFixAtRef.current = now;
     setAutoFixAttempt(nextAttempt);
     setAutoFixStatus(fallback ? "fallback" : "fixing");
+    setBuilderStatus(fallback ? "rebuilding" : "fixing");
     startTransition(async () => {
       try { await requestFix({ error, auto: true, attempt: nextAttempt, fallback }); }
-      catch { autoFixPendingRef.current = false; setAutoFixStatus("watching"); }
+      catch {
+        autoFixPendingRef.current = false;
+        setAutoFixStatus("watching");
+        setBuilderStatus("validating");
+      }
     });
   }, [autoFixEnabled, requestFix]);
 
   const handlePreviewReady = useCallback(() => {
-    if (!autoFixEnabled || streamPromiseRef.current || streamTextRef.current) return;
+    if (streamPromiseRef.current || streamTextRef.current) return;
     autoFixPendingRef.current = false;
     lastAutoFixErrorRef.current = "";
     autoFixAttemptRef.current = 0;
     setAutoFixAttempt(0);
     setAutoFixStatus("ready");
-  }, [autoFixEnabled]);
+    setBuilderStatus("ready");
+    if (!hasAutoSwitchedPreviewRef.current && activeMessage) {
+      hasAutoSwitchedPreviewRef.current = true;
+      setActiveTab("preview");
+      setBuilderMode("preview");
+      setMobilePanel("preview");
+    }
+  }, [activeMessage]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -316,6 +383,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     async function readStream() {
       if (!streamPromise || isHandlingStreamRef.current) return;
       isHandlingStreamRef.current = true;
+      setBuilderStatus("generating");
       setReasoningText("");
       context.setStreamPromise(undefined);
       let stream: ReadableStream | null = null;
@@ -349,6 +417,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               const currentFiles = extractAllCodeBlocks(finalText) as RawGeneratedFile[];
               const mergedFiles = mergeArtifactFiles(previousFiles, currentFiles);
               const message = await createMessage(chat.id, finalText, "assistant", mergedFiles);
+              void syncWorkspaceFiles(mergedFiles);
               startTransition(() => {
                 isHandlingStreamRef.current = false;
                 setStreamText("");
@@ -356,6 +425,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
                 setStreamReasoningEnabled(false);
                 autoFixPendingRef.current = false;
                 if (autoFixEnabled) setAutoFixStatus("watching");
+                setBuilderStatus("validating");
+                hasAutoSwitchedPreviewRef.current = false;
                 setActiveMessage(message);
                 setActiveTab("code");
                 setBuilderMode("code");
@@ -369,19 +440,23 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
         console.error(error);
         isHandlingStreamRef.current = false;
         setStreamPromise(undefined);
+        setBuilderStatus("failed");
       }
     }
     readStream();
-  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled]);
+  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles]);
 
   const handleSaveFiles = useCallback((files: { path: string; code: string; language: string }[]) => {
     startTransition(async () => {
       const content = "Manual edit saved from the code editor.\n\n" + files.map((f) => "```" + f.language + "{path=" + f.path + "}\n" + f.code + "\n```").join("\n\n");
       const newMessage = await createMessage(chat.id, content, "assistant", files);
+      void syncWorkspaceFiles(files);
+      hasAutoSwitchedPreviewRef.current = false;
+      setBuilderStatus("validating");
       setActiveMessage(newMessage);
       router.refresh();
     });
-  }, [chat.id, router]);
+  }, [chat.id, router, syncWorkspaceFiles]);
 
   const handleDownloadZip = useCallback(() => {
     const files = activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : [];
@@ -397,17 +472,6 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     await navigator.clipboard.writeText(window.location.href).catch(() => undefined);
     toast({ title: "Chat URL copied" });
   }, []);
-
-  const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
-    const response = await fetch(`/api/workspace/${chat.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...payload }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok && !data.reason) throw new Error(data.error || "Workspace request failed");
-    return data as any;
-  }, [chat.id]);
 
   const handlePublishMobile = useCallback(async () => {
     if (!activeMessage?.id || artifactFiles.length === 0) return;
@@ -503,6 +567,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
         onAutoFixEnabledChange={handleAutoFixEnabledChange}
         autoFixAttempt={autoFixAttempt}
         autoFixStatus={autoFixStatus}
+        builderStatus={builderStatus}
         previewMode={previewMode}
         onPreviewModeChange={setPreviewMode}
         sandpackOptions={sandpackOptions}
@@ -517,9 +582,34 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const nextPreviewMode = previewMode === "web" ? "mobile" : "web";
   const canAct = !!activeMessage?.id && artifactFiles.length > 0;
+  const shouldRunHiddenValidator =
+    Boolean(activeMessage?.id) &&
+    artifactFiles.length > 0 &&
+    !streamPromise &&
+    !streamText &&
+    builderStatus !== "ready" &&
+    builderStatus !== "failed" &&
+    activeTab !== "preview" &&
+    builderMode !== "design";
 
   return (
     <TooltipProvider>
+      {shouldRunHiddenValidator ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -left-[10000px] top-0 h-[720px] w-[1280px] overflow-hidden opacity-0"
+        >
+          <CodeRunner
+            key={`hidden-validator-${activeMessage?.id}-${autoFixAttempt}-${builderStatus}`}
+            files={artifactFiles.map((file) => ({ path: file.path, content: file.code }))}
+            onPreviewError={handlePreviewError}
+            onPreviewReady={handlePreviewReady}
+            previewMode="web"
+            sandpackOptions={sandpackOptions}
+            hiddenValidation
+          />
+        </div>
+      ) : null}
       <ShareDialog
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -531,23 +621,20 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
         duplicateProtected={duplicateProtected}
         onPublish={handlePublishMobile}
       />
-      <div className="flex h-dvh overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
-        <Sidebar
+      <SidebarProvider defaultOpen={false} className="h-dvh overflow-hidden">
+        <ChatsAppSidebar
           currentChatId={chat.id}
           chats={sidebarChats}
-          collapsed={mobileAppMenuOpen ? false : appSidebarCollapsed}
-          mobileOpen={mobileAppMenuOpen}
-          onMobileOpenChange={setMobileAppMenuOpen}
-          onToggleCollapse={() => setAppSidebarCollapsed((value) => !value)}
-          onNewChat={() => router.push("/")}
-          onSelectChat={(chatId) => router.push(`/chats/${chatId}`)}
+          user={user}
+          authEnabled={authEnabled}
+          isAuthenticated={isAuthenticated}
         />
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <SidebarInset className="min-h-0 overflow-hidden">
+      <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
           <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/70 bg-transparent px-3 text-sm">
             <div className="flex min-w-0 items-center gap-2">
               <Tip label="Open app menu">
-                <button type="button" onClick={() => setMobileAppMenuOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open app menu"><Menu className="size-4" /></button>
+                <SidebarTrigger className="inline-flex size-8 md:hidden" />
               </Tip>
               <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
                 <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button>
@@ -583,7 +670,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
             <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
               {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
               <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
-              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
             </section>
 
             <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-px flex-shrink-0 cursor-col-resize bg-border/70 transition focus-visible:outline-none`} />
@@ -631,7 +718,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
                 <SheetAction icon={<Palette className="size-4" />} label="Visual editor" onClick={() => { setModeSafely("design"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />} label={`Switch to ${nextPreviewMode}`} onClick={() => setPreviewMode(nextPreviewMode)} />
                 <SheetAction icon={<Database className="size-4" />} label="Database workspace" onClick={() => { setModeSafely("database"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
-                <SheetAction icon={<PanelLeftOpen className="size-4" />} label="Main app menu" onClick={() => { setMobileOptionsOpen(false); setMobileAppMenuOpen(true); }} />
+                <OpenAppMenuAction onOpen={() => setMobileOptionsOpen(false)} />
               </div>
 
               <div className="grid gap-1 border-t border-border/70 pt-3">
@@ -655,6 +742,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
             </div>
           </DrawerContent>
         </Drawer>
+        </SidebarInset>
+      </SidebarProvider>
 
         {showUnsavedOverlay && (
           <div className="fixed inset-0 z-50 hidden items-center justify-center bg-background/70 p-4 backdrop-blur-sm md:flex" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
@@ -679,7 +768,6 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
             </div>
           </DrawerContent>
         </Drawer>
-      </div>
     </TooltipProvider>
   );
 }
@@ -696,4 +784,19 @@ function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: Mo
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
   return <button type="button" onClick={onClick} disabled={disabled} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-left text-xs text-foreground disabled:opacity-40">{icon}<span>{label}</span></button>;
+}
+
+function OpenAppMenuAction({ onOpen }: { onOpen: () => void }) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <SheetAction
+      icon={<PanelLeftOpen className="size-4" />}
+      label="Main app menu"
+      onClick={() => {
+        onOpen();
+        setOpenMobile(true);
+      }}
+    />
+  );
 }

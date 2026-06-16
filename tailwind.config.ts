@@ -5,7 +5,7 @@ import typography from "@tailwindcss/typography";
 import animate from "tailwindcss-animate";
 
 const config: Config = {
-  darkMode: "class",
+  darkMode: ["class", "class"],
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -14,8 +14,14 @@ const config: Config = {
   theme: {
   	extend: {
   		fontFamily: {
-  			sans: ["Aeonik", ...defaultTheme.fontFamily.sans],
-  			mono: ["Aeonik Mono", ...defaultTheme.fontFamily.mono],
+  			sans: [
+  				'Aeonik',
+                    ...defaultTheme.fontFamily.sans
+                ],
+  			mono: [
+  				'Aeonik Mono',
+                    ...defaultTheme.fontFamily.mono
+                ]
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -29,7 +35,7 @@ const config: Config = {
   				'500': '#326DF5',
   				'700': '#1F326F'
   			},
-  			gray: colors.zinc,
+  			gray: 'colors.zinc',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
