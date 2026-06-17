@@ -3,7 +3,10 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { OptionDropdown } from "@/components/option-dropdown";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+
+const Synthesis = dynamic(() => import("@/components/synthesis"), { ssr: false });
 import {
   use,
   useState,
@@ -424,15 +427,34 @@ export default function HomePageClient() {
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-dvh flex-col bg-gradient-to-b from-muted/40 via-background to-background dark:from-muted/20"
+          className="relative flex min-h-dvh flex-col overflow-hidden"
         >
-          <Header hideLogo showSidebarTrigger />
+          <Synthesis
+            speed={0.1}
+            color1="#3023e7"
+            color2="#e265c7"
+            color3="#f0ebe5"
+            scale={0.7}
+            complexity={11}
+            distortion={0.5}
+            glowIntensity={0.5}
+            flowFrequency={4.5}
+            contrast={1.2}
+            backgroundColor="#1a1040"
+          />
+          <div
+            className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/25 via-black/10 to-black/35"
+            aria-hidden="true"
+          />
 
-          <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
-            <div className="flex w-full max-w-[760px] flex-col items-center">
+          <div className="relative z-10 flex flex-1 flex-col">
+            <Header hideLogo showSidebarTrigger />
+
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
+              <div className="flex w-full max-w-[760px] flex-col items-center">
               <h1
                 id="hero-headline"
-                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-foreground md:min-h-[5.25rem] md:text-6xl"
+                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-white/90 drop-shadow-lg md:min-h-[5.25rem] md:text-6xl"
               >
                 {HEADLINES[headlineIndex]}
               </h1>
@@ -519,11 +541,12 @@ export default function HomePageClient() {
                 </div>
 
                 {mode === "ask" ? (
-                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                  <p className="mt-2 text-center text-xs text-white/70">
                     Ask mode — best for questions, refinements, and targeted changes.
                   </p>
                 ) : null}
               </div>
+            </div>
             </div>
           </div>
         </section>
