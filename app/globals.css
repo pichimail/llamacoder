@@ -522,3 +522,191 @@ a:hover {
   color: hsl(var(--muted-foreground));
 }
 
+/* TextColor headline + GradientText assistant */
+:root {
+  --color-1: 270 100% 70%;
+  --color-2: 200 100% 60%;
+  --color-3: 330 100% 65%;
+  --color-4: 45 100% 55%;
+}
+
+@keyframes gradient-foreground-1 {
+  0%,
+  18%,
+  100% {
+    opacity: 1;
+  }
+  28%,
+  82% {
+    opacity: 0;
+  }
+}
+
+@keyframes gradient-foreground-2 {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30%,
+  48% {
+    opacity: 1;
+  }
+  20%,
+  62% {
+    opacity: 0;
+  }
+}
+
+@keyframes gradient-foreground-3 {
+  0%,
+  48%,
+  100% {
+    opacity: 0;
+  }
+  64%,
+  82% {
+    opacity: 1;
+  }
+}
+
+@keyframes gradient-background-1 {
+  0%,
+  18%,
+  100% {
+    opacity: 0;
+  }
+  26%,
+  90% {
+    opacity: 1;
+  }
+}
+
+@keyframes gradient-background-2 {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  30%,
+  48% {
+    opacity: 0;
+  }
+  24%,
+  56% {
+    opacity: 1;
+  }
+}
+
+@keyframes gradient-background-3 {
+  0%,
+  56%,
+  90%,
+  100% {
+    opacity: 1;
+  }
+  64%,
+  82% {
+    opacity: 0;
+  }
+}
+
+@keyframes gradient-border {
+  0%,
+  100% {
+    border-radius: 37% 63% 55% 45% / 49% 55% 45% 51%;
+  }
+  50% {
+    border-radius: 50% 50% 33% 67% / 55% 27% 73% 45%;
+  }
+}
+
+@keyframes gradient-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(8%, 6%) scale(1.08);
+  }
+}
+
+@keyframes gradient-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-6%, 8%) scale(1.06);
+  }
+}
+
+@keyframes gradient-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6%, -8%) scale(1.07);
+  }
+}
+
+@keyframes gradient-4 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-8%, -6%) scale(1.09);
+  }
+}
+
+.animate-gradient-foreground-1 {
+  animation: gradient-foreground-1 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.animate-gradient-foreground-2 {
+  animation: gradient-foreground-2 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.animate-gradient-foreground-3 {
+  animation: gradient-foreground-3 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.before\:animate-gradient-background-1::before {
+  animation: gradient-background-1 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.before\:animate-gradient-background-2::before {
+  animation: gradient-background-2 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.before\:animate-gradient-background-3::before {
+  animation: gradient-background-3 12s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.from-gradient-1-start {
+  --tw-gradient-from: #39ff14;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(57, 255, 20, 0));
+}
+
+.to-gradient-1-end {
+  --tw-gradient-to: #00ffff;
+}
+
+.from-gradient-2-start {
+  --tw-gradient-from: #ff073a;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255, 7, 58, 0));
+}
+
+.to-gradient-2-end {
+  --tw-gradient-to: #ff6ec7;
+}
+
+.from-gradient-3-start {
+  --tw-gradient-from: #faff00;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(250, 255, 0, 0));
+}
+
+.to-gradient-3-end {
+  --tw-gradient-to: #00f0ff;
+}
+

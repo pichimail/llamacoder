@@ -1,7 +1,9 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
+import { KnowledgeAssistantButton } from "@/components/home/knowledge-assistant-button";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
+import { TextColor } from "@/components/ui/text-color";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -33,14 +35,6 @@ type ComposerAttachment = {
   url?: string;
   size?: number;
 };
-
-const HEADLINES = [
-  "Build apps at hyperspeed",
-  "Warp prompts into production",
-  "Forge code at light velocity",
-  "Neon synthesis of full-stack apps",
-  "Synthesize vision at warp speed",
-];
 
 const PROMPT_CHIP_GROUPS = [
   {
@@ -262,7 +256,6 @@ export default function HomePageClient() {
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [headlineIndex, setHeadlineIndex] = useState(0);
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
 
   const [, startTransition] = useTransition();
@@ -295,13 +288,6 @@ export default function HomePageClient() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setHeadlineIndex((prev) => (prev + 1) % HEADLINES.length);
-    }, 4800);
-    return () => clearInterval(interval);
   }, []);
 
   const isUploadAvailable = blobUploadConfigured === true;
@@ -435,16 +421,11 @@ export default function HomePageClient() {
 
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
               <div className="flex w-full max-w-[760px] flex-col items-center">
-              <h1
-                id="hero-headline"
-                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-slate-900 md:min-h-[5.25rem] md:text-6xl"
-              >
-                {HEADLINES[headlineIndex]}
-              </h1>
+              <TextColor className="mb-2 min-h-[4.25rem] md:min-h-[5.25rem]" />
 
               <div
                 id="prompt-composer"
-                className="relative mt-8 w-full"
+                className="relative mt-6 w-full"
                 style={{ ["--an-max-width" as any]: "760px" }}
               >
                 {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
@@ -565,6 +546,8 @@ export default function HomePageClient() {
         >
           Chinna-Coder — Build production apps from a prompt
         </footer>
+
+        <KnowledgeAssistantButton />
       </div>
     </HomeShell>
   );
