@@ -42,7 +42,7 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "@radix-ui/react-use-controllable-state": "^1.2.3",
     "@radix-ui/react-visually-hidden": "^1.2.3",
-    "@react-three/fiber": "^9.6.1",
+
     "@streamdown/cjk": "^1.0.3",
     "@streamdown/code": "^1.1.1",
     "@streamdown/math": "^1.0.2",

@@ -3,10 +3,7 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { OptionDropdown } from "@/components/option-dropdown";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-
-const Synthesis = dynamic(() => import("@/components/synthesis"), { ssr: false });
 import {
   use,
   useState,
@@ -148,6 +145,9 @@ const PRESET_PROMPTS = new Set(
   PROMPT_CHIP_GROUPS.flatMap((group) => group.prompts),
 );
 
+const HERO_GRADIENT =
+  "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
+
 function PresetChipsScroller({
   groups,
   activeTitles,
@@ -192,7 +192,7 @@ function PresetChipsScroller({
           type="button"
           onClick={() => scrollBy(-1)}
           aria-label="Scroll presets left"
-          className="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border/40 bg-background/80 text-muted-foreground/50 shadow-sm backdrop-blur-sm transition hover:text-muted-foreground"
+          className="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/70 text-slate-700/70 shadow-sm backdrop-blur-sm transition hover:text-slate-900"
         >
           <ChevronLeft className="size-3.5" />
         </button>
@@ -211,8 +211,8 @@ function PresetChipsScroller({
               onClick={() => onSelect(group)}
               className={`shrink-0 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
                 isActive
-                  ? "border-foreground/25 bg-accent text-foreground"
-                  : "border-border/60 bg-background/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+                  ? "border-slate-900/20 bg-white/90 text-slate-900 shadow-sm"
+                  : "border-white/50 bg-white/55 text-slate-800/80 hover:border-white/70 hover:bg-white/75 hover:text-slate-900"
               }`}
             >
               {group.title}
@@ -225,7 +225,7 @@ function PresetChipsScroller({
           type="button"
           onClick={() => scrollBy(1)}
           aria-label="Scroll presets right"
-          className="absolute right-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border/40 bg-background/80 text-muted-foreground/50 shadow-sm backdrop-blur-sm transition hover:text-muted-foreground"
+          className="absolute right-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/70 text-slate-700/70 shadow-sm backdrop-blur-sm transition hover:text-slate-900"
         >
           <ChevronRight className="size-3.5" />
         </button>
@@ -424,37 +424,20 @@ export default function HomePageClient() {
 
   return (
     <HomeShell>
-      <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <div className="flex min-h-dvh flex-col text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-dvh flex-col overflow-hidden"
+          className="relative flex min-h-dvh flex-col"
+          style={{ background: HERO_GRADIENT }}
         >
-          <Synthesis
-            speed={0.1}
-            color1="#3023e7"
-            color2="#e265c7"
-            color3="#f0ebe5"
-            scale={0.7}
-            complexity={11}
-            distortion={0.5}
-            glowIntensity={0.5}
-            flowFrequency={4.5}
-            contrast={1.2}
-            backgroundColor="#1a1040"
-          />
-          <div
-            className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/25 via-black/10 to-black/35"
-            aria-hidden="true"
-          />
-
-          <div className="relative z-10 flex flex-1 flex-col">
+          <div className="relative flex flex-1 flex-col">
             <Header hideLogo showSidebarTrigger />
 
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
               <div className="flex w-full max-w-[760px] flex-col items-center">
               <h1
                 id="hero-headline"
-                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-white/90 drop-shadow-lg md:min-h-[5.25rem] md:text-6xl"
+                className="min-h-[4.25rem] text-balance text-center text-4xl font-semibold tracking-tight text-slate-900 md:min-h-[5.25rem] md:text-6xl"
               >
                 {HEADLINES[headlineIndex]}
               </h1>
@@ -507,7 +490,7 @@ export default function HomePageClient() {
                         {currentMode.icon} {currentMode.label}
                       </span>
                     }
-                    triggerClassName="h-8 px-2.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    triggerClassName="h-8 border-white/50 bg-white/60 px-2.5 text-slate-800 hover:bg-white/80 hover:text-slate-900"
                     options={modes.map((item) => ({
                       value: item.value,
                       label: (
@@ -530,7 +513,7 @@ export default function HomePageClient() {
                       onValueChange={setModel}
                       aria-label="Select AI model"
                       triggerLabel={getModelLabel(model)}
-                      triggerClassName="h-8 min-w-[180px] px-2.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                      triggerClassName="h-8 min-w-[180px] border-white/50 bg-white/60 px-2.5 text-slate-800 hover:bg-white/80 hover:text-slate-900"
                       contentClassName="max-h-[320px]"
                       options={getVisibleModels().map((item) => ({
                         value: item.value,
@@ -541,7 +524,7 @@ export default function HomePageClient() {
                 </div>
 
                 {mode === "ask" ? (
-                  <p className="mt-2 text-center text-xs text-white/70">
+                  <p className="mt-2 text-center text-xs text-slate-800/75">
                     Ask mode — best for questions, refinements, and targeted changes.
                   </p>
                 ) : null}
@@ -553,7 +536,7 @@ export default function HomePageClient() {
 
         <section
           id="featured-templates"
-          className="mx-auto w-full max-w-5xl border-t border-border/50 px-4 py-14"
+          className="mx-auto w-full max-w-5xl border-t border-border/50 bg-background px-4 py-14"
         >
           <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
             <div>
@@ -578,7 +561,7 @@ export default function HomePageClient() {
 
         <footer
           id="examples"
-          className="flex w-full justify-center border-t border-border/40 px-4 py-8 text-xs text-muted-foreground"
+          className="flex w-full justify-center border-t border-border/40 bg-background px-4 py-8 text-xs text-muted-foreground"
         >
           Chinna-Coder — Build production apps from a prompt
         </footer>
