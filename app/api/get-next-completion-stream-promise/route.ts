@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool } from "@neondatabase/serverless";
 import { z } from "zod";
-import { getFallbackModel, resolveModel } from "@/lib/constants";
+import { getFallbackModel, getHistoryCompressionModel, resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import {
   anyProviderConfigured,
@@ -45,7 +45,7 @@ async function compressHistoryWithSmallModel(
 
   try {
     const result = await createTextWithFallback({
-      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      model: getHistoryCompressionModel(),
       temperature: 0.2,
       maxTokens: 700,
       messages: [
@@ -73,6 +73,7 @@ const requestSchema = z.object({
   messageId: z.string().min(1),
   model: z.string().min(1),
   reasoning: z.boolean().optional().default(false),
+  quality: z.enum(["low", "high"]).optional().default("low"),
 });
 
 function improveAutofixPrompt(messages: { role: "system" | "user" | "assistant"; content: string }[]) {
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
 
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return new Response("Invalid request", { status: 400 });
-  const { messageId, model, reasoning } = parsed.data;
+  const { messageId, model, reasoning, quality } = parsed.data;
 
   try {
     await rateLimitOrThrow(`generation:${messageId}`, { limit: 20, windowSeconds: 60 });
@@ -191,6 +192,17 @@ export async function POST(req: Request) {
     messages = [
       ...messages,
       { role: "system" as const, content: patchModeSystemHint },
+    ];
+  }
+
+  if (quality === "high" && message.role === "user") {
+    messages = [
+      ...messages,
+      {
+        role: "system" as const,
+        content:
+          "High-quality mode: be thorough, verify imports and dependencies, return complete working files, and proactively fix edge cases. Prefer complete corrected files over partial patches when uncertain.",
+      },
     ];
   }
 

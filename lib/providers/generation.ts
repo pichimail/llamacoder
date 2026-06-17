@@ -131,16 +131,20 @@ export async function createChatStream({
 
   if (config.provider === "openrouter") {
     const baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
+    const body: Record<string, unknown> = {
+      model: resolveNativeModel(model),
+      messages: normalizeMessages(messages),
+      stream: true,
+      temperature,
+      max_tokens: maxTokens,
+    };
+    if (reasoningEnabled) {
+      body.reasoning = { enabled: true };
+    }
     const response = await fetch(`${baseURL}/chat/completions`, {
       method: "POST",
       headers: openRouterHeaders(),
-      body: JSON.stringify({
-        model: resolveNativeModel(model),
-        messages: normalizeMessages(messages),
-        stream: true,
-        temperature,
-        max_tokens: maxTokens,
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok || !response.body) throw new Error(await response.text());
     return { stream: response.body, model: resolveNativeModel(model), provider: "openrouter" };

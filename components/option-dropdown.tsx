@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 export type OptionDropdownItem = {
   value: string
   label: ReactNode
+  disabled?: boolean
 }
 
 type OptionDropdownProps = {
@@ -70,7 +71,11 @@ export function OptionDropdown({
       >
         <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
           {options.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value}>
+            <DropdownMenuRadioItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+            >
               {option.label}
             </DropdownMenuRadioItem>
           ))}

@@ -64,8 +64,21 @@ export default async function SharePage({
     notFound();
   }
 
-  const files = extractAllCodeBlocks(message.content);
-  if (files.length === 0) {
+  const storedFiles = message.files as Array<{
+    path?: string;
+    code?: string;
+    content?: string;
+    language?: string;
+  }> | null;
+  const files =
+    storedFiles && Array.isArray(storedFiles) && storedFiles.length > 0
+      ? storedFiles.map((file) => ({
+          path: file.path || "App.tsx",
+          code: file.code || file.content || "",
+          language: file.language,
+        }))
+      : extractAllCodeBlocks(message.content);
+  if (files.length === 0 || files.every((file) => !file.code?.trim())) {
     notFound();
   }
 

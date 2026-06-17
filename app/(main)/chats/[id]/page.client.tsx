@@ -10,7 +10,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
+import { ChatCompletionStreamClient } from "@/lib/chat-completion-stream-client";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
@@ -392,31 +392,64 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       if (!stream) { isHandlingStreamRef.current = false; setStreamPromise(undefined); return; }
       let didPushToCode = false;
       try {
-        const completionStream = ChatCompletionStream.fromReadableStream(stream);
+        const completionStream = ChatCompletionStreamClient.fromReadableStream(stream);
         completionStream.on("content", (delta, content) => {
             if (!streamPromiseRef.current) return;
-            setStreamText((text) => text + delta);
-            if (!didPushToCode && parseReplySegments(content).some((seg) => seg.type === "file")) {
+            const deltaText = String(delta ?? "");
+            const fullText = String(content ?? "");
+            setStreamText((text) => text + deltaText);
+            if (!didPushToCode && parseReplySegments(fullText).some((seg) => seg.type === "file")) {
               didPushToCode = true;
               setActiveTab("code");
               setBuilderMode("code");
               setMobilePanel("code");
             }
           });
-        (completionStream as { on?: (event: string, cb: (delta: string) => void) => void }).on?.(
-          "reasoning",
-          (delta: string) => {
+        completionStream.on("reasoning", (delta) => {
             if (!streamPromiseRef.current) return;
-            setReasoningText((text) => text + delta);
-          },
-        );
+            setReasoningText((text) => text + String(delta ?? ""));
+          });
+        completionStream.on("error", (error) => {
+            console.error(error);
+            isHandlingStreamRef.current = false;
+            setStreamPromise(undefined);
+            setBuilderStatus("failed");
+            toast({
+              title: "Generation failed",
+              description: error instanceof Error ? error.message : "Stream parsing failed.",
+              variant: "destructive",
+            });
+          });
         completionStream.on("finalContent", async (finalText) => {
             abortControllerRef.current = null;
+            const resolvedText = String(finalText ?? "");
+            if (!resolvedText.trim()) {
+              isHandlingStreamRef.current = false;
+              setStreamPromise(undefined);
+              setBuilderStatus("failed");
+              toast({
+                title: "Generation failed",
+                description: "The model returned an empty response. Try another model or rephrase your prompt.",
+                variant: "destructive",
+              });
+              return;
+            }
             startTransition(async () => {
               const previousFiles = chat.messages.filter((m) => m.role === "assistant" && extractAllCodeBlocks(m.content).length > 0).flatMap((m) => getMessageFiles(m));
-              const currentFiles = extractAllCodeBlocks(finalText) as RawGeneratedFile[];
+              const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
               const mergedFiles = mergeArtifactFiles(previousFiles, currentFiles);
-              const message = await createMessage(chat.id, finalText, "assistant", mergedFiles);
+              if (mergedFiles.length === 0) {
+                isHandlingStreamRef.current = false;
+                setStreamPromise(undefined);
+                setBuilderStatus("failed");
+                toast({
+                  title: "No code generated",
+                  description: "The model replied without fenced code blocks. Try again or switch models.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              const message = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
               void syncWorkspaceFiles(mergedFiles);
               startTransition(() => {
                 isHandlingStreamRef.current = false;

@@ -159,7 +159,23 @@ export function resolveNativeModel(model: string): string {
 }
 
 export function getFallbackModel(): ModelConfig {
-  return getModelConfig(WORKING_FALLBACK_MODEL);
+  if (process.env.OPENROUTER_API_KEY && !process.env.TOGETHER_API_KEY) {
+    return getModelConfig("openrouter/auto");
+  }
+  if (process.env.TOGETHER_API_KEY) {
+    return getModelConfig(WORKING_FALLBACK_MODEL);
+  }
+  return getModelConfig("openrouter/auto");
+}
+
+export function getHistoryCompressionModel(): string {
+  if (process.env.TOGETHER_API_KEY) {
+    return "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    return "openrouter/auto";
+  }
+  return WORKING_FALLBACK_MODEL;
 }
 
 export function getFinetunedModelConfig(): ModelConfig | null {

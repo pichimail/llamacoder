@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
 import { MODELS } from "@/lib/constants";
+import { useAvailableModels } from "@/lib/use-available-models";
 import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
@@ -60,7 +61,9 @@ export default function ChatBox({
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(chat.model);
-  const [quality, setQuality] = useState("low");
+  const [quality, setQuality] = useState<"low" | "high">(
+    chat.quality === "high" ? "high" : "low",
+  );
   const [mode, setMode] = useState<ComposerMode>("agent");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>();
   const [screenshotLoading, setScreenshotLoading] = useState(false);
@@ -71,16 +74,36 @@ export default function ChatBox({
   >(null);
   const [shadcnEnabled, setShadcnEnabled] = useState(chat.shadcn);
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const availableModels = useAvailableModels();
 
   const isScreenshotUploadAvailable = blobUploadConfigured === true;
 
-  const persistShadcn = async (enabled: boolean) => {
-    setShadcnEnabled(enabled);
+  const persistBuilderSettings = async (updates: {
+    shadcn?: boolean;
+    model?: string;
+    quality?: "low" | "high";
+  }) => {
     await fetch(`/api/chats/${chat.id}/builder-settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shadcn: enabled }),
+      body: JSON.stringify(updates),
     }).catch(() => undefined);
+  };
+
+  const persistShadcn = async (enabled: boolean) => {
+    setShadcnEnabled(enabled);
+    await persistBuilderSettings({ shadcn: enabled });
+  };
+
+  const handleModelChange = (nextModel: string) => {
+    setModel(nextModel);
+    void persistBuilderSettings({ model: nextModel });
+  };
+
+  const handleQualityChange = (nextQuality: string) => {
+    const normalized = nextQuality === "high" ? "high" : "low";
+    setQuality(normalized);
+    void persistBuilderSettings({ quality: normalized });
   };
 
   useEffect(() => {
@@ -235,7 +258,12 @@ export default function ChatBox({
       const streamPromise = fetch("/api/get-next-completion-stream-promise", {
         method: "POST",
         signal: controller.signal,
-        body: JSON.stringify({ messageId: message.id, model, reasoning: reasoningEnabled }),
+        body: JSON.stringify({
+          messageId: message.id,
+          model,
+          reasoning: reasoningEnabled,
+          quality,
+        }),
       })
         .then(async (res) => {
           if (!res.ok)
@@ -355,22 +383,28 @@ export default function ChatBox({
               />
               <OptionDropdown
                 value={model}
-                onValueChange={setModel}
+                onValueChange={handleModelChange}
                 aria-label="Select AI model"
                 tip="Model"
                 triggerLabel={
-                  MODELS.find((item) => item.value === model)?.label ?? model
+                  availableModels?.find((item) => item.value === model)?.label ??
+                  MODELS.find((item) => item.value === model)?.label ??
+                  model
                 }
                 triggerClassName={ghostTrigger}
-                options={MODELS.filter((item) => !item.hidden).map((item) => ({
+                options={(availableModels ?? MODELS.filter((item) => !item.hidden)).map((item) => ({
                   value: item.value,
-                  label: item.label,
+                  label:
+                    "available" in item && item.available === false
+                      ? `${item.label} (needs API key)`
+                      : item.label,
+                  disabled: "available" in item ? !item.available : false,
                 }))}
               />
 
               <OptionDropdown
                 value={quality}
-                onValueChange={setQuality}
+                onValueChange={handleQualityChange}
                 aria-label="Select generation quality"
                 tip={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}
                 triggerLabel={

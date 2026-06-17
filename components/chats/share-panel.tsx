@@ -25,8 +25,8 @@ export function SharePanel({ chatId, onClose }: SharePanelProps) {
   const [copied, setCopied] = useState(false)
 
   const shareUrl = useMemo(() => {
-    if (typeof window === 'undefined') return `/share/${chatId}`
-    return `${window.location.origin}/share/${chatId}`
+    if (typeof window === 'undefined') return `/chats/${chatId}`
+    return `${window.location.origin}/chats/${chatId}`
   }, [chatId])
 
   const handleCopy = async () => {

@@ -71,7 +71,9 @@ export default function PythonArtifactRunner({
                 <button
                   key={label}
                   type="button"
-                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+                  disabled
+                  title="Simulated Streamlit preview — buttons are visual placeholders only"
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground opacity-80"
                 >
                   {label}
                 </button>

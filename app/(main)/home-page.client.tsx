@@ -21,6 +21,7 @@ import { Context } from "./providers";
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { getVisibleModels, MODELS } from "@/lib/constants";
+import { useAvailableModels } from "@/lib/use-available-models";
 import type { FeaturedApp } from "@/lib/featured-apps";
 import { BuilderToggles } from "@/components/builder-toggles";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
@@ -240,6 +241,7 @@ export default function HomePageClient() {
 
   const [prompt, setPrompt] = useState("");
   const visibleModels = getVisibleModels();
+  const availableModels = useAvailableModels();
   const [model, setModel] = useState(
     visibleModels.find((m) => !m.hidden)?.value || visibleModels[0]?.value || MODELS[0].value,
   );
@@ -297,7 +299,18 @@ export default function HomePageClient() {
     [prompt],
   );
 
-  const getModelLabel = (val: string) => MODELS.find(x => x.value === val)?.label || val;
+  const getModelLabel = (val: string) =>
+    availableModels?.find((x) => x.value === val)?.label ||
+    MODELS.find((x) => x.value === val)?.label ||
+    val;
+
+  useEffect(() => {
+    if (!availableModels?.length) return;
+    const current = availableModels.find((entry) => entry.value === model);
+    if (current?.available) return;
+    const fallback = availableModels.find((entry) => entry.available);
+    if (fallback) setModel(fallback.value);
+  }, [availableModels, model]);
 
   const modes = [
     { value: "ask" as const, label: "Ask", icon: "?" },
@@ -496,9 +509,13 @@ export default function HomePageClient() {
                       triggerLabel={getModelLabel(model)}
                       triggerClassName="h-8 min-w-[180px] border-white/50 bg-white/60 px-2.5 text-slate-800 hover:bg-white/80 hover:text-slate-900"
                       contentClassName="max-h-[320px]"
-                      options={getVisibleModels().map((item) => ({
+                      options={(availableModels ?? getVisibleModels()).map((item) => ({
                         value: item.value,
-                        label: item.label,
+                        label:
+                          "available" in item && item.available === false
+                            ? `${item.label} (needs API key)`
+                            : item.label,
+                        disabled: "available" in item ? !item.available : false,
                       }))}
                     />
                   </div>

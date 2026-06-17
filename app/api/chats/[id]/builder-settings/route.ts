@@ -4,6 +4,8 @@ import { getPrisma } from "@/lib/prisma";
 
 const schema = z.object({
   shadcn: z.boolean().optional(),
+  model: z.string().min(1).optional(),
+  quality: z.enum(["low", "high"]).optional(),
 });
 
 export async function PATCH(
@@ -26,8 +28,10 @@ export async function PATCH(
     where: { id },
     data: {
       ...(parsed.data.shadcn !== undefined ? { shadcn: parsed.data.shadcn } : {}),
+      ...(parsed.data.model !== undefined ? { model: parsed.data.model } : {}),
+      ...(parsed.data.quality !== undefined ? { quality: parsed.data.quality } : {}),
     },
-    select: { id: true, shadcn: true },
+    select: { id: true, shadcn: true, model: true, quality: true },
   });
 
   return NextResponse.json(updated);
