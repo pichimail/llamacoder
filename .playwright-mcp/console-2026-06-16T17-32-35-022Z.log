@@ -1,5 +1,0 @@
-[    1700ms] [ERROR] ErrorUtils caught an error:
-
-[storage] storage bucket persistence denied (aquire-persistent-storage-denied)
-
-Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 17870, clientTime: 1781631156, extra: Object, guardList: Array(0), hash: and2jf} @ https://static.whatsapp.net/rsrc.php/v4/y6/r/9XjTbjv73Qt.js:79

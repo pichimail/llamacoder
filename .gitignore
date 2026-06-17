@@ -18,6 +18,7 @@
 /build
 
 # misc
+.playwright-mcp/
 /data/*.jsonl
 .DS_Store
 *.pem
