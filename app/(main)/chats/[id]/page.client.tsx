@@ -84,7 +84,16 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
   const [builderStatus, setBuilderStatus] = useState<BuilderStatus>(context.streamPromise ? "generating" : "ready");
-  const [activeMessage, setActiveMessage] = useState(chat.messages.filter((m) => m.role === "assistant" && extractFirstCodeBlock(m.content)).at(-1));
+  const [activeMessage, setActiveMessage] = useState(
+    chat.messages
+      .filter(
+        (m) =>
+          m.role === "assistant" &&
+          (Boolean(extractFirstCodeBlock(m.content)) ||
+            (Array.isArray(m.files) && (m.files as unknown[]).length > 0)),
+      )
+      .at(-1),
+  );
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
   const [chatPanelWidth, setChatPanelWidth] = useState(420);
 
@@ -101,6 +110,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
+
+  useEffect(() => {
+    if (searchParams.get("preview") !== "1") return;
+    setBuilderMode("preview");
+    setActiveTab("preview");
+    setMobilePanel("preview");
+    setBuilderStatus("validating");
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/public-settings", { cache: "no-store" })

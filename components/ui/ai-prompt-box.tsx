@@ -454,6 +454,7 @@ const PromptInputAction: React.FC<PromptInputActionProps> = ({
 
 export interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
+  onRepoImported?: (chatId: string) => void;
   onStop?: () => void;
   isLoading?: boolean;
   placeholder?: string;
@@ -473,6 +474,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   (props, ref) => {
     const {
       onSend = () => {},
+      onRepoImported,
       onStop,
       isLoading = false,
       placeholder = "Type your message here...",
@@ -603,14 +605,38 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       if (!url) {
         toast({
           title: "GitHub URL required",
-          description: "Paste a public GitHub file URL to import it.",
+          description: "Paste a public GitHub repository or file URL.",
           variant: "destructive",
         });
         return;
       }
 
+      const looksLikeRepo =
+        /github\.com\/[^/]+\/[^/]+(?:\.git)?\/?$/i.test(url) ||
+        /github\.com\/[^/]+\/[^/]+\/tree\//i.test(url);
+
       setIsImportingGitHub(true);
       try {
+        if (looksLikeRepo) {
+          const response = await fetch("/api/import-github-repo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+          const body = await response.json().catch(() => null);
+          if (!response.ok) {
+            throw new Error(body?.error || "Could not import GitHub repository");
+          }
+
+          toast({
+            title: "Repository imported",
+            description: `${body.fileCount ?? 0} files loaded. Opening live preview…`,
+          });
+          setShowGitHubImport(false);
+          if (body.chatId) onRepoImported?.(body.chatId);
+          return;
+        }
+
         const response = await fetch("/api/github-import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -630,13 +656,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       } catch (error) {
         toast({
           title: "Import failed",
-          description: error instanceof Error ? error.message : "Could not import the GitHub file.",
+          description: error instanceof Error ? error.message : "Could not import from GitHub.",
           variant: "destructive",
         });
       } finally {
         setIsImportingGitHub(false);
       }
-    }, [gitHubUrl, processFile]);
+    }, [gitHubUrl, onRepoImported, processFile]);
 
     const handlePaste = React.useCallback(
       (e: ClipboardEvent) => {
@@ -960,12 +986,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             <DialogTitle className="px-6 pt-6 text-white">Import from GitHub</DialogTitle>
             <div className="space-y-4 px-6 pb-6">
               <p className="text-sm text-[#A1A1AA]">
-                Paste a public GitHub file URL. Private repo import can be enabled later when auth is wired.
+                Paste any public GitHub repository URL to import the project, install dependencies from
+                package.json, and open a live sandbox preview. Single file URLs still work too.
               </p>
               <Input
                 value={gitHubUrl}
                 onChange={(e) => setGitHubUrl(e.target.value)}
-                placeholder="https://github.com/owner/repo/blob/main/path/to/file.ts"
+                placeholder="https://github.com/owner/repo"
+                aria-label="GitHub repository or file URL"
                 className="border-[#343438] bg-[#111113] text-white placeholder:text-[#71717a]"
               />
               <div className="flex justify-end gap-2">
@@ -976,7 +1004,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   onClick={() => void handleImportGitHub()}
                   disabled={isImportingGitHub}
                 >
-                  {isImportingGitHub ? "Importing..." : "Import file"}
+                  {isImportingGitHub ? "Importing..." : "Import project"}
                 </Button>
               </div>
             </div>

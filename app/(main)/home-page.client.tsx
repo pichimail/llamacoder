@@ -450,10 +450,11 @@ export default function HomePageClient() {
                   style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}
                 >
                   {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-                  <PromptInputBox
-                    value={prompt}
-                    onValueChange={setPrompt}
-                    onSend={handlePromptSend}
+                <PromptInputBox
+                  value={prompt}
+                  onValueChange={setPrompt}
+                  onSend={handlePromptSend}
+                  onRepoImported={(chatId) => router.push(`/chats/${chatId}?preview=1`)}
                     isLoading={isSubmitting}
                     disabled={isSubmitting || screenshotLoading}
                     placeholder="Describe what to build"

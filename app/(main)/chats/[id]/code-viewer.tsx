@@ -32,6 +32,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import BuilderTerminal from "@/components/builder-terminal";
+import { extractPreviewDependencies } from "@/lib/package-deps";
 import {
   FileTree,
   FileTreeActions,
@@ -340,6 +341,15 @@ export default function CodeViewer({
       return previous && baseFiles.some((f) => f.path === previous) ? previous : baseFiles[0]?.path ?? null;
     });
   }, [baseKey]);
+
+  useEffect(() => {
+    const packageFile = baseFiles.find((file) => file.path === "package.json");
+    if (!packageFile?.code) {
+      setExtraDeps({});
+      return;
+    }
+    setExtraDeps(extractPreviewDependencies(packageFile.code));
+  }, [baseKey, baseFiles]);
 
   const selectedFile = draft.find((file) => file.path === selectedPath) || draft[0] || null;
   const sideFile = sidePath ? draft.find((file) => file.path === sidePath) : null;

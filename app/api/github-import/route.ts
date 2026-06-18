@@ -1,58 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  isGithubRepoUrl,
+  parseGithubFileUrl,
+  parseGithubRepoUrl,
+} from "@/lib/github-repo-import";
 
 const schema = z.object({
   url: z.string().url(),
   accessToken: z.string().optional(),
 });
-
-type GithubFileSpec = {
-  owner: string;
-  repo: string;
-  ref: string;
-  path: string;
-  filename: string;
-  rawUrl: string;
-};
-
-function parseGithubFileUrl(input: string): GithubFileSpec | null {
-  try {
-    const parsed = new URL(input);
-    const parts = parsed.pathname.split("/").filter(Boolean);
-
-    if (parsed.hostname === "raw.githubusercontent.com") {
-      if (parts.length < 4) return null;
-      const [owner, repo, ref, ...rest] = parts;
-      const path = rest.join("/");
-      if (!path) return null;
-      return {
-        owner,
-        repo,
-        ref,
-        path,
-        filename: rest.at(-1) || "github-file",
-        rawUrl: input,
-      };
-    }
-
-    if (parsed.hostname !== "github.com") return null;
-    if (parts.length < 5) return null;
-    const [owner, repo, mode, ref, ...rest] = parts;
-    if (mode !== "blob" && mode !== "raw") return null;
-    const path = rest.join("/");
-    if (!path) return null;
-    return {
-      owner,
-      repo,
-      ref,
-      path,
-      filename: rest.at(-1) || "github-file",
-      rawUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`,
-    };
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,10 +22,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isGithubRepoUrl(parsed.data.url)) {
+      const spec = parseGithubRepoUrl(parsed.data.url);
+      return NextResponse.json(
+        {
+          type: "repository",
+          repoUrl: parsed.data.url,
+          owner: spec?.owner,
+          repo: spec?.repo,
+          redirectTo: "/api/import-github-repo",
+          message:
+            "Repository URLs should be imported through the repo importer. Retrying automatically.",
+        },
+        { status: 409 },
+      );
+    }
+
     const spec = parseGithubFileUrl(parsed.data.url);
     if (!spec) {
       return NextResponse.json(
-        { error: "Paste a GitHub file URL, not a repository homepage." },
+        {
+          error:
+            "Paste a public GitHub repository URL (https://github.com/owner/repo) or a direct file URL.",
+        },
         { status: 400 },
       );
     }
