@@ -18,7 +18,7 @@ function Header({ hideLogo = false, showSidebarTrigger = false }: HeaderProps) {
     >
       {showSidebarTrigger ? (
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="-ml-1 inline-flex rounded-lg border border-border/70 bg-background/70 text-foreground shadow-sm hover:bg-accent hover:text-foreground" />
+          <SidebarTrigger className="-ml-1 inline-flex rounded-lg border border-white/8 bg-white/5 text-[#F4F4F5]/80 shadow-sm transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
           <Separator orientation="vertical" className="mr-1 hidden h-4 md:block" />
         </div>
       ) : null}

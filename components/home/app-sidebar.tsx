@@ -73,15 +73,24 @@ export function HomeAppSidebar({
   loading?: boolean
 }) {
   return (
-    <Sidebar variant="inset" collapsible="icon" {...props}>
+    <Sidebar
+      variant="inset"
+      collapsible="icon"
+      className="bg-[#1F2023] text-[#F4F4F5]"
+      {...props}
+    >
       <SidebarRail />
-      <SidebarHeader className="gap-3 border-b border-sidebar-border/70 bg-sidebar/95 pb-3">
+      <SidebarHeader className="gap-3 border-b border-white/8 bg-[#1F2023]/95 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild className="data-[active=true]:bg-sidebar-accent">
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              className="rounded-xl border border-white/8 bg-white/5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/8 hover:text-white data-[active=true]:bg-white/8"
+            >
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-                  <GalleryVerticalEnd className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center rounded-xl bg-white/10 text-white shadow-sm">
+                  <GalleryVerticalEnd className="size-4 stroke-[1.8]" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Chinna-Coder</span>
@@ -91,22 +100,22 @@ export function HomeAppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="New Chat">
+            <SidebarMenuButton asChild tooltip="New Chat" className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px">
               <Link href="/">
-                <Plus />
+                <Plus className="stroke-[1.8]" />
                 <span>New Chat</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="bg-sidebar px-0 py-2">
+      <SidebarContent className="bg-[#1F2023] px-0 py-2">
         <NavMain items={navMain} />
         <NavRecentChats chats={chats} loading={loading} />
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border/70 bg-sidebar/95">
+      <SidebarFooter className="border-t border-white/8 bg-[#1F2023]/95">
         <div className="flex items-center justify-between px-2">
-          <ThemeToggle className="size-9" />
+          <ThemeToggle className="size-9 rounded-xl border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
           <span className="text-xs text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
             Theme
           </span>

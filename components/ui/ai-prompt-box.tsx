@@ -21,6 +21,7 @@ import {
   Globe,
   BrainCog,
   FolderCode,
+  LayoutTemplate,
   Plus,
   Github,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 
 const PROMPT_BOX_STYLES = `
@@ -468,6 +470,9 @@ export interface PromptInputBoxProps {
   accept?: string;
   maxFileSizeMb?: number;
   toolbarEnd?: React.ReactNode;
+  footer?: React.ReactNode;
+  shadcnEnabled?: boolean;
+  onShadcnChange?: (enabled: boolean) => void;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
@@ -488,6 +493,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       accept = "image/*",
       maxFileSizeMb = 10,
       toolbarEnd,
+      footer,
+      shadcnEnabled = true,
+      onShadcnChange,
     } = props;
 
     const [input, setInput] = React.useState(controlledValue ?? "");
@@ -539,6 +547,8 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       setInput(next);
       onValueChange?.(next);
     };
+
+    const closeAddMenu = () => setAddMenuOpen(false);
 
     const handleToggleChange = (value: string) => {
       if (value === "search") {
@@ -818,11 +828,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       type="button"
                       aria-label="Add options"
                       disabled={isRecording || disabled}
-                      whileHover={{ rotate: 90, scale: 1.06 }}
-                      whileTap={{ rotate: 135, scale: 0.96 }}
-                      transition={{ type: "spring", stiffness: 320, damping: 18 }}
+                      whileHover={{ rotate: 18, scale: 1.03 }}
+                      whileTap={{ rotate: 0, scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 280, damping: 22 }}
                       className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-full border border-[#353535] bg-[#2A2A2E] text-[#D1D5DB] transition-colors",
+                        "flex h-9 w-9 items-center justify-center rounded-full border border-[#353535] bg-[#2A2A2E] text-[#D1D5DB] transition-all duration-200 ease-out",
                         "hover:border-[#5b5b62] hover:bg-[#34343a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
                       )}
                     >
@@ -839,9 +849,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     Actions
                   </DropdownMenuLabel>
                   <DropdownMenuItem
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
                     onSelect={(event) => {
-                      setAddMenuOpen(false);
+                      closeAddMenu();
                       uploadInputRef.current?.click();
                     }}
                   >
@@ -849,9 +859,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     Upload file
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
                     onSelect={(event) => {
-                      setAddMenuOpen(false);
+                      closeAddMenu();
                       setShowGitHubImport(true);
                     }}
                   >
@@ -859,13 +869,35 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     Import from GitHub
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2 h-px bg-white/10" />
+                  <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-[#A1A1AA]">
+                    Builder
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="flex cursor-pointer items-center justify-between rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      onShadcnChange?.(!shadcnEnabled);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <LayoutTemplate className="h-4 w-4" />
+                      shadcn UI
+                    </span>
+                    <Switch
+                      checked={shadcnEnabled}
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      className="pointer-events-none scale-90"
+                    />
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-2 h-px bg-white/10" />
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
                       showSearch && "text-cyan-300",
                     )}
                     onSelect={(event) => {
-                      setAddMenuOpen(false);
+                      closeAddMenu();
                       handleToggleChange("search");
                     }}
                   >
@@ -874,11 +906,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
                       showThink && "text-violet-300",
                     )}
                     onSelect={(event) => {
-                      setAddMenuOpen(false);
+                      closeAddMenu();
                       handleToggleChange("think");
                     }}
                   >
@@ -887,11 +919,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
                       showCanvas && "text-orange-300",
                     )}
                     onSelect={(event) => {
-                      setAddMenuOpen(false);
+                      closeAddMenu();
                       handleCanvasToggle();
                     }}
                   >
@@ -979,6 +1011,12 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               </PromptInputAction>
             </div>
           </PromptInputActions>
+
+          {footer ? (
+            <div className="mt-3 border-t border-white/8 pt-3">
+              {footer}
+            </div>
+          ) : null}
         </PromptInput>
 
         <Dialog open={showGitHubImport} onOpenChange={setShowGitHubImport}>

@@ -318,6 +318,56 @@ export default function HomePageClient() {
     { value: "agent" as const, label: "Agent  ", icon: "◇" },
   ];
   const currentMode = modes.find(m => m.value === mode)!;
+  const composerFooter = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <OptionDropdown
+        value={mode}
+        onValueChange={(value) => setMode(value as Mode)}
+        aria-label="Select mode"
+        triggerLabel={
+          <span>
+            {currentMode.icon} {currentMode.label}
+          </span>
+        }
+        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:border-white/20 hover:bg-white/10 hover:text-white"
+        options={modes.map((item) => ({
+          value: item.value,
+          label: (
+            <span>
+              {item.icon} {item.label}
+            </span>
+          ),
+        }))}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <BuilderToggles
+          compact
+          className="text-slate-200/80"
+          showShadcn={false}
+          shadcnEnabled={shadcnEnabled}
+          onShadcnChange={setShadcnEnabled}
+          reasoningEnabled={reasoningEnabled}
+          onReasoningChange={setReasoningEnabled}
+        />
+        <OptionDropdown
+          value={model}
+          onValueChange={setModel}
+          aria-label="Select AI model"
+          triggerLabel={getModelLabel(model)}
+          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:border-white/20 hover:bg-white/10 hover:text-white"
+          contentClassName="max-h-[320px]"
+          options={(availableModels ?? getVisibleModels()).map((item) => ({
+            value: item.value,
+            label:
+              "available" in item && item.available === false
+                ? `${item.label} (needs API key)`
+                : item.label,
+            disabled: "available" in item ? !item.available : false,
+          }))}
+        />
+      </div>
+    </div>
+  );
 
   const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
     const currentIndex = promptChipIndexes[group.title] ?? -1;
@@ -473,6 +523,9 @@ export default function HomePageClient() {
                         />
                       ) : null
                     }
+                    footer={composerFooter}
+                    shadcnEnabled={shadcnEnabled}
+                    onShadcnChange={setShadcnEnabled}
                   />
 
                   <div className="mt-4">
@@ -481,56 +534,6 @@ export default function HomePageClient() {
                       activeTitles={promptChipIndexes}
                       onSelect={handlePromptChipClick}
                     />
-                  </div>
-
-                  <div className="mt-4 w-full rounded-[28px] border border-[#444444]/80 bg-[#1F2023] px-3 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)]">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <OptionDropdown
-                        value={mode}
-                        onValueChange={(value) => setMode(value as Mode)}
-                        aria-label="Select mode"
-                        triggerLabel={
-                          <span>
-                            {currentMode.icon} {currentMode.label}
-                          </span>
-                        }
-                        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
-                        options={modes.map((item) => ({
-                          value: item.value,
-                          label: (
-                            <span>
-                              {item.icon} {item.label}
-                            </span>
-                          ),
-                        }))}
-                      />
-                      <div className="flex flex-wrap items-center gap-2">
-                        <BuilderToggles
-                          compact
-                          className="text-slate-200/80"
-                          shadcnEnabled={shadcnEnabled}
-                          onShadcnChange={setShadcnEnabled}
-                          reasoningEnabled={reasoningEnabled}
-                          onReasoningChange={setReasoningEnabled}
-                        />
-                        <OptionDropdown
-                          value={model}
-                          onValueChange={setModel}
-                          aria-label="Select AI model"
-                          triggerLabel={getModelLabel(model)}
-                          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
-                          contentClassName="max-h-[320px]"
-                          options={(availableModels ?? getVisibleModels()).map((item) => ({
-                            value: item.value,
-                            label:
-                              "available" in item && item.available === false
-                                ? `${item.label} (needs API key)`
-                                : item.label,
-                            disabled: "available" in item ? !item.available : false,
-                          }))}
-                        />
-                      </div>
-                    </div>
                   </div>
 
                   {mode === "ask" ? (

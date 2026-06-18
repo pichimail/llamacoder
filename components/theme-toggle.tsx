@@ -18,7 +18,7 @@ function ThemeToggle({ className }: { className?: string }) {
         aria-pressed={false}
         title="Theme"
         className={cn(
-          "group relative inline-flex size-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent/80 hover:text-sidebar-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
+          "group relative inline-flex size-9 items-center justify-center rounded-lg border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
           className,
         )}
       >
@@ -39,12 +39,12 @@ function ThemeToggle({ className }: { className?: string }) {
       aria-pressed={isDark}
       title={`Theme: ${label}. Click to change`}
       className={cn(
-        "group relative inline-flex size-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent/80 hover:text-sidebar-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
+        "group relative inline-flex size-9 items-center justify-center rounded-lg border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
         className,
       )}
     >
       <Icon
-        className="size-[18px] transition-all group-active:scale-90"
+        className="size-[18px] stroke-[1.85] transition-all duration-200 ease-out group-active:scale-90"
         strokeWidth={2.25}
         aria-hidden="true"
       />

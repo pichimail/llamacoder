@@ -25,16 +25,16 @@ export function NavRecentChats({
       <SidebarMenu>
         {loading ? (
           <SidebarMenuItem>
-            <SidebarMenuButton disabled>
-              <MessageSquare />
+            <SidebarMenuButton disabled className="rounded-xl">
+              <MessageSquare className="stroke-[1.8]" />
               <span>Loading chats...</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         ) : chats.length === 0 ? (
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px">
               <Link href="/">
-                <MessageSquare />
+                <MessageSquare className="stroke-[1.8]" />
                 <span>Start your first chat</span>
               </Link>
             </SidebarMenuButton>
@@ -42,12 +42,12 @@ export function NavRecentChats({
         ) : (
           chats.map((chat) => (
             <SidebarMenuItem key={chat.id}>
-              <SidebarMenuButton asChild tooltip={chat.title}>
+              <SidebarMenuButton asChild tooltip={chat.title} className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px">
                 <Link href={`/chats/${chat.id}`}>
                   {chat.isPinned ? (
-                    <Pin className="size-4 shrink-0" />
+                    <Pin className="size-4 shrink-0 stroke-[1.8]" />
                   ) : (
-                    <MessageSquare className="size-4 shrink-0" />
+                    <MessageSquare className="size-4 shrink-0 stroke-[1.8]" />
                   )}
                   <span>{chat.title}</span>
                 </Link>
@@ -56,9 +56,9 @@ export function NavRecentChats({
           ))
         )}
         <SidebarMenuItem>
-          <SidebarMenuButton asChild className="text-sidebar-foreground/70">
+          <SidebarMenuButton asChild className="rounded-xl text-sidebar-foreground/70 transition-all duration-200 ease-out hover:-translate-y-px hover:text-white">
             <Link href="/chats">
-              <MoreHorizontal className="text-sidebar-foreground/70" />
+              <MoreHorizontal className="stroke-[1.8] text-sidebar-foreground/70" />
               <span>View all chats</span>
             </Link>
           </SidebarMenuButton>
