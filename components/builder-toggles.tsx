@@ -1,6 +1,7 @@
 "use client";
 
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { Brain, LayoutTemplate } from "lucide-react";
 
 type BuilderTogglesProps = {
@@ -9,6 +10,7 @@ type BuilderTogglesProps = {
   reasoningEnabled?: boolean;
   onReasoningChange?: (value: boolean) => void;
   compact?: boolean;
+  className?: string;
 };
 
 export function BuilderToggles({
@@ -17,9 +19,10 @@ export function BuilderToggles({
   reasoningEnabled = false,
   onReasoningChange,
   compact = false,
+  className,
 }: BuilderTogglesProps) {
   return (
-    <div className={`flex items-center gap-3 ${compact ? "" : "flex-wrap"}`}>
+    <div className={cn("flex items-center gap-3", compact ? "" : "flex-wrap", className)}>
       <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
         <LayoutTemplate className="size-3.5" aria-hidden="true" />
         <span className={compact ? "sr-only sm:not-sr-only" : ""}>shadcn</span>

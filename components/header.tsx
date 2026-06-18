@@ -13,12 +13,12 @@ type HeaderProps = {
 
 function Header({ hideLogo = false, showSidebarTrigger = false }: HeaderProps) {
   return (
-    <header
+      <header
       className={`relative mx-auto flex w-full shrink-0 items-center px-4 py-6 sm:px-6 ${hideLogo && !showSidebarTrigger ? "justify-end" : "justify-between"}`}
     >
       {showSidebarTrigger ? (
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
+          <SidebarTrigger className="-ml-1 inline-flex rounded-lg border border-border/70 bg-background/70 text-foreground shadow-sm hover:bg-accent hover:text-foreground" />
           <Separator orientation="vertical" className="mr-1 hidden h-4 md:block" />
         </div>
       ) : null}

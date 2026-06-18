@@ -4,8 +4,16 @@ import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowUp,
-  Paperclip,
+  FileText,
   Square,
   X,
   StopCircle,
@@ -13,10 +21,14 @@ import {
   Globe,
   BrainCog,
   FolderCode,
+  Plus,
+  Github,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 const PROMPT_BOX_STYLES = `
   .ai-prompt-box textarea::-webkit-scrollbar {
@@ -440,18 +452,6 @@ const PromptInputAction: React.FC<PromptInputActionProps> = ({
   );
 };
 
-const CustomDivider: React.FC = () => (
-  <div className="relative mx-1 h-6 w-[1.5px]">
-    <div
-      className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-[#9b87f5]/70 to-transparent"
-      style={{
-        clipPath:
-          "polygon(0% 0%, 100% 0%, 100% 40%, 140% 50%, 100% 60%, 100% 100%, 0% 100%, 0% 60%, -40% 50%, 0% 40%)",
-      }}
-    />
-  </div>
-);
-
 export interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
   onStop?: () => void;
@@ -493,6 +493,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const [filePreviews, setFilePreviews] = React.useState<Record<string, string>>({});
     const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
     const [isRecording, setIsRecording] = React.useState(false);
+    const [showGitHubImport, setShowGitHubImport] = React.useState(false);
+    const [gitHubUrl, setGitHubUrl] = React.useState("");
+    const [isImportingGitHub, setIsImportingGitHub] = React.useState(false);
+    const [addMenuOpen, setAddMenuOpen] = React.useState(false);
     const [showSearch, setShowSearch] = React.useState(false);
     const [showThink, setShowThink] = React.useState(thinkEnabled ?? false);
     const [showCanvas, setShowCanvas] = React.useState(false);
@@ -506,6 +510,18 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     React.useEffect(() => {
       if (thinkEnabled !== undefined) setShowThink(thinkEnabled);
     }, [thinkEnabled]);
+
+    React.useEffect(() => {
+      if (!showGitHubImport) {
+        setGitHubUrl("");
+      }
+    }, [showGitHubImport]);
+
+    React.useEffect(() => {
+      if (showGitHubImport) {
+        setAddMenuOpen(false);
+      }
+    }, [showGitHubImport]);
 
     React.useEffect(() => {
       if (typeof document === "undefined") return;
@@ -582,6 +598,46 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
 
     const openImageModal = (imageUrl: string) => setSelectedImage(imageUrl);
 
+    const handleImportGitHub = React.useCallback(async () => {
+      const url = gitHubUrl.trim();
+      if (!url) {
+        toast({
+          title: "GitHub URL required",
+          description: "Paste a public GitHub file URL to import it.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsImportingGitHub(true);
+      try {
+        const response = await fetch("/api/github-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error || "Could not import from GitHub");
+        }
+
+        const filename = response.headers.get("x-filename") || "github-import";
+        const contentType = response.headers.get("content-type") || "text/plain";
+        const blob = await response.blob();
+        const file = new File([blob], filename, { type: contentType });
+        processFile(file);
+        setShowGitHubImport(false);
+      } catch (error) {
+        toast({
+          title: "Import failed",
+          description: error instanceof Error ? error.message : "Could not import the GitHub file.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsImportingGitHub(false);
+      }
+    }, [gitHubUrl, processFile]);
+
     const handlePaste = React.useCallback(
       (e: ClipboardEvent) => {
         const items = e.clipboardData?.items;
@@ -649,9 +705,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               {files.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="group relative">
                   {file.type.startsWith("image/") && filePreviews[file.name] ? (
-                    <div
+                    <button
+                      type="button"
                       className="h-16 w-16 cursor-pointer overflow-hidden rounded-xl transition-all duration-300"
                       onClick={() => openImageModal(filePreviews[file.name])}
+                      aria-label={`Preview ${file.name}`}
                     >
                       <img
                         src={filePreviews[file.name]}
@@ -665,13 +723,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                           handleRemoveFile();
                         }}
                         className="absolute right-1 top-1 rounded-full bg-black/70 p-0.5 opacity-100 transition-opacity"
+                        aria-label={`Remove ${file.name}`}
                       >
-                        <X className="h-3 w-3 text-white" />
+                        <X className="h-3 w-3 text-white" aria-hidden="true" />
                       </button>
-                    </div>
+                    </button>
                   ) : (
                     <div className="flex h-16 min-w-[120px] items-center gap-2 rounded-xl border border-[#444444] bg-[#2E3033] px-3">
-                      <Paperclip className="h-4 w-4 text-[#9CA3AF]" />
+                      <FileText className="h-4 w-4 text-[#9CA3AF]" />
                       <span className="max-w-[96px] truncate text-xs text-gray-200">
                         {file.name}
                       </span>
@@ -679,8 +738,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                         type="button"
                         onClick={handleRemoveFile}
                         className="rounded-full bg-black/70 p-0.5"
+                        aria-label={`Remove ${file.name}`}
                       >
-                        <X className="h-3 w-3 text-white" />
+                        <X className="h-3 w-3 text-white" aria-hidden="true" />
                       </button>
                     </div>
                   )}
@@ -705,6 +765,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       ? "Create on canvas..."
                       : placeholder
               }
+              aria-label="Message"
               className="text-base"
             />
           </div>
@@ -724,155 +785,109 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 isRecording ? "invisible h-0 opacity-0" : "visible opacity-100",
               )}
             >
-              <PromptInputAction tooltip="Attach file">
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB] disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={isRecording || disabled}
+              <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+                <PromptInputAction tooltip="Add files, GitHub, or modes">
+                  <DropdownMenuTrigger asChild>
+                    <motion.button
+                      type="button"
+                      aria-label="Add options"
+                      disabled={isRecording || disabled}
+                      whileHover={{ rotate: 90, scale: 1.06 }}
+                      whileTap={{ rotate: 135, scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 320, damping: 18 }}
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full border border-[#353535] bg-[#2A2A2E] text-[#D1D5DB] transition-colors",
+                        "hover:border-[#5b5b62] hover:bg-[#34343a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
+                      )}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden="true" />
+                    </motion.button>
+                  </DropdownMenuTrigger>
+                </PromptInputAction>
+                <DropdownMenuContent
+                  align="start"
+                  sideOffset={10}
+                  className="z-[999] w-64 rounded-2xl border border-[#36363a] bg-[#1F2023] p-2 text-[#F4F4F5] shadow-2xl"
                 >
-                  <Paperclip className="h-5 w-5 transition-colors" />
-                  <input
-                    ref={uploadInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        processFile(e.target.files[0]);
-                      }
-                      if (e.target) e.target.value = "";
+                  <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-[#A1A1AA]">
+                    Actions
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5"
+                    onSelect={(event) => {
+                      setAddMenuOpen(false);
+                      uploadInputRef.current?.click();
                     }}
-                    accept={accept}
-                    disabled={disabled}
-                  />
-                </button>
-              </PromptInputAction>
-
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => handleToggleChange("search")}
-                  className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
-                    showSearch
-                      ? "border-[#1EAEDB] bg-[#1EAEDB]/15 text-[#1EAEDB]"
-                      : "border-transparent bg-transparent text-[#9CA3AF] hover:text-[#D1D5DB]",
-                  )}
-                >
-                  <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                    <motion.div
-                      animate={{ rotate: showSearch ? 360 : 0, scale: showSearch ? 1.1 : 1 }}
-                      whileHover={{
-                        rotate: showSearch ? 360 : 15,
-                        scale: 1.1,
-                        transition: { type: "spring", stiffness: 300, damping: 10 },
-                      }}
-                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                    >
-                      <Globe
-                        className={cn("h-4 w-4", showSearch ? "text-[#1EAEDB]" : "text-inherit")}
-                      />
-                    </motion.div>
-                  </div>
-                  <AnimatePresence>
-                    {showSearch && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex-shrink-0 overflow-hidden whitespace-nowrap text-xs text-[#1EAEDB]"
-                      >
-                        Search
-                      </motion.span>
+                  >
+                    <FileText className="h-4 w-4" />
+                    Upload file
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5"
+                    onSelect={(event) => {
+                      setAddMenuOpen(false);
+                      setShowGitHubImport(true);
+                    }}
+                  >
+                    <Github className="h-4 w-4" />
+                    Import from GitHub
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-2 h-px bg-white/10" />
+                  <DropdownMenuItem
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      showSearch && "text-cyan-300",
                     )}
-                  </AnimatePresence>
-                </button>
-
-                <CustomDivider />
-
-                <button
-                  type="button"
-                  onClick={() => handleToggleChange("think")}
-                  className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
-                    showThink
-                      ? "border-[#8B5CF6] bg-[#8B5CF6]/15 text-[#8B5CF6]"
-                      : "border-transparent bg-transparent text-[#9CA3AF] hover:text-[#D1D5DB]",
-                  )}
-                >
-                  <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                    <motion.div
-                      animate={{ rotate: showThink ? 360 : 0, scale: showThink ? 1.1 : 1 }}
-                      whileHover={{
-                        rotate: showThink ? 360 : 15,
-                        scale: 1.1,
-                        transition: { type: "spring", stiffness: 300, damping: 10 },
-                      }}
-                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                    >
-                      <BrainCog
-                        className={cn("h-4 w-4", showThink ? "text-[#8B5CF6]" : "text-inherit")}
-                      />
-                    </motion.div>
-                  </div>
-                  <AnimatePresence>
-                    {showThink && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex-shrink-0 overflow-hidden whitespace-nowrap text-xs text-[#8B5CF6]"
-                      >
-                        Think
-                      </motion.span>
+                    onSelect={(event) => {
+                      setAddMenuOpen(false);
+                      handleToggleChange("search");
+                    }}
+                  >
+                    <Globe className="h-4 w-4" />
+                    Web search
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      showThink && "text-violet-300",
                     )}
-                  </AnimatePresence>
-                </button>
-
-                <CustomDivider />
-
-                <button
-                  type="button"
-                  onClick={handleCanvasToggle}
-                  className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
-                    showCanvas
-                      ? "border-[#F97316] bg-[#F97316]/15 text-[#F97316]"
-                      : "border-transparent bg-transparent text-[#9CA3AF] hover:text-[#D1D5DB]",
-                  )}
-                >
-                  <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                    <motion.div
-                      animate={{ rotate: showCanvas ? 360 : 0, scale: showCanvas ? 1.1 : 1 }}
-                      whileHover={{
-                        rotate: showCanvas ? 360 : 15,
-                        scale: 1.1,
-                        transition: { type: "spring", stiffness: 300, damping: 10 },
-                      }}
-                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                    >
-                      <FolderCode
-                        className={cn("h-4 w-4", showCanvas ? "text-[#F97316]" : "text-inherit")}
-                      />
-                    </motion.div>
-                  </div>
-                  <AnimatePresence>
-                    {showCanvas && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex-shrink-0 overflow-hidden whitespace-nowrap text-xs text-[#F97316]"
-                      >
-                        Canvas
-                      </motion.span>
+                    onSelect={(event) => {
+                      setAddMenuOpen(false);
+                      handleToggleChange("think");
+                    }}
+                  >
+                    <BrainCog className="h-4 w-4" />
+                    Deep thinking
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition hover:bg-white/5 focus:bg-white/5",
+                      showCanvas && "text-orange-300",
                     )}
-                  </AnimatePresence>
-                </button>
-              </div>
+                    onSelect={(event) => {
+                      setAddMenuOpen(false);
+                      handleCanvasToggle();
+                    }}
+                  >
+                    <FolderCode className="h-4 w-4" />
+                    Canvas
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                className="hidden"
+                aria-label="Attach file"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    processFile(e.target.files[0]);
+                  }
+                  if (e.target) e.target.value = "";
+                }}
+                accept={accept}
+                disabled={disabled}
+              />
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -891,43 +906,82 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 }
               >
                 <Button
-                variant="default"
-                size="icon"
-                className={cn(
-                  "h-8 w-8 rounded-full transition-all duration-200",
-                  isRecording
-                    ? "bg-transparent text-red-500 hover:bg-gray-600/30 hover:text-red-400"
-                    : hasContent
-                      ? "bg-white text-[#1F2023] hover:bg-white/80"
-                      : "bg-transparent text-[#9CA3AF] hover:bg-gray-600/30 hover:text-[#D1D5DB]",
-                )}
-                onClick={() => {
-                  if (isLoading && onStop) {
-                    onStop();
-                    return;
+                  variant="default"
+                  size="icon"
+                  aria-label={
+                    isLoading
+                      ? "Stop generation"
+                      : isRecording
+                        ? "Stop recording"
+                        : hasContent
+                          ? "Send message"
+                          : showVoice
+                            ? "Start voice recording"
+                            : "Send message"
                   }
-                  if (isRecording) setIsRecording(false);
-                  else if (hasContent) handleSubmit();
-                  else if (showVoice) setIsRecording(true);
-                }}
-                disabled={disabled && !hasContent}
-              >
-                {isLoading ? (
-                  <Square className="h-4 w-4 animate-pulse fill-[#1F2023]" />
-                ) : isRecording ? (
-                  <StopCircle className="h-5 w-5 text-red-500" />
-                ) : hasContent ? (
-                  <ArrowUp className="h-4 w-4 text-[#1F2023]" />
-                ) : showVoice ? (
-                  <Mic className="h-5 w-5 text-[#1F2023] transition-colors" />
-                ) : (
-                  <ArrowUp className="h-4 w-4 text-[#9CA3AF]" />
-                )}
-              </Button>
+                  className={cn(
+                    "h-8 w-8 rounded-full transition-all duration-200",
+                    isRecording
+                      ? "bg-transparent text-red-500 hover:bg-gray-600/30 hover:text-red-400"
+                      : hasContent
+                        ? "bg-white text-[#1F2023] hover:bg-white/80"
+                        : "bg-transparent text-[#9CA3AF] hover:bg-gray-600/30 hover:text-[#D1D5DB]",
+                  )}
+                  onClick={() => {
+                    if (isLoading && onStop) {
+                      onStop();
+                      return;
+                    }
+                    if (isRecording) setIsRecording(false);
+                    else if (hasContent) handleSubmit();
+                    else if (showVoice) setIsRecording(true);
+                  }}
+                  disabled={disabled && !hasContent}
+                >
+                  {isLoading ? (
+                    <Square className="h-4 w-4 animate-pulse fill-[#1F2023]" />
+                  ) : isRecording ? (
+                    <StopCircle className="h-5 w-5 text-red-500" />
+                  ) : hasContent ? (
+                    <ArrowUp className="h-4 w-4 text-[#1F2023]" />
+                  ) : showVoice ? (
+                    <Mic className="h-5 w-5 text-[#1F2023] transition-colors" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4 text-[#9CA3AF]" />
+                  )}
+                </Button>
               </PromptInputAction>
             </div>
           </PromptInputActions>
         </PromptInput>
+
+        <Dialog open={showGitHubImport} onOpenChange={setShowGitHubImport}>
+          <DialogContent className="max-w-[560px] border-[#343438] bg-[#1F2023]">
+            <DialogTitle className="px-6 pt-6 text-white">Import from GitHub</DialogTitle>
+            <div className="space-y-4 px-6 pb-6">
+              <p className="text-sm text-[#A1A1AA]">
+                Paste a public GitHub file URL. Private repo import can be enabled later when auth is wired.
+              </p>
+              <Input
+                value={gitHubUrl}
+                onChange={(e) => setGitHubUrl(e.target.value)}
+                placeholder="https://github.com/owner/repo/blob/main/path/to/file.ts"
+                className="border-[#343438] bg-[#111113] text-white placeholder:text-[#71717a]"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowGitHubImport(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleImportGitHub()}
+                  disabled={isImportingGitHub}
+                >
+                  {isImportingGitHub ? "Importing..." : "Import file"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <ImageViewDialog imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
       </>

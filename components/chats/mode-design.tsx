@@ -357,8 +357,10 @@ export function ModeDesign({
                 {elements.length ? elements.slice(0, 64).map((element) => (
                   <button
                     key={element.id}
+                    type="button"
                     data-layer-id={element.id}
                     onClick={() => selectElement(element)}
+                    aria-label={`${element.tag}: ${element.text || element.className || element.filePath}`}
                     className={`block w-full rounded px-2 py-1.5 text-left transition hover:bg-accent/40 ${selectedElement?.id === element.id ? 'bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35)]' : ''}`}
                   >
                     <p className="truncate font-mono text-[11px] text-foreground">{element.tag}</p>
@@ -379,7 +381,7 @@ export function ModeDesign({
                     <Button variant="ghost" size="sm" className="h-7 w-7 bg-transparent p-0 text-red-500" onClick={removeSelectedElement} aria-label="Remove selected element"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
-                <Input value={selectedElement.tag} readOnly className="h-8 bg-transparent font-mono text-xs" />
+                <Input value={selectedElement.tag} readOnly className="h-8 bg-transparent font-mono text-xs" aria-label="Selected element tag" />
                 <Label className="text-xs">Tailwind classes</Label>
                 <Textarea value={selectedElement.className} onChange={(event) => updateSelectedElementClass(event.target.value)} className="min-h-20 bg-transparent font-mono text-xs" aria-label="Edit selected element class utilities" />
                 <Label className="text-xs">Layout presets</Label>
@@ -425,7 +427,7 @@ export function ModeDesign({
             {selectedToken && (
               <div className="space-y-2 border-t border-border/70 pt-3">
                 <Label className="text-xs">Selected token</Label>
-                <Input value={selectedToken.name} readOnly className="h-8 bg-transparent font-mono text-xs" />
+                <Input value={selectedToken.name} readOnly className="h-8 bg-transparent font-mono text-xs" aria-label="Selected design token name" />
                 <Label className="text-xs">Value</Label>
                 <Input value={selectedToken.value} onChange={(event) => updateToken(selectedToken, event.target.value)} className="h-8 bg-transparent font-mono text-xs" aria-label="Edit design token value" />
               </div>
@@ -480,7 +482,7 @@ export function ModeDesign({
             <button key={chip} type="button" onClick={() => setInstructions((value) => `${value} ${chip}`.trim())} className="rounded-full border border-border/70 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">{chip}</button>
           ))}
         </div>
-        <Textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') applyInstructions() }} placeholder="Add instructions for this element… (⌘↵ to apply)" className="mb-2 min-h-20 bg-transparent text-xs" />
+        <Textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') applyInstructions() }} placeholder="Add instructions for this element… (⌘↵ to apply)" aria-label="Design instructions for selected element" className="mb-2 min-h-20 bg-transparent text-xs" />
         <div className="grid grid-cols-3 gap-2">
           <Button type="button" variant="outline" size="sm" onClick={resetChanges} className="bg-transparent text-xs"><RefreshCw className="mr-1 h-3.5 w-3.5" />Reset</Button>
           <Button type="button" variant="outline" size="sm" onClick={previewChanges} className="bg-transparent text-xs"><Eye className="mr-1 h-3.5 w-3.5" />Preview</Button>

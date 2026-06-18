@@ -125,5 +125,5 @@ export function featuredAppPath(slug: string) {
 }
 
 export function featuredAppBuilderHref(prompt: string) {
-  return `/?prompt=${encodeURIComponent(prompt)}`;
+  return `/chats/new?prompt=${encodeURIComponent(prompt)}`;
 }

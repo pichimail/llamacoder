@@ -91,7 +91,7 @@ export function ShareDialog({
                     className="inline-flex size-8 items-center justify-center rounded-md text-foreground transition hover:bg-accent"
                     aria-label="Open preview in new tab"
                   >
-                    <ExternalLink className="size-4" />
+                    <ExternalLink className="size-4" aria-hidden="true" />
                   </a>
                 ) : null}
               </SnippetAddon>

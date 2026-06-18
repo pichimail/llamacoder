@@ -1,8 +1,5 @@
 "use client";
 
-import React from "react";
-import { Plus } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 
 type TextColorWord = {
@@ -65,11 +62,6 @@ export function TextColor({ className, words = DEFAULT_WORDS }: TextColorProps) 
           id="hero-headline"
           className="relative flex select-none flex-col px-3 py-2 text-center text-5xl font-extrabold leading-none tracking-tighter sm:text-7xl md:flex-col lg:flex-row lg:justify-center"
         >
-          <Plus className="absolute -left-2 -top-3 h-6 w-6 text-indigo-500 sm:-left-4 sm:-top-4 sm:h-8 sm:w-8" />
-          <Plus className="absolute -bottom-3 -left-2 h-6 w-6 text-indigo-500 sm:-bottom-4 sm:-left-4 sm:h-8 sm:w-8" />
-          <Plus className="absolute -right-2 -top-3 h-6 w-6 text-indigo-500 sm:-right-4 sm:-top-4 sm:h-8 sm:w-8" />
-          <Plus className="absolute -bottom-3 -right-2 h-6 w-6 text-indigo-500 sm:-bottom-4 sm:-right-4 sm:h-8 sm:w-8" />
-
           {words.map((word) => (
             <AnimatedWord key={word.text} {...word} />
           ))}

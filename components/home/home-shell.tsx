@@ -11,7 +11,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
   const { chats, user, authEnabled, isAuthenticated, loading } = useHomeSidebarData()
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <HomeAppSidebar
         chats={chats}
         user={user}

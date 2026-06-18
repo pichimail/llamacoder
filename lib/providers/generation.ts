@@ -6,6 +6,8 @@ import {
   getModelConfig,
   resolveNativeModel,
   type ModelConfig,
+  type ModelProvider,
+  WORKING_FALLBACK_MODEL,
 } from "@/lib/constants";
 
 type ChatRole = "system" | "user" | "assistant";
@@ -64,7 +66,22 @@ function normalizeMessages(messages: GenerationMessage[]) {
   }));
 }
 
-export async function createChatTextCompletion({
+function isAuthError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  return /invalid_api_key|401/i.test(message);
+}
+
+function getAlternateFallbackModel(provider: ModelProvider) {
+  if (provider === "openrouter") return getModelConfig(WORKING_FALLBACK_MODEL);
+  return getModelConfig("openrouter/auto");
+}
+
+async function createChatTextCompletionPrimary({
   model,
   messages,
   temperature = 0.3,
@@ -113,7 +130,7 @@ export async function createChatTextCompletion({
   };
 }
 
-export async function createChatStream({
+async function createChatStreamPrimary({
   model,
   messages,
   temperature = 0.4,
@@ -160,6 +177,69 @@ export async function createChatStream({
     max_tokens: maxTokens,
   });
   return { stream: response.toReadableStream(), model: resolveNativeModel(model), provider: "together" };
+}
+
+export async function createChatTextCompletion({
+  model,
+  messages,
+  temperature = 0.3,
+  maxTokens = 1000,
+}: {
+  model: string;
+  messages: GenerationMessage[];
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<TextGenerationResult> {
+  try {
+    return await createChatTextCompletionPrimary({ model, messages, temperature, maxTokens });
+  } catch (error) {
+    const config = getModelConfig(model);
+    if (!isAuthError(error)) throw error;
+    const fallback = getAlternateFallbackModel(config.provider);
+    if (!providerConfigured(fallback) || fallback.value === model) throw error;
+    return createChatTextCompletionPrimary({
+      model: fallback.value,
+      messages,
+      temperature,
+      maxTokens,
+    });
+  }
+}
+
+export async function createChatStream({
+  model,
+  messages,
+  temperature = 0.4,
+  maxTokens = 9000,
+  reasoningEnabled = false,
+}: {
+  model: string;
+  messages: GenerationMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  reasoningEnabled?: boolean;
+}): Promise<{ stream: ReadableStream; model: string; provider: string }> {
+  try {
+    return await createChatStreamPrimary({
+      model,
+      messages,
+      temperature,
+      maxTokens,
+      reasoningEnabled,
+    });
+  } catch (error) {
+    const config = getModelConfig(model);
+    if (!isAuthError(error)) throw error;
+    const fallback = getAlternateFallbackModel(config.provider);
+    if (!providerConfigured(fallback) || fallback.value === model) throw error;
+    return createChatStreamPrimary({
+      model: fallback.value,
+      messages,
+      temperature,
+      maxTokens,
+      reasoningEnabled,
+    });
+  }
 }
 
 export async function createChatStreamWithFallback(args: {

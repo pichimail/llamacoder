@@ -287,24 +287,29 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     const now = Date.now();
     const same = normalized === lastAutoFixErrorRef.current;
     if (same && now - lastAutoFixAtRef.current < 4500) return;
+    if (same && autoFixAttemptRef.current > 0) {
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      return;
+    }
     if (!same) autoFixAttemptRef.current = 0;
     const nextAttempt = autoFixAttemptRef.current + 1;
-    if (nextAttempt > 4) {
+    if (nextAttempt > 1) {
       autoFixAttemptRef.current = nextAttempt;
-      setAutoFixAttempt(4);
+      setAutoFixAttempt(1);
       setAutoFixStatus("idle");
       setBuilderStatus("failed");
       autoFixPendingRef.current = false;
       return;
     }
-    const fallback = nextAttempt === 4;
+    const fallback = false;
     autoFixAttemptRef.current = nextAttempt;
     autoFixPendingRef.current = true;
     lastAutoFixErrorRef.current = normalized;
     lastAutoFixAtRef.current = now;
     setAutoFixAttempt(nextAttempt);
-    setAutoFixStatus(fallback ? "fallback" : "fixing");
-    setBuilderStatus(fallback ? "rebuilding" : "fixing");
+    setAutoFixStatus("fixing");
+    setBuilderStatus("fixing");
     startTransition(async () => {
       try { await requestFix({ error, auto: true, attempt: nextAttempt, fallback }); }
       catch {
@@ -670,7 +675,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
                 <SidebarTrigger className="inline-flex size-8 md:hidden" />
               </Tip>
               <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
-                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button>
+                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
               </Tip>
               <div className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
                 <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
@@ -735,7 +740,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
         />
 
         <Drawer open={mobileOptionsOpen} onOpenChange={setMobileOptionsOpen} shouldScaleBackground={false} snapPoints={[0.3, 0.5, 0.7, 1]}>
-          <DrawerContent showOverlay={false} className="md:hidden h-[70dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
+          <DrawerContent showOverlay className="md:hidden h-[70dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
             <DrawerHeader className="px-0 text-left">
               <DrawerTitle className="text-sm">Builder options</DrawerTitle>
               <DrawerDescription>No mobile dropdowns. Use this sheet for secondary controls.</DrawerDescription>
@@ -779,10 +784,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       </SidebarProvider>
 
         {showUnsavedOverlay && (
-          <div className="fixed inset-0 z-50 hidden items-center justify-center bg-background/70 p-4 backdrop-blur-sm md:flex" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title">
+          <div className="fixed inset-0 z-50 hidden items-center justify-center bg-background/70 p-4 backdrop-blur-sm md:flex" role="alertdialog" aria-modal="true" aria-labelledby="unsaved-design-title" aria-describedby="unsaved-design-description">
             <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-2xl shadow-black/30">
               <h2 id="unsaved-design-title" className="text-sm font-semibold text-foreground">Save design changes?</h2>
-              <p className="mt-2 text-sm leading-5 text-muted-foreground">You have live visual edits that are not committed as a version yet.</p>
+              <p id="unsaved-design-description" className="mt-2 text-sm leading-5 text-muted-foreground">You have live visual edits that are not committed as a version yet.</p>
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" onClick={() => { setShowUnsavedOverlay(false); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Cancel</button>
                 <button type="button" onClick={() => { setDesignDirty(false); setShowUnsavedOverlay(false); if (pendingMode) applyMode(pendingMode); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Discard</button>
@@ -792,7 +797,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           </div>
         )}
         <Drawer open={showUnsavedOverlay} onOpenChange={setShowUnsavedOverlay} shouldScaleBackground={false} snapPoints={[0.3, 0.5]}>
-          <DrawerContent showOverlay={false} className="md:hidden h-[42dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
+          <DrawerContent showOverlay className="md:hidden h-[42dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
             <DrawerHeader className="px-0 text-left"><DrawerTitle className="text-sm">Save design changes?</DrawerTitle><DrawerDescription>You have live visual edits that are not committed yet.</DrawerDescription></DrawerHeader>
             <div className="grid gap-2">
               <button type="button" onClick={() => setDesignSaveRequest((value) => value + 1)} className="rounded-md border border-border px-3 py-2 text-sm text-foreground">Save Changes</button>
@@ -807,12 +812,12 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}>{icon}<span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true">{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
 }
 
 function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
   const active = current === panel;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"}`} aria-label={label}>{icon}<span className="sr-only">{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"}`} aria-label={label}><span aria-hidden="true">{icon}</span><span className="sr-only">{label}</span></button>;
 }
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {

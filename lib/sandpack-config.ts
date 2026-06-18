@@ -151,6 +151,7 @@ export function getSandpackConfig(
   if (!sandpackFiles["/app/globals.css"]) {
     sandpackFiles["/app/globals.css"] = SANDBOX_GLOBALS_CSS;
   }
+  sandpackFiles["/lib/twind.ts"] = twindSetupFile;
 
   sandpackFiles["/tsconfig.json"] = `{
     "include": [
@@ -217,7 +218,10 @@ export function getSandpackConfig(
       sandpackFiles["App.tsx"] = `import React from 'react';
 import './app/globals.css';
 ${cssImports}
+import { ensureTwind } from '@/lib/twind';
 ${inspectorImport}import MainComponent from '${toImportPath(mainFile.path)}';
+
+ensureTwind();
 
 export default function App() {
   return (
@@ -296,6 +300,111 @@ export { AspectRatio }
 `;
 
 const sonnerComponent = `export { Toaster, toast } from "sonner"
+`;
+
+const twindSetupFile = `import { install } from "@twind/core";
+import presetAutoprefix from "@twind/preset-autoprefix";
+import presetTailwind from "@twind/preset-tailwind";
+
+let installed = false;
+
+export function ensureTwind() {
+  if (installed || typeof window === "undefined") return;
+
+  install({
+    hash: false,
+    darkMode: "class",
+    presets: [
+      presetAutoprefix(),
+      presetTailwind({ disablePreflight: true }),
+    ],
+    theme: {
+      extend: {
+        borderRadius: {
+          lg: "var(--radius)",
+          md: "calc(var(--radius) - 2px)",
+          sm: "calc(var(--radius) - 4px)",
+        },
+        colors: {
+          background: "hsl(var(--background))",
+          foreground: "hsl(var(--foreground))",
+          card: {
+            DEFAULT: "hsl(var(--card))",
+            foreground: "hsl(var(--card-foreground))",
+          },
+          popover: {
+            DEFAULT: "hsl(var(--popover))",
+            foreground: "hsl(var(--popover-foreground))",
+          },
+          primary: {
+            DEFAULT: "hsl(var(--primary))",
+            foreground: "hsl(var(--primary-foreground))",
+          },
+          secondary: {
+            DEFAULT: "hsl(var(--secondary))",
+            foreground: "hsl(var(--secondary-foreground))",
+          },
+          muted: {
+            DEFAULT: "hsl(var(--muted))",
+            foreground: "hsl(var(--muted-foreground))",
+          },
+          accent: {
+            DEFAULT: "hsl(var(--accent))",
+            foreground: "hsl(var(--accent-foreground))",
+          },
+          destructive: {
+            DEFAULT: "hsl(var(--destructive))",
+            foreground: "hsl(var(--destructive-foreground))",
+          },
+          border: "hsl(var(--border))",
+          input: "hsl(var(--input))",
+          ring: "hsl(var(--ring))",
+          chart: {
+            "1": "hsl(var(--chart-1))",
+            "2": "hsl(var(--chart-2))",
+            "3": "hsl(var(--chart-3))",
+            "4": "hsl(var(--chart-4))",
+            "5": "hsl(var(--chart-5))",
+          },
+          sidebar: {
+            DEFAULT: "hsl(var(--sidebar-background))",
+            foreground: "hsl(var(--sidebar-foreground))",
+            primary: "hsl(var(--sidebar-primary))",
+            "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+            accent: "hsl(var(--sidebar-accent))",
+            "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+            border: "hsl(var(--sidebar-border))",
+            ring: "hsl(var(--sidebar-ring))",
+          },
+        },
+        fontFamily: {
+          sans: [
+            "Aeonik",
+            "ui-sans-serif",
+            "system-ui",
+            "-apple-system",
+            "BlinkMacSystemFont",
+            '"Segoe UI"',
+            "sans-serif",
+          ],
+          mono: [
+            "Aeonik Mono",
+            "ui-monospace",
+            "SFMono-Regular",
+            "Menlo",
+            "Monaco",
+            "Consolas",
+            '"Liberation Mono"',
+            '"Courier New"',
+            "monospace",
+          ],
+        },
+      },
+    },
+  });
+
+  installed = true;
+}
 `;
 
 const shadcnFiles = {
@@ -415,6 +524,11 @@ const shadcnFiles = {
 };
 
 const dependencies = {
+  "@twind/core": "latest",
+  "@twind/preset-autoprefix": "latest",
+  "@twind/preset-tailwind": "latest",
+  animejs: "latest",
+  gsap: "^3.15.0",
   "lucide-react": "latest",
   recharts: "2.9.0",
   "react-router-dom": "latest",
@@ -458,6 +572,7 @@ const dependencies = {
   "react-resizable-panels": "latest",
   sonner: "latest",
   "tailwind-merge": "^2.4.0",
+  three: "^0.167.1",
   vaul: "^0.9.1",
   zod: "^3.24.1",
   zustand: "latest",

@@ -28,13 +28,13 @@ Convert prompts, screenshots, or uploaded files into clean, responsive, producti
 - Do not put \`package.json\`, \`tsconfig.json\`, \`tailwind.config.*\`, \`postcss.config.*\`, or \`next.config.*\` in the generated artifact unless the user explicitly asks for project setup files.
 - Do not import server-only modules in the render path: \`next/headers\`, \`fs\`, \`path\`, \`crypto\`, Prisma client, Neon client, Auth adapters, or database drivers.
 - If backend/auth/database behavior is needed, create preview-safe adapters using React state, localStorage, typed mock services, and clear function boundaries for the visible app, plus separate real backend-shaped files that are not imported into preview-rendered components.
-- Replace missing dependencies with plain React, Tailwind, shadcn-style local components, lucide-react, framer-motion, recharts, or local utility code.
+- Replace missing dependencies with plain React, Tailwind, shadcn-style local components, lucide-react, framer-motion, GSAP, animejs, Three.js, recharts, or local utility code.
 - Use \`next/link\`, \`next/image\`, and \`next/navigation\` only when needed. The preview provides compatibility shims.
 
 ## COMPONENT SUPPORT TOGGLES
 - shadcn-style components are preferred for forms, buttons, dialogs, sheets, tabs, selects, accordions, and tables.
 - lucide-react icons are available and should be used directly when helpful.
-- ReactBits-style motion/visual ideas are allowed only as lightweight local components, not as unsupported imports.
+- ReactBits-style motion/visual ideas are allowed only as lightweight local components or with the supported motion/graphics libraries. GSAP, animejs, Three.js, and framer-motion are available for landing-page visuals.
 - If a component package is uncertain, inline the component locally instead of importing a missing dependency.
 
 ## AUTO-FIX FRIENDLY RULES
@@ -45,13 +45,30 @@ Convert prompts, screenshots, or uploaded files into clean, responsive, producti
 
 ## CORE BUILD RULES
 - Compile first: no missing imports, no unresolved aliases, no undefined symbols, no invalid JSX, no server-only imports in visible components.
-- Visual fidelity first: match the requested design, screenshot, spacing, typography, layout, text, icons, and responsive behavior precisely.
+- Visual fidelity first: match the requested design, screenshot, spacing, typography, layout, text, icons, motion, visual depth, and responsive behavior precisely.
 - Functional first: every button, tab, dropdown, dialog, upload control, toggle, form, search, and filter must have working local behavior.
 - Iteration: follow-ups are patches. Output only changed files and new supporting files, still using exact \`{path=...}\` fences.
 - No fake proof: no fake testimonials, fake analytics, fake metrics, fake users, or placeholder dashboards unless the user explicitly asks.
 - No brittle imports: when in doubt, inline small helper components instead of relying on packages that may not exist.
 
-Use TypeScript, React, Tailwind classes, shadcn-style components, lucide icons, and subtle responsive motion. The result should render successfully on the first preview.
+Use TypeScript, React, Tailwind classes, shadcn-style components, lucide icons, GSAP/animejs/framer-motion where useful, and Three.js for immersive canvas scenes. The result should render successfully on the first preview.
+`;
+
+const premiumLandingPagePrompt = dedent`
+## PREMIUM LANDING PAGE MODE
+Build a genuinely premium, visually rich landing page, not a generic AI template.
+
+Required landing-page quality bar:
+- Start with a distinctive first viewport: full-bleed immersive hero, canvas/Three.js scene, video-like product mockup, kinetic typography, or a precise editorial composition. Do not emit a plain hero plus three cards.
+- Use at least one real visual system: Three.js canvas background/product scene, GSAP scroll choreography, animejs text/object sequencing, framer-motion section transitions, CSS mask/reveal effects, SVG path animation, or layered product mockups.
+- If the prompt names GSAP, Three.js, animejs, Framer Motion, scroll reveals, cinematic, ReactBits, 3D, particles, orbital, magnetic, morphing, parallax, or kinetic UI, include one of those libraries directly and wire it safely with React effects and cleanup.
+- Design section rhythm with structural variety. Avoid the default sequence "nav -> hero -> three features -> pricing -> testimonials -> CTA -> footer" unless the user explicitly asks for that exact pattern.
+- Use a confident art direction: intentional typography scale, non-default spacing, high-contrast hierarchy, responsive composition, and a clear color system. Avoid bland white pages with unstyled links, default buttons, or stacked text.
+- For B2B/SaaS, show the product through a live-feeling interface, workflow, terminal, dashboard, system map, timeline, or technical artifact. Do not rely on vague abstract cards.
+- Do not invent customer names, logos, testimonials, awards, or metrics. If proof is needed and the user did not supply it, use clearly labeled placeholders or design a proof section that does not depend on fabricated claims.
+- Keep mobile first-class: no horizontal overflow, no overlapping text, and no hover-only interactions required to understand the page.
+- Include local interaction behavior for forms, tabs, toggles, nav, carousels, or demos. Static decoration alone is not enough.
+- Still compile first. Every import must resolve in the preview sandbox, and every effect must clean up timers, animation contexts, canvas renderers, and event listeners.
 `;
 
 export const planModePrompt = dedent`
@@ -115,7 +132,7 @@ export function getMainCodingPrompt(
     if (hasImage) p += "\n\n**IMAGE CONTEXT**: Enforce high visual fidelity with precise layout, spacing, colors, typography, shadows, and exact visible text.";
     if (hasCodeFile) p += "\n\n**CODE FILE CONTEXT**: Refactor the uploaded code into a clean working app while preserving the best parts.";
     if (isLanding) {
-      p += "\n\n**LANDING PAGE MODE**: Build a polished marketing page with working forms, responsive sections, and no heavy backend unless explicitly requested. Keep it preview-safe.";
+      p += "\n\n" + premiumLandingPagePrompt;
     } else if (lower.includes("admin") || lower.includes("dashboard") || lower.includes("saas") || lower.includes("management")) {
       p += "\n\n**APP/DASHBOARD MODE**: Include working local data flows, tables, filters, dialogs, sheets, and settings. Keep the visible preview independent of real database/auth imports.";
     }

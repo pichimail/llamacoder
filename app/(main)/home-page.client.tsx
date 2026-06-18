@@ -1,7 +1,6 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
-import { KnowledgeAssistantButton } from "@/components/home/knowledge-assistant-button";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { TextColor } from "@/components/ui/text-color";
 import { OptionDropdown } from "@/components/option-dropdown";
@@ -42,16 +41,16 @@ const PROMPT_CHIP_GROUPS = [
     title: "SaaS landing",
     prompts: [
       "Build a premium SaaS landing page for a future-ready B2B product with a cinematic hero, GSAP-style scroll reveals, shadcn/ui pricing, animated feature cards, testimonials, waitlist capture, and a fully responsive dark visual system.",
-      "Create a conversion-focused SaaS landing page for a productivity platform using Three.js-inspired background depth, magnetic hover cards, sticky nav, pricing tiers, FAQ accordion, lead form, and polished mobile-first layout.",
-      "Generate a launch-ready SaaS homepage for an existing company product with carousel-style feature storytelling, glass panels, shadcn/ui components, animated stats placeholders, customer logo placeholders, and backend-ready signup form wiring.",
+      "Create a conversion-focused SaaS landing page with a real Three.js canvas hero, GSAP section choreography, magnetic product cards, sticky nav, pricing tiers, FAQ accordion, lead form, and polished mobile-first layout.",
+      "Generate a launch-ready SaaS homepage with kinetic typography, animejs micro-sequences, a live-feeling product dashboard mockup, shadcn/ui components, proof placeholders, and backend-ready signup form wiring.",
     ],
   },
   {
     title: "GSAP / Three.js",
     prompts: [
-      "Create a highly interactive landing page with GSAP-style section transitions, Three.js-inspired particle background, hover-reactive cards, scroll progress, responsive animation fallbacks, and a clean shadcn/ui component system.",
-      "Build a futuristic product microsite with 3D orbital visuals, animated carousel panels, pointer-reactive gradients, kinetic typography, sticky feature navigation, and performant responsive behavior across mobile, tablet, and desktop.",
-      "Generate an immersive launch page with ReactBits-style free background effects, reveal-on-scroll modules, animated comparison cards, a pricing carousel, and production-safe animation fallbacks when motion is reduced.",
+      "Create a highly interactive landing page with real GSAP section transitions, a Three.js particle field, hover-reactive cards, scroll progress, responsive animation fallbacks, and a clean shadcn/ui component system.",
+      "Build a futuristic product microsite with a Three.js orbital scene, animejs staggered panels, kinetic typography, sticky feature navigation, and performant responsive behavior across mobile, tablet, and desktop.",
+      "Generate an immersive launch page with ReactBits-style background effects, GSAP reveal-on-scroll modules, animated comparison cards, a pricing carousel, and production-safe animation fallbacks when motion is reduced.",
     ],
   },
   {
@@ -142,6 +141,7 @@ const PRESET_PROMPTS = new Set(
 
 const HERO_GRADIENT =
   "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
+const COMPOSER_MAX_WIDTH = "760px";
 
 function PresetChipsScroller({
   groups,
@@ -181,7 +181,7 @@ function PresetChipsScroller({
   };
 
   return (
-    <div className="relative mx-auto w-full max-w-[34.5rem]">
+    <div className="relative mx-auto w-full max-w-[760px]">
       {canScrollLeft ? (
         <button
           type="button"
@@ -377,6 +377,7 @@ export default function HomePageClient() {
 
         const promptText =
           content.trim() || (files?.length ? "Build this from the attached file" : "");
+        const initialQuality = mode === "agent" ? "high" : "low";
 
         const res = await fetch("/api/create-chat", {
           method: "POST",
@@ -384,6 +385,7 @@ export default function HomePageClient() {
           body: JSON.stringify({
             prompt: promptText,
             model,
+            quality: initialQuality,
             mode,
             screenshotUrl: nextScreenshotUrl,
             attachments,
@@ -404,12 +406,18 @@ export default function HomePageClient() {
 
         const streamPromise = fetch("/api/get-next-completion-stream-promise", {
           method: "POST",
-          body: JSON.stringify({ messageId: lastMessageId, model, reasoning: reasoningEnabled }),
+          body: JSON.stringify({
+            messageId: lastMessageId,
+            model,
+            reasoning: reasoningEnabled,
+            quality: initialQuality,
+          }),
         }).then(async (r) => {
           if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
           if (!r.body) throw new Error("No body on response");
           return r.body;
         });
+        void streamPromise.catch(() => undefined);
 
         context.setStreamPromise(streamPromise);
         setPrompt("");
@@ -426,7 +434,7 @@ export default function HomePageClient() {
       <div className="flex min-h-dvh flex-col text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-dvh flex-col"
+          className="relative flex min-h-[104dvh] flex-col"
           style={{ background: HERO_GRADIENT }}
         >
           <div className="relative flex flex-1 flex-col">
@@ -434,126 +442,136 @@ export default function HomePageClient() {
 
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
               <div className="flex w-full max-w-[760px] flex-col items-center">
-              <TextColor className="mb-2 min-h-[4.25rem] md:min-h-[5.25rem]" />
+                <TextColor className="mb-2 min-h-[4.25rem] md:min-h-[5.25rem]" />
 
-              <div
-                id="prompt-composer"
-                className="relative mt-6 w-full"
-                style={{ ["--an-max-width" as any]: "760px" }}
-              >
-                {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-                <PromptInputBox
-                  value={prompt}
-                  onValueChange={setPrompt}
-                  onSend={handlePromptSend}
-                  isLoading={isSubmitting}
-                  disabled={isSubmitting || screenshotLoading}
-                  placeholder="Describe what to build"
-                  thinkEnabled={reasoningEnabled}
-                  onThinkChange={setReasoningEnabled}
-                  accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-                  toolbarEnd={
-                    showEnhance ? (
-                      <PromptRewriteButton
-                        prompt={prompt}
-                        mode={mode}
-                        model={model}
-                        onRewrite={setPrompt}
-                        disabled={isSubmitting || screenshotLoading}
-                        iconOnly
-                      />
-                    ) : null
-                  }
-                />
-
-                <div className="mt-4">
-                  <PresetChipsScroller
-                    groups={PROMPT_CHIP_GROUPS}
-                    activeTitles={promptChipIndexes}
-                    onSelect={handlePromptChipClick}
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                  <OptionDropdown
-                    value={mode}
-                    onValueChange={(value) => setMode(value as Mode)}
-                    aria-label="Select mode"
-                    triggerLabel={
-                      <span>
-                        {currentMode.icon} {currentMode.label}
-                      </span>
+                <div
+                  id="prompt-composer"
+                  className="relative mt-6 w-full"
+                  style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}
+                >
+                  {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
+                  <PromptInputBox
+                    value={prompt}
+                    onValueChange={setPrompt}
+                    onSend={handlePromptSend}
+                    isLoading={isSubmitting}
+                    disabled={isSubmitting || screenshotLoading}
+                    placeholder="Describe what to build"
+                    thinkEnabled={reasoningEnabled}
+                    onThinkChange={setReasoningEnabled}
+                    accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+                    toolbarEnd={
+                      showEnhance ? (
+                        <PromptRewriteButton
+                          prompt={prompt}
+                          mode={mode}
+                          model={model}
+                          onRewrite={setPrompt}
+                          disabled={isSubmitting || screenshotLoading}
+                          iconOnly
+                        />
+                      ) : null
                     }
-                    triggerClassName="h-8 border-white/50 bg-white/60 px-2.5 text-slate-800 hover:bg-white/80 hover:text-slate-900"
-                    options={modes.map((item) => ({
-                      value: item.value,
-                      label: (
-                        <span>
-                          {item.icon} {item.label}
-                        </span>
-                      ),
-                    }))}
                   />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <BuilderToggles
-                      compact
-                      shadcnEnabled={shadcnEnabled}
-                      onShadcnChange={setShadcnEnabled}
-                      reasoningEnabled={reasoningEnabled}
-                      onReasoningChange={setReasoningEnabled}
-                    />
-                    <OptionDropdown
-                      value={model}
-                      onValueChange={setModel}
-                      aria-label="Select AI model"
-                      triggerLabel={getModelLabel(model)}
-                      triggerClassName="h-8 min-w-[180px] border-white/50 bg-white/60 px-2.5 text-slate-800 hover:bg-white/80 hover:text-slate-900"
-                      contentClassName="max-h-[320px]"
-                      options={(availableModels ?? getVisibleModels()).map((item) => ({
-                        value: item.value,
-                        label:
-                          "available" in item && item.available === false
-                            ? `${item.label} (needs API key)`
-                            : item.label,
-                        disabled: "available" in item ? !item.available : false,
-                      }))}
+
+                  <div className="mt-4">
+                    <PresetChipsScroller
+                      groups={PROMPT_CHIP_GROUPS}
+                      activeTitles={promptChipIndexes}
+                      onSelect={handlePromptChipClick}
                     />
                   </div>
-                </div>
 
-                {mode === "ask" ? (
-                  <p className="mt-2 text-center text-xs text-slate-800/75">
-                    Ask mode — best for questions, refinements, and targeted changes.
-                  </p>
-                ) : null}
+                  <div className="mt-4 w-full rounded-[28px] border border-[#444444]/80 bg-[#1F2023] px-3 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <OptionDropdown
+                        value={mode}
+                        onValueChange={(value) => setMode(value as Mode)}
+                        aria-label="Select mode"
+                        triggerLabel={
+                          <span>
+                            {currentMode.icon} {currentMode.label}
+                          </span>
+                        }
+                        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                        options={modes.map((item) => ({
+                          value: item.value,
+                          label: (
+                            <span>
+                              {item.icon} {item.label}
+                            </span>
+                          ),
+                        }))}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <BuilderToggles
+                          compact
+                          className="text-slate-200/80"
+                          shadcnEnabled={shadcnEnabled}
+                          onShadcnChange={setShadcnEnabled}
+                          reasoningEnabled={reasoningEnabled}
+                          onReasoningChange={setReasoningEnabled}
+                        />
+                        <OptionDropdown
+                          value={model}
+                          onValueChange={setModel}
+                          aria-label="Select AI model"
+                          triggerLabel={getModelLabel(model)}
+                          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                          contentClassName="max-h-[320px]"
+                          options={(availableModels ?? getVisibleModels()).map((item) => ({
+                            value: item.value,
+                            label:
+                              "available" in item && item.available === false
+                                ? `${item.label} (needs API key)`
+                                : item.label,
+                            disabled: "available" in item ? !item.available : false,
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {mode === "ask" ? (
+                    <p className="mt-2 text-center text-xs text-slate-800/75">
+                      Ask mode — best for questions, refinements, and targeted changes.
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            </div>
             </div>
           </div>
         </section>
 
         <section
           id="featured-templates"
-          className="mx-auto w-full max-w-5xl border-t border-border/50 bg-background px-4 py-14"
+          className="relative z-10 mx-auto w-full max-w-5xl -mt-8 px-4 pb-8 pt-4 md:-mt-12"
         >
-          <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Open a sandbox preview, then remix in the builder.
-              </p>
+          <div className="rounded-[32px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
+            <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Featured templates
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Open a sandbox preview, then remix in the builder.
+                </p>
+              </div>
+              <Link
+                href="/gallery"
+                className="text-xs text-muted-foreground transition hover:text-foreground"
+              >
+                View gallery
+              </Link>
             </div>
-            <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">
-              View gallery
-            </Link>
-          </div>
-          <div className="mt-4">
-            <FeaturedAppsGrid
-              apps={featuredApps ?? undefined}
-              limit={3}
-              compact
-              liveThumbs={false}
-            />
+            <div className="mt-4">
+              <FeaturedAppsGrid
+                apps={featuredApps ?? undefined}
+                limit={3}
+                compact
+                liveThumbs={false}
+              />
+            </div>
           </div>
         </section>
 
@@ -563,8 +581,6 @@ export default function HomePageClient() {
         >
           Chinna-Coder — Build production apps from a prompt
         </footer>
-
-        <KnowledgeAssistantButton />
       </div>
     </HomeShell>
   );

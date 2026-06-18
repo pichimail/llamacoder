@@ -117,35 +117,41 @@ export function FileAttachment({
       onMouseLeave={() => setIsHovered(false)}
     >
       {isImageOnly ? (
-        <div
+        <button
+          type="button"
           className={cn(
             "size-8 overflow-hidden shrink-0 rounded-[calc(var(--an-input-border-radius)-var(--an-context-padding)-2px)]",
             canPreview && "cursor-pointer",
           )}
           onClick={canPreview ? openLightbox : undefined}
+          aria-label={canPreview ? `Preview ${filename}` : filename}
+          disabled={!canPreview}
         >
           <img
             src={url}
             alt={filename}
             className="w-full h-full object-cover"
           />
-        </div>
+        </button>
       ) : (
         <>
           {isImage && url ? (
-            <div
+            <button
+              type="button"
               className={cn(
                 "w-8 self-stretch overflow-hidden shrink-0 rounded-[calc(var(--an-input-border-radius)-var(--an-context-padding)-2px)]",
                 canPreview && "cursor-pointer",
               )}
               onClick={canPreview ? openLightbox : undefined}
+              aria-label={canPreview ? `Preview ${filename}` : filename}
+              disabled={!canPreview}
             >
               <img
                 src={url}
                 alt={filename}
                 className="w-full h-full object-cover aspect-square"
               />
-            </div>
+            </button>
           ) : (
             <div className="flex items-center justify-center w-8 self-stretch bg-muted shrink-0 rounded-[calc(var(--an-input-border-radius)-var(--an-context-padding)-2px)]">
               {renderFileIcon(iconName)}
@@ -179,8 +185,9 @@ export function FileAttachment({
                      text-muted-foreground hover:text-foreground
                      ${isHovered ? "opacity-100" : "opacity-0"}`}
           type="button"
+          aria-label={`Remove ${filename}`}
         >
-          <X className="size-3" />
+          <X className="size-3" aria-hidden="true" />
         </button>
       )}
 

@@ -82,12 +82,6 @@ export default function ChatLog({
                   1
                 }
                 message={message}
-                previousMessage={(() => {
-                  const idx = assistantMessages
-                    .map((m) => m.id)
-                    .indexOf(message.id);
-                  return idx > 0 ? assistantMessages[idx - 1] : undefined;
-                })()}
                 isActive={!streamText && activeMessage?.id === message.id}
                 onMessageClick={onMessageClick}
                 isStreaming={!!streamText}
@@ -117,7 +111,6 @@ export default function ChatLog({
                 1
               }
               isActive={true}
-              previousMessage={assistantMessages.at(-1)}
               isStreaming
             />
           )
@@ -133,7 +126,6 @@ function AssistantMessage({
   message,
   isActive,
   onMessageClick = () => {},
-  previousMessage,
   isStreaming = false,
 }: {
   content: string;
@@ -141,7 +133,6 @@ function AssistantMessage({
   message?: Message;
   isActive?: boolean;
   onMessageClick?: (v: Message) => void;
-  previousMessage?: Message;
   isStreaming?: boolean;
 }) {
   const allFiles = extractAllCodeBlocks(content);

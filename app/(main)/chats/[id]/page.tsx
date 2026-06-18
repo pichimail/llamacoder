@@ -2,8 +2,8 @@ import { getPrisma } from "@/lib/prisma";
 import { getOgDataForChat } from "@/lib/og-utils";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import PageClient from "./page.client";
 import { Metadata } from "next";
+import PageClientWrapper from "./page-client-wrapper";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -51,7 +51,7 @@ export default async function Page({
 
   if (!chat) notFound();
 
-  return <PageClient chat={chat} sidebarChats={sidebarChats} />;
+  return <PageClientWrapper chat={chat} sidebarChats={sidebarChats} />;
 }
 
 const getSidebarChats = cache(async () => {

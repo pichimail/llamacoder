@@ -3,19 +3,17 @@
 import Link from "next/link"
 import {
   GalleryVerticalEnd,
-  Github,
   Home,
   Images,
-  LifeBuoy,
   MessageSquare,
   Plus,
   Sparkles,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import { NavRecentChats } from "@/components/home/nav-recent-chats"
+import ThemeToggle from "@/components/theme-toggle"
 import type { HomeSidebarChat, HomeSidebarUser } from "@/components/home/use-home-sidebar-data"
 import {
   Sidebar,
@@ -25,6 +23,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 
 const navMain = [
@@ -58,19 +58,6 @@ const navMain = [
   },
 ]
 
-const navSecondary = [
-  {
-    title: "Support",
-    url: "https://github.com/pichimail/llamacoder/issues",
-    icon: LifeBuoy,
-  },
-  {
-    title: "GitHub",
-    url: "https://github.com/pichimail/llamacoder",
-    icon: Github,
-  },
-]
-
 export function HomeAppSidebar({
   chats,
   user,
@@ -86,13 +73,14 @@ export function HomeAppSidebar({
   loading?: boolean
 }) {
   return (
-    <Sidebar variant="inset" {...props}>
-      <SidebarHeader>
+    <Sidebar variant="inset" collapsible="icon" {...props}>
+      <SidebarRail />
+      <SidebarHeader className="gap-3 border-b border-sidebar-border/70 bg-sidebar/95 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="data-[active=true]:bg-sidebar-accent">
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
                   <GalleryVerticalEnd className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
@@ -112,16 +100,22 @@ export function HomeAppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="bg-sidebar px-0 py-2">
         <NavMain items={navMain} />
         <NavRecentChats chats={chats} loading={loading} />
-        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border/70 bg-sidebar/95">
+        <div className="flex items-center justify-between px-2">
+          <ThemeToggle className="size-9" />
+          <span className="text-xs text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
+            Theme
+          </span>
+        </div>
+        <SidebarSeparator />
         {authEnabled && !isAuthenticated ? (
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild size="lg">
+              <SidebarMenuButton asChild size="lg" className="bg-sidebar-accent/40">
                 <Link href="/api/auth/signin/google">
                   <MessageSquare />
                   <span>Sign in with Google</span>

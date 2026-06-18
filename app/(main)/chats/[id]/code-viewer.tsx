@@ -232,7 +232,7 @@ function renderFileTree(
 }
 
 export default function CodeViewer({
-  chat,
+  chat: _chat,
   streamText,
   message,
   activeTab,
@@ -738,7 +738,7 @@ function AutoFixStatusBadge({ status, attempt }: { status: AutoFixStatus; attemp
   if (status === "idle") return null;
   const map = {
     watching: { label: "Watching", cls: "text-muted-foreground", icon: <Eye className="size-3" aria-hidden="true" /> },
-    fixing: { label: `Fixing ${Math.min(attempt, 3)}/3`, cls: "text-amber-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
+    fixing: { label: `Fixing ${Math.min(attempt, 1)}/1`, cls: "text-amber-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
     fallback: { label: "Rebuilding", cls: "text-orange-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
     ready: { label: "Healthy", cls: "text-emerald-500", icon: <CheckCircle2 className="size-3" aria-hidden="true" /> },
   } as const;

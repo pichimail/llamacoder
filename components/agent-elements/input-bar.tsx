@@ -483,6 +483,7 @@ export const InputBar = memo(function InputBar({
                 ) : (
                   <PromptInputTextarea
                     placeholder={effectivePlaceholder}
+                    aria-label={effectivePlaceholder}
                     disabled={disabled}
                     autoFocus={autoFocus}
                     onPaste={onPaste}

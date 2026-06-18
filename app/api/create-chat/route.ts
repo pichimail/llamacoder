@@ -3,14 +3,11 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import {
   getMainCodingPrompt,
-  screenshotToCodePrompt,
-  softwareArchitectPrompt,
 } from "@/lib/prompts";
-import { getShadcnFewShotPrompt } from "@/lib/shadcn-examples";
 import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
-import { anyProviderConfigured, createTextWithFallback } from "@/lib/providers/generation";
+import { anyProviderConfigured } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 
 const createChatSchema = z.object({
@@ -84,73 +81,9 @@ export async function POST(request: NextRequest) {
 
     let title = promptWithAttachments.trim().split(/\s+/).slice(0, 6).join(" ");
     if (title.length > 60) title = title.slice(0, 57) + "...";
-    try {
-      const responseForChatTitle = await createTextWithFallback({
-        model: resolvedModel,
-        temperature: 0.2,
-        maxTokens: 80,
-        messages: [
-          { role: "system", content: "Create a succinct 3-5 word title for this app-building chat. Return only the title." },
-          { role: "user", content: promptWithAttachments },
-        ],
-      });
-      const aiTitle = responseForChatTitle.content.trim();
-      if (aiTitle && aiTitle.length < 100) title = aiTitle;
-    } catch (titleErr) {
-      console.warn("Failed to generate AI title, using fallback from prompt:", titleErr);
-    }
-
-    let fullScreenshotDescription: string | undefined;
-    if (screenshotUrl) {
-      try {
-        const screenshotResponse = await createTextWithFallback({
-          model: resolvedModel,
-          temperature: 0.3,
-          maxTokens: 1200,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: screenshotToCodePrompt },
-                { type: "image_url", image_url: { url: screenshotUrl } },
-              ],
-            },
-          ],
-        });
-        fullScreenshotDescription = screenshotResponse.content;
-      } catch (err) {
-        console.warn("Screenshot processing failed, continuing without it:", err);
-      }
-    }
-
-    let userMessage: string;
-    if (quality === "high") {
-      let planContent: string | undefined;
-      try {
-        const initialRes = await createTextWithFallback({
-          model: resolvedModel,
-          temperature: 0.35,
-          maxTokens: 3000,
-          messages: [
-            { role: "system", content: softwareArchitectPrompt },
-            {
-              role: "user",
-              content: fullScreenshotDescription
-                ? fullScreenshotDescription + promptWithAttachments
-                : promptWithAttachments,
-            },
-          ],
-        });
-        planContent = initialRes.content || undefined;
-      } catch (planErr) {
-        console.warn("High quality plan generation failed, falling back to raw prompt:", planErr);
-      }
-      userMessage = planContent ?? promptWithAttachments;
-    } else if (fullScreenshotDescription) {
-      userMessage = `${promptWithAttachments}\n\nRECREATE THIS APP AS CLOSELY AS POSSIBLE:\n${fullScreenshotDescription}`;
-    } else {
-      userMessage = promptWithAttachments;
-    }
+    const userMessage = screenshotUrl
+      ? `${promptWithAttachments}\n\nScreenshot attachment: ${screenshotUrl}`
+      : promptWithAttachments;
 
     const newChat = await prisma.chat.update({
       where: { id: chat.id },
@@ -163,11 +96,11 @@ export async function POST(request: NextRequest) {
               content:
                 getMainCodingPrompt(
                   mode,
-                  !!fullScreenshotDescription,
+                  !!screenshotUrl,
                   false,
                   promptWithAttachments,
                   shadcn,
-                ) + (shadcn ? getShadcnFewShotPrompt(promptWithAttachments) : ""),
+                ),
               position: 0,
             },
             {

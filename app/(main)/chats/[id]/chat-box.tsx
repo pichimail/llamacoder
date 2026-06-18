@@ -58,6 +58,7 @@ export default function ChatBox({
   const router = useRouter();
   const disabled = isPending || isStreaming;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(chat.model);
@@ -196,9 +197,10 @@ export default function ChatBox({
   };
 
   useEffect(() => {
-    if (shouldFocusInput) {
-      onInputFocused?.();
-    }
+    if (!shouldFocusInput) return;
+    const textarea = composerRef.current?.querySelector("textarea");
+    textarea?.focus();
+    onInputFocused?.();
   }, [shouldFocusInput, onInputFocused]);
 
   const buildModePrefix = () => {
@@ -310,7 +312,10 @@ export default function ChatBox({
 
   return (
     <TooltipProvider>
-      <div className="relative w-full">
+      <div ref={composerRef} className="relative w-full">
+        <label htmlFor="screenshot" className="sr-only">
+          Attach image or file
+        </label>
         <input
           id="screenshot"
           type="file"
@@ -319,6 +324,7 @@ export default function ChatBox({
           className="hidden"
           ref={fileInputRef}
           disabled={!isScreenshotUploadAvailable}
+          aria-label="Attach image or file"
         />
 
         {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}

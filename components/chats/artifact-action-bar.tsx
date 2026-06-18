@@ -44,6 +44,9 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const menuId = `artifact-actions-menu-${chatId}`;
 
   const canAct = !!activeMessageId && files.length > 0;
   const endpoint = `/api/workspace/${chatId}`;
@@ -76,6 +79,24 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     refreshWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || moreButtonRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   const handleSync = () => {
     startTransition(async () => {
@@ -178,19 +199,19 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
         </label>
       )}
 
-      <input ref={uploadRef} type="file" className="hidden" onChange={handleUpload} />
+      <input ref={uploadRef} type="file" className="hidden" onChange={handleUpload} aria-label="Upload project asset" />
       <Tip label="Upload asset"><button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset"><Upload className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Export zip"><button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files"><Download className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Publish site"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
       {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
-      <Tip label="More project actions"><button type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
+      <Tip label="More project actions"><button ref={moreButtonRef} type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu" aria-controls={menuId} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
 
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
+        <div ref={menuRef} id={menuId} role="menu" className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
           <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground"><p className="font-medium text-foreground">{chatTitle}</p><p>{activeVersionLabel || "No version"} · {workspace?.fileCount ?? files.length} backend files</p></div>
-          <div className="py-1"><button type="button" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button><button type="button" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button></div>
-          <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">Save</button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
+          <div className="py-1"><button type="button" role="menuitem" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button><button type="button" role="menuitem" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button></div>
+          <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" aria-label="Environment variable key" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" aria-label="Environment variable value" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} aria-label="Save environment variable" className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">Save</button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
         </div>
       )}
     </div>
