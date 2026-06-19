@@ -46,6 +46,63 @@ function normalizePreviewPath(path: string) {
   return cleanPath(path) || path.replace(/^\/+/, "").replace(/^src\//, "");
 }
 
+function toSandpackPath(path: string) {
+  const normalized = normalizePreviewPath(path);
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function stripCssAtRuleBlock(css: string, atRule: string) {
+  let output = "";
+  let index = 0;
+
+  while (index < css.length) {
+    const start = css.indexOf(atRule, index);
+    if (start === -1) {
+      output += css.slice(index);
+      break;
+    }
+
+    output += css.slice(index, start);
+    const open = css.indexOf("{", start);
+    const semicolon = css.indexOf(";", start);
+    if (open === -1 || (semicolon !== -1 && semicolon < open)) {
+      const nextLine = css.indexOf("\n", start);
+      index = nextLine === -1 ? css.length : nextLine + 1;
+      continue;
+    }
+
+    let depth = 0;
+    let end = open;
+    for (; end < css.length; end += 1) {
+      if (css[end] === "{") depth += 1;
+      if (css[end] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end += 1;
+          break;
+        }
+      }
+    }
+    index = end;
+  }
+
+  return output;
+}
+
+function sanitizePreviewCssContent(content: string) {
+  let css = content
+    .replace(/^@import\s+["'][^"']*tailwindcss[^"']*["'];?\s*$/gm, "")
+    .replace(/^@import\s+["'][^"']+["'];?\s*$/gm, "")
+    .replace(/^@tailwind\s+(?:base|components|utilities);?\s*$/gm, "")
+    .replace(/^@(?:config|plugin|source)\s+[^;]+;?\s*$/gm, "")
+    .replace(/^@custom-variant\s+.*$/gm, "")
+    .replace(/^.*@apply\s+.*$/gm, "");
+
+  css = stripCssAtRuleBlock(css, "@theme");
+
+  return css.trim();
+}
+
 function isGeneratedConfigFile(path: string, content: string) {
   const normalizedPath = normalizePreviewPath(inferPathFromContent(path, content)).toLowerCase();
   const filename = normalizedPath.split("/").pop() || normalizedPath;
@@ -180,12 +237,18 @@ export function getSandpackConfig(
     if (!isPreviewRuntimeFile(file.path, file.content)) continue;
 
     const normalizedPath = normalizePreviewPath(inferPathFromContent(file.path, file.content));
-    const sanitizedContent = sanitizePreviewContent(file.content);
+    const sanitizedContent = normalizedPath.endsWith(".css")
+      ? sanitizePreviewCssContent(file.content)
+      : sanitizePreviewContent(file.content);
     const previewContent = designInspector
       ? instrumentFileForInspector({ path: normalizedPath, code: sanitizedContent })
       : sanitizedContent;
 
-    sandpackFiles[normalizedPath] = previewContent;
+    const sandpackPath = toSandpackPath(normalizedPath);
+    sandpackFiles[sandpackPath] =
+      normalizedPath === "app/globals.css"
+        ? `${SANDBOX_GLOBALS_CSS}\n${previewContent}`.trim()
+        : previewContent;
     previewUserFiles.push({ path: normalizedPath, content: previewContent });
   }
 
