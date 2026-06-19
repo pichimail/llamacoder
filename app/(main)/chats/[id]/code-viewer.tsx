@@ -294,6 +294,20 @@ export default function CodeViewer({
     return Array.from(byPath.values());
   }, [message, streamAllFiles]);
 
+  const previewFiles: ViewerFile[] = useMemo(() => {
+    const completeStreamFiles = streamAllFiles.filter((file) => !file.isPartial);
+    if (!message) return completeStreamFiles;
+
+    const stored = message.files as ViewerFile[] | null;
+    const existing = stored && Array.isArray(stored) && stored.length > 0 ? stored : extractAllCodeBlocks(message.content);
+    if (completeStreamFiles.length === 0) return existing;
+
+    const byPath = new Map<string, ViewerFile>();
+    existing.forEach((file) => byPath.set(file.path, file));
+    completeStreamFiles.forEach((file) => byPath.set(file.path, file));
+    return Array.from(byPath.values());
+  }, [message, streamAllFiles]);
+
   const [draft, setDraft] = useState<ViewerFile[]>(baseFiles);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [extraDeps, setExtraDeps] = useState<Record<string, string>>({});
@@ -353,11 +367,18 @@ export default function CodeViewer({
 
   const selectedFile = draft.find((file) => file.path === selectedPath) || draft[0] || null;
   const sideFile = sidePath ? draft.find((file) => file.path === sidePath) : null;
-  const runnerFiles = useMemo(() => draft.map((file) => ({ path: file.path, content: file.code ?? "" })), [draft]);
   const tree = useMemo(() => buildTree(draft.map((file) => file.path)), [draft]);
   const isStreaming = Boolean(streamText);
   const streamingPath = draft.find((file) => file.isPartial)?.path ?? streamAllFiles.at(-1)?.path;
   const hasUnsaved = dirty.size > 0;
+  const runnerFiles = useMemo(
+    () =>
+      (isStreaming ? previewFiles : draft).map((file) => ({
+        path: file.path,
+        content: file.code ?? "",
+      })),
+    [draft, isStreaming, previewFiles],
+  );
 
   const updateFile = useCallback((path: string, code: string) => {
     setDraft((files) => files.map((file) => (file.path === path ? { ...file, code } : file)));
