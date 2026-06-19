@@ -828,9 +828,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       type="button"
                       aria-label="Add options"
                       disabled={isRecording || disabled}
-                      whileHover={{ rotate: 18, scale: 1.03 }}
-                      whileTap={{ rotate: 0, scale: 0.96 }}
-                      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+                      whileHover={{ y: -1, scale: 1.02 }}
+                      whileTap={{ scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 24 }}
                       className={cn(
                         "flex h-9 w-9 items-center justify-center rounded-full border border-[#353535] bg-[#2A2A2E] text-[#D1D5DB] transition-all duration-200 ease-out",
                         "hover:border-[#5b5b62] hover:bg-[#34343a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
@@ -843,13 +843,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 <DropdownMenuContent
                   align="start"
                   sideOffset={10}
-                  className="z-[999] w-64 rounded-2xl border border-[#36363a] bg-[#1F2023] p-2 text-[#F4F4F5] shadow-2xl"
+                  className="z-[999] w-64 rounded-[20px] border border-[#36363a] bg-[#1F2023] p-2 text-[#F4F4F5] shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
                 >
                   <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-[#A1A1AA]">
                     Actions
                   </DropdownMenuLabel>
                   <DropdownMenuItem
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6"
                     onSelect={(event) => {
                       closeAddMenu();
                       uploadInputRef.current?.click();
@@ -859,7 +859,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     Upload file
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6"
                     onSelect={(event) => {
                       closeAddMenu();
                       setShowGitHubImport(true);
@@ -873,7 +873,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     Builder
                   </DropdownMenuLabel>
                   <DropdownMenuItem
-                    className="flex cursor-pointer items-center justify-between rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5"
+                    className="flex cursor-pointer items-center justify-between rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6"
                     onSelect={(event) => {
                       event.preventDefault();
                       onShadcnChange?.(!shadcnEnabled);
@@ -893,7 +893,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   <DropdownMenuSeparator className="my-2 h-px bg-white/10" />
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6",
                       showSearch && "text-cyan-300",
                     )}
                     onSelect={(event) => {
@@ -906,7 +906,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6",
                       showThink && "text-violet-300",
                     )}
                     onSelect={(event) => {
@@ -919,7 +919,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/5 focus:bg-white/5",
+                      "flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors duration-200 ease-out hover:bg-white/6 focus:bg-white/6",
                       showCanvas && "text-orange-300",
                     )}
                     onSelect={(event) => {

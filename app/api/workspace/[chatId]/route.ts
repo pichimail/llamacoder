@@ -1,12 +1,34 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { createArtifactPullRequest } from "@/lib/github/create-pr";
+import { buildPhaseOneSpec, type BuildMode } from "@/lib/build-engine";
+import {
+  formatGeneratedCodeIssues,
+  validateGeneratedCodeFiles,
+} from "@/lib/generated-code-validation";
 
 type ArtifactFileInput = {
   path: string;
   code?: string;
   content?: string;
   language?: string;
+};
+
+type BuildSpecSummary = {
+  templateId: string;
+  title: string;
+  summary: string;
+  dependencies: string[];
+  envHints: string[];
+  routes: string[];
+  previewRoute: string;
+};
+
+type ValidationSummary = {
+  ok: boolean;
+  issueCount: number;
+  issues: Array<{ path: string; line: number; column: number; message: string }>;
+  formatted: string;
 };
 
 const LOCAL_USER_ID = "local-workspace-user";
@@ -21,9 +43,67 @@ function cleanFiles(files: ArtifactFileInput[] = []) {
     .filter((file) => file.path && !file.path.endsWith(".gitkeep"));
 }
 
+function inferModeFromMessages(
+  messages: Array<{ role: string; content: string }>,
+): BuildMode {
+  const system = messages.find((message) => message.role === "system")?.content || "";
+  if (system.includes("plan mode")) return "plan";
+  if (system.includes("ask mode")) return "ask";
+  return "agent";
+}
+
+function summarizeBuildSpec(chat: {
+  prompt: string;
+  shadcn: boolean;
+  messages?: Array<{ role: string; content: string }>;
+}): BuildSpecSummary {
+  const spec = buildPhaseOneSpec({
+    prompt: chat.prompt,
+    mode: inferModeFromMessages(chat.messages ?? []),
+    shadcn: chat.shadcn,
+  });
+
+  return {
+    templateId: spec.templateId,
+    title: spec.title,
+    summary: spec.summary,
+    dependencies: spec.dependencies,
+    envHints: spec.envHints,
+    routes: spec.routes,
+    previewRoute: spec.previewRoute,
+  };
+}
+
+async function summarizeValidation(files: Array<{ path: string; content: string }>) {
+  const issues = await validateGeneratedCodeFiles(
+    files.map((file) => ({
+      path: file.path,
+      content: file.content,
+    })),
+  );
+
+  return {
+    ok: issues.length === 0,
+    issueCount: issues.length,
+    issues: issues.slice(0, 8).map((issue) => ({
+      path: issue.path,
+      line: issue.line,
+      column: issue.column,
+      message: issue.message,
+    })),
+    formatted: formatGeneratedCodeIssues(issues),
+  } satisfies ValidationSummary;
+}
+
 async function ensureWorkspace(chatId: string) {
   const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, include: { project: true } });
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    include: {
+      project: true,
+      messages: { select: { role: true, content: true }, orderBy: { position: "asc" } },
+    },
+  });
   if (!chat) return null;
   if (chat.projectId && chat.project) return { prisma, chat, project: chat.project };
 
@@ -50,6 +130,10 @@ async function serializeWorkspace(chatId: string) {
     prisma.shareLink.findMany({ where: { projectId: project.id }, orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.projectFile.findMany({ where: { projectId: project.id }, orderBy: { path: "asc" } }),
   ]);
+  const validation = await summarizeValidation(
+    projectFiles.map((file) => ({ path: file.path, content: file.content })),
+  );
+  const buildSpec = summarizeBuildSpec(workspace.chat);
 
   return {
     project: { id: project.id, name: project.name, description: project.description || "" },
@@ -65,6 +149,8 @@ async function serializeWorkspace(chatId: string) {
     shareLinks: shareLinks.map((link) => ({ id: link.id, token: link.token, isPublic: link.isPublic })),
     fileCount: projectFiles.length,
     hasGithub: integrations.some((integration) => integration.type === "github"),
+    buildSpec,
+    validation,
   };
 }
 
@@ -81,7 +167,8 @@ async function syncFiles(chatId: string, files: ArtifactFileInput[]) {
       }),
     ),
   );
-  return { workspace, count: clean.length, files: clean };
+  const validation = await summarizeValidation(clean);
+  return { workspace, count: clean.length, files: clean, validation };
 }
 
 export async function GET(_: Request, context: { params: Promise<{ chatId: string }> }) {
@@ -99,7 +186,12 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   if (action === "sync") {
     const result = await syncFiles(chatId, body.files || []);
     if (!result) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
-    return NextResponse.json({ ok: true, fileCount: result.count, workspace: await serializeWorkspace(chatId) });
+    return NextResponse.json({
+      ok: true,
+      fileCount: result.count,
+      validation: result.validation,
+      workspace: await serializeWorkspace(chatId),
+    });
   }
 
   const workspace = await ensureWorkspace(chatId);
@@ -117,6 +209,49 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
+  if (action === "bootstrap") {
+    const spec = buildPhaseOneSpec({
+      prompt: chat.prompt,
+      mode: inferModeFromMessages(chat.messages),
+      shadcn: chat.shadcn,
+    });
+    const hasFiles = await prisma.projectFile.count({ where: { projectId: project.id } });
+    if (hasFiles > 0 && !body.force) {
+      return NextResponse.json({
+        ok: false,
+        reason: "Workspace already contains files. Pass force=true to reseed the scaffold.",
+        workspace: await serializeWorkspace(chatId),
+      }, { status: 409 });
+    }
+    const result = await syncFiles(chatId, spec.artifactFiles);
+    return NextResponse.json({
+      ok: true,
+      fileCount: result?.count || spec.artifactFiles.length,
+      validation: result?.validation,
+      workspace: await serializeWorkspace(chatId),
+    });
+  }
+
+  if (action === "validate") {
+    const candidateFiles = cleanFiles(body.files || []);
+    const files =
+      candidateFiles.length > 0
+        ? candidateFiles
+        : (
+            await prisma.projectFile.findMany({
+              where: { projectId: project.id },
+              orderBy: { path: "asc" },
+            })
+          ).map((file) => ({ path: file.path, content: file.content }));
+
+    const validation = await summarizeValidation(files);
+    return NextResponse.json({
+      ok: validation.ok,
+      validation,
+      workspace: await serializeWorkspace(chatId),
+    });
+  }
+
   if (action === "connect-github") {
     await prisma.integration.upsert({
       where: { projectId_type: { projectId: project.id, type: "github" } },
@@ -129,7 +264,15 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   if (action === "publish") {
     const messageId = String(body.messageId || "");
     if (!messageId) return NextResponse.json({ error: "Message id is required" }, { status: 400 });
-    await syncFiles(chatId, body.files || []);
+    const syncResult = await syncFiles(chatId, body.files || []);
+    if (syncResult && !syncResult.validation.ok) {
+      return NextResponse.json({
+        ok: false,
+        reason: "Validation failed. Fix the generated files before publishing.",
+        validation: syncResult.validation,
+        workspace: await serializeWorkspace(chatId),
+      }, { status: 409 });
+    }
     const token = `${chatId}-${messageId}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
     await prisma.shareLink.upsert({
       where: { token },
@@ -145,13 +288,26 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
         data: { projectId: project.id, status: "published", previewUrl: url, productionUrl: url },
       });
     }
-    return NextResponse.json({ ok: true, url, workspace: await serializeWorkspace(chatId), duplicateProtected: Boolean(existingDeployment) });
+    return NextResponse.json({
+      ok: true,
+      url,
+      workspace: await serializeWorkspace(chatId),
+      duplicateProtected: Boolean(existingDeployment),
+    });
   }
 
   if (action === "create-pr") {
     const github = await prisma.integration.findUnique({ where: { projectId_type: { projectId: project.id, type: "github" } } });
     if (!github) return NextResponse.json({ ok: false, reason: "Connect GitHub before creating a PR." }, { status: 409 });
     const result = await syncFiles(chatId, body.files || []);
+    if (result && !result.validation.ok) {
+      return NextResponse.json({
+        ok: false,
+        reason: "Validation failed. Fix the generated files before creating a PR.",
+        validation: result.validation,
+        workspace: await serializeWorkspace(chatId),
+      }, { status: 409 });
+    }
     const pr = await createArtifactPullRequest({
       title: `${chat.title || project.name || "HyperSpeed app"} update`,
       files: result?.files || [],

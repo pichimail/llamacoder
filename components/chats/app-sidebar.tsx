@@ -67,31 +67,31 @@ export function ChatsAppSidebar({
   isAuthenticated?: boolean
 }) {
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar collapsible="icon" className="bg-[#1F2023] text-[#F4F4F5]" {...props}>
+      <SidebarHeader className="gap-3 border-b border-white/8 bg-[#1F2023]/95 pb-3">
         <TeamSwitcher teams={teams} />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="New Chat">
+            <SidebarMenuButton asChild tooltip="New Chat" className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/8 hover:text-white">
               <Link href="/">
-                <Plus />
+                <Plus className="stroke-[1.8]" />
                 <span>New Chat</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="bg-[#1F2023] px-0 py-2">
         <NavMain items={navMain} />
         <NavChats chats={chats} currentChatId={currentChatId} />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-white/8 bg-[#1F2023]/95">
         {authEnabled && !isAuthenticated ? (
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild size="lg">
+              <SidebarMenuButton asChild size="lg" className="rounded-xl border border-white/8 bg-white/5 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white">
                 <Link href="/api/auth/signin/google">
-                  <MessageSquare />
+                  <MessageSquare className="stroke-[1.8]" />
                   <span>Sign in with Google</span>
                 </Link>
               </SidebarMenuButton>

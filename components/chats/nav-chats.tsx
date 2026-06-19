@@ -71,9 +71,9 @@ export function NavChats({
                 >
                   <Link href={`/chats/${chat.id}`}>
                     {chat.isPinned ? (
-                      <Pin className="size-4 shrink-0" />
+                      <Pin className="size-4 shrink-0 stroke-[1.8]" />
                     ) : (
-                      <MessageSquare className="size-4 shrink-0" />
+                      <MessageSquare className="size-4 shrink-0 stroke-[1.8]" />
                     )}
                     <span>{chat.title}</span>
                   </Link>

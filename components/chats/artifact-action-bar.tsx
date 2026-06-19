@@ -16,6 +16,21 @@ type WorkspaceState = {
   shareLinks: Array<{ id: string; token: string; isPublic: boolean }>;
   fileCount: number;
   hasGithub: boolean;
+  buildSpec?: {
+    templateId: string;
+    title: string;
+    summary: string;
+    dependencies: string[];
+    envHints: string[];
+    routes: string[];
+    previewRoute: string;
+  };
+  validation?: {
+    ok: boolean;
+    issueCount: number;
+    issues: Array<{ path: string; line: number; column: number; message: string }>;
+    formatted: string;
+  };
 };
 
 type VersionOption = { id: string; version: number; label: string };
@@ -101,13 +116,42 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const handleSync = () => {
     startTransition(async () => {
       const result = await workspaceRequest("sync", { files });
-      toast({ title: "Files synced", description: `${result.fileCount ?? files.length} files stored in the project backend.` });
+      const description = result.validation?.ok
+        ? `${result.fileCount ?? files.length} files stored in the project backend.`
+        : `${result.validation?.issueCount ?? 0} validation issue(s) detected.`;
+      toast({ title: "Files synced", description });
+    });
+  };
+
+  const handleBootstrap = () => {
+    startTransition(async () => {
+      const result = await workspaceRequest("bootstrap", { force: true });
+      if (result.ok === false) {
+        toast({
+          title: "Scaffold not reseeded",
+          description: result.reason || "Workspace already has files.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Scaffold reseeded",
+        description: `${result.fileCount ?? files.length} scaffold files restored.`,
+      });
     });
   };
 
   const handlePublish = async () => {
     if (!activeMessageId) return;
     const result = await workspaceRequest("publish", { messageId: activeMessageId, files });
+    if (result.ok === false) {
+      toast({
+        title: "Publish blocked",
+        description: result.reason || "Fix validation errors before publishing.",
+        variant: "destructive",
+      });
+      return result;
+    }
     const absoluteUrl = `${window.location.origin}${result.url}`;
     setPublishedUrl(absoluteUrl);
     setDuplicateProtected(Boolean(result.duplicateProtected));
@@ -137,7 +181,11 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     startTransition(async () => {
       const result = await workspaceRequest("create-pr", { files });
       if (result.ok === false) {
-        toast({ title: "GitHub not ready", description: result.reason || "Connect GitHub first.", variant: "destructive" });
+        toast({
+          title: "PR blocked",
+          description: result.reason || "Connect GitHub first.",
+          variant: "destructive",
+        });
         return;
       }
       toast({ title: "PR request queued", description: `${result.fileCount ?? files.length} files prepared for GitHub.` });
@@ -209,8 +257,27 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
       {open && (
         <div ref={menuRef} id={menuId} role="menu" className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
-          <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground"><p className="font-medium text-foreground">{chatTitle}</p><p>{activeVersionLabel || "No version"} · {workspace?.fileCount ?? files.length} backend files</p></div>
-          <div className="py-1"><button type="button" role="menuitem" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button><button type="button" role="menuitem" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button></div>
+          <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground">
+            <p className="font-medium text-foreground">{chatTitle}</p>
+            <p>{activeVersionLabel || "No version"} · {workspace?.fileCount ?? files.length} backend files</p>
+            {workspace?.buildSpec ? (
+              <p className="mt-1 truncate text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                {workspace.buildSpec.templateId} · {workspace.buildSpec.previewRoute}
+              </p>
+            ) : null}
+            {workspace?.validation ? (
+              <p className={`mt-1 ${workspace.validation.ok ? "text-emerald-600" : "text-amber-600"}`}>
+                {workspace.validation.ok
+                  ? "Validation clean"
+                  : `${workspace.validation.issueCount} validation issue(s)`}
+              </p>
+            ) : null}
+          </div>
+          <div className="py-1">
+            <button type="button" role="menuitem" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button>
+            <button type="button" role="menuitem" className={menuItem} onClick={handleBootstrap} disabled={isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Reseed scaffold</button>
+            <button type="button" role="menuitem" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button>
+          </div>
           <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" aria-label="Environment variable key" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" aria-label="Environment variable value" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} aria-label="Save environment variable" className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">Save</button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
         </div>
       )}

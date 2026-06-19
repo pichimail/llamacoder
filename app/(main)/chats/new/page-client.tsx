@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { useAvailableModels } from "@/lib/use-available-models";
 import { getVisibleModels, MODELS } from "@/lib/constants";
+import { Context } from "../../providers";
 
 export default function NewChatPageClient({
   prompt,
@@ -14,6 +15,7 @@ export default function NewChatPageClient({
   model: string | null;
 }) {
   const router = useRouter();
+  const context = use(Context);
   const availableModels = useAvailableModels();
   const [error, setError] = useState<string | null>(null);
 
@@ -61,8 +63,27 @@ export default function NewChatPageClient({
           throw new Error(message);
         }
 
-        const { chatId } = await res.json();
+        const { chatId, lastMessageId } = await res.json();
         if (cancelled) return;
+
+        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+          method: "POST",
+          body: JSON.stringify({
+            messageId: lastMessageId,
+            model,
+            reasoning: false,
+            quality: "low",
+          }),
+        }).then(async (streamRes) => {
+          if (!streamRes.ok) {
+            throw new Error((await streamRes.text()) || "Failed to start generation");
+          }
+          if (!streamRes.body) throw new Error("No body on response");
+          return streamRes.body;
+        });
+        void streamPromise.catch(() => undefined);
+        context.setStreamPromise(streamPromise);
+
         router.replace(`/chats/${chatId}`);
       } catch (err) {
         if (cancelled) return;

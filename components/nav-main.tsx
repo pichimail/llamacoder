@@ -68,8 +68,8 @@ export function NavMain({
           >
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip={item.title} className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px">
-                  {item.icon && <item.icon />}
+                <SidebarMenuButton tooltip={item.title} className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/8 hover:text-white">
+                  {item.icon && <item.icon className="stroke-[1.8]" />}
                   <span>{item.title}</span>
                   <ChevronRight className="ml-auto size-4 stroke-[1.8] transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-90" />
                 </SidebarMenuButton>
@@ -78,7 +78,7 @@ export function NavMain({
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild className="rounded-lg transition-all duration-200 ease-out hover:-translate-y-px">
+                      <SidebarMenuSubButton asChild className="rounded-lg transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/8 hover:text-white">
                         <NavSubLink title={subItem.title} url={subItem.url} />
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

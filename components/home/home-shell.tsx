@@ -20,7 +20,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
         loading={loading}
       />
       <SidebarInset className="min-h-dvh overflow-x-hidden overflow-y-auto">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/8 px-4 md:hidden">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/8 bg-[#1F2023] px-4 text-[#F4F4F5] md:hidden">
           <SidebarTrigger className="-ml-1 rounded-lg border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <span className="text-sm font-medium">Chinna-Coder</span>

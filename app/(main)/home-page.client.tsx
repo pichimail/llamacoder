@@ -22,7 +22,6 @@ import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { getVisibleModels, MODELS } from "@/lib/constants";
 import { useAvailableModels } from "@/lib/use-available-models";
 import type { FeaturedApp } from "@/lib/featured-apps";
-import { BuilderToggles } from "@/components/builder-toggles";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 import { PlanModePanel } from "@/components/plan-mode-panel";
 import Link from "next/link";
@@ -319,7 +318,7 @@ export default function HomePageClient() {
   ];
   const currentMode = modes.find(m => m.value === mode)!;
   const composerFooter = (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
       <OptionDropdown
         value={mode}
         onValueChange={(value) => setMode(value as Mode)}
@@ -329,7 +328,7 @@ export default function HomePageClient() {
             {currentMode.icon} {currentMode.label}
           </span>
         }
-        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:border-white/20 hover:bg-white/10 hover:text-white"
+        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/20 hover:bg-white/10 hover:text-white"
         options={modes.map((item) => ({
           value: item.value,
           label: (
@@ -340,21 +339,12 @@ export default function HomePageClient() {
         }))}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <BuilderToggles
-          compact
-          className="text-slate-200/80"
-          showShadcn={false}
-          shadcnEnabled={shadcnEnabled}
-          onShadcnChange={setShadcnEnabled}
-          reasoningEnabled={reasoningEnabled}
-          onReasoningChange={setReasoningEnabled}
-        />
         <OptionDropdown
           value={model}
           onValueChange={setModel}
           aria-label="Select AI model"
           triggerLabel={getModelLabel(model)}
-          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:border-white/20 hover:bg-white/10 hover:text-white"
+          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/20 hover:bg-white/10 hover:text-white"
           contentClassName="max-h-[320px]"
           options={(availableModels ?? getVisibleModels()).map((item) => ({
             value: item.value,
@@ -469,10 +459,10 @@ export default function HomePageClient() {
         });
         void streamPromise.catch(() => undefined);
 
-        context.setStreamPromise(streamPromise);
         setPrompt("");
         setScreenshotUrl(undefined);
         router.push(`/chats/${chatId}`);
+        context.setStreamPromise(streamPromise);
       } finally {
         setIsSubmitting(false);
       }
@@ -484,7 +474,7 @@ export default function HomePageClient() {
       <div className="flex min-h-dvh flex-col text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-[104dvh] flex-col"
+          className="relative flex min-h-[112dvh] flex-col"
           style={{ background: HERO_GRADIENT }}
         >
           <div className="relative flex flex-1 flex-col">
@@ -549,9 +539,9 @@ export default function HomePageClient() {
 
         <section
           id="featured-templates"
-          className="relative z-10 mx-auto w-full max-w-5xl -mt-8 px-4 pb-8 pt-4 md:-mt-12"
+          className="relative z-10 mx-auto w-full max-w-5xl -mt-2 px-4 pb-8 pt-4 md:-mt-4"
         >
-          <div className="rounded-[32px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
+          <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
             <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
               <div>
                 <h2 className="text-lg font-semibold tracking-tight">

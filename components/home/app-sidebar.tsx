@@ -53,7 +53,6 @@ const navMain = [
     icon: Images,
     items: [
       { title: "Gallery", url: "/gallery" },
-      { title: "GitHub", url: "https://github.com/pichimail/llamacoder" },
     ],
   },
 ]
@@ -100,7 +99,7 @@ export function HomeAppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="New Chat" className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px">
+            <SidebarMenuButton asChild tooltip="New Chat" className="rounded-xl transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/8 hover:text-white">
               <Link href="/">
                 <Plus className="stroke-[1.8]" />
                 <span>New Chat</span>

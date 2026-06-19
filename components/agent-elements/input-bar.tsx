@@ -47,7 +47,7 @@ import {
   PromptInputTools,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
-import { Paperclip } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useInputTyping } from "./input/input-typing";
 import { QuestionPrompt } from "./question/question-prompt";
 import { Suggestions, type SuggestionItem } from "./input/suggestions";
@@ -501,7 +501,7 @@ export const InputBar = memo(function InputBar({
                       onClick={onAttach}
                       className="text-muted-foreground hover:text-foreground"
                     >
-                      <Paperclip className="size-4" />
+                      <Plus className="size-4" />
                     </PromptInputButton>
                   ) : null}
                   {leftActions}
@@ -514,7 +514,7 @@ export const InputBar = memo(function InputBar({
                       onClick={onAttach}
                       className="text-muted-foreground hover:text-foreground"
                     >
-                      <Paperclip className="size-4" />
+                      <Plus className="size-4" />
                     </PromptInputButton>
                   ) : null}
                   <PromptInputSubmit

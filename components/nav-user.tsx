@@ -100,22 +100,22 @@ export function NavUser({
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem disabled>
-                    <Sparkles />
+                    <Sparkles className="stroke-[1.8]" />
                     Upgrade to Pro
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem disabled={!isAuthenticated}>
-                    <BadgeCheck />
+                    <BadgeCheck className="stroke-[1.8]" />
                     Account
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={!isAuthenticated}>
-                    <CreditCard />
+                    <CreditCard className="stroke-[1.8]" />
                     Billing
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={!isAuthenticated}>
-                    <Bell />
+                    <Bell className="stroke-[1.8]" />
                     Notifications
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -123,14 +123,14 @@ export function NavUser({
                 {isAuthenticated ? (
                   <DropdownMenuItem asChild>
                     <a href="/api/auth/signout">
-                      <LogOut />
+                      <LogOut className="stroke-[1.8]" />
                       Log out
                     </a>
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
                     <Link href="/api/auth/signin/google">
-                      <LogIn />
+                      <LogIn className="stroke-[1.8]" />
                       Sign in with Google
                     </Link>
                   </DropdownMenuItem>
@@ -141,28 +141,17 @@ export function NavUser({
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
                     <Link href="/chats">
-                      <BadgeCheck />
+                      <BadgeCheck className="stroke-[1.8]" />
                       View chats
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/gallery">
-                      <Sparkles />
+                      <Sparkles className="stroke-[1.8]" />
                       Gallery
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a
-                    href="https://github.com/pichimail/llamacoder"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <LogIn />
-                    GitHub
-                  </a>
-                </DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>

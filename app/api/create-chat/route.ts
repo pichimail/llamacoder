@@ -9,6 +9,8 @@ import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import { anyProviderConfigured } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
+import { buildPhaseOneSpec } from "@/lib/build-engine";
+import { seedBuildArtifacts } from "@/lib/build-workspace";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -60,6 +62,7 @@ export async function POST(request: NextRequest) {
     const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn } = parsed.data;
     const resolvedModel = resolveModel(model);
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
+    const buildSpec = buildPhaseOneSpec({ prompt: promptWithAttachments, mode, shadcn });
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
@@ -76,11 +79,9 @@ export async function POST(request: NextRequest) {
 
     const prisma = getPrisma();
     const chat = await prisma.chat.create({
-      data: { model: resolvedModel, quality, prompt, title: "", shadcn },
+      data: { model: resolvedModel, quality, prompt, title: buildSpec.title, shadcn },
     });
 
-    let title = promptWithAttachments.trim().split(/\s+/).slice(0, 6).join(" ");
-    if (title.length > 60) title = title.slice(0, 57) + "...";
     const userMessage = screenshotUrl
       ? `${promptWithAttachments}\n\nScreenshot attachment: ${screenshotUrl}`
       : promptWithAttachments;
@@ -88,19 +89,19 @@ export async function POST(request: NextRequest) {
     const newChat = await prisma.chat.update({
       where: { id: chat.id },
       data: {
-        title,
+        title: buildSpec.title,
         messages: {
           create: [
             {
               role: "system",
               content:
-                getMainCodingPrompt(
+                `${buildSpec.systemContext}\n\n${getMainCodingPrompt(
                   mode,
                   !!screenshotUrl,
                   false,
                   promptWithAttachments,
                   shadcn,
-                ),
+                )}`,
               position: 0,
             },
             {
@@ -120,15 +121,28 @@ export async function POST(request: NextRequest) {
     const lastMessage = newChat.messages.sort((a, b) => a.position - b.position).at(-1);
     if (!lastMessage) throw new Error("No new message");
 
+    const seededArtifacts = await seedBuildArtifacts(
+      chat.id,
+      buildSpec.title,
+      promptWithAttachments,
+      buildSpec.artifactFiles,
+    );
+
     logGeneration({
       chatId: chat.id,
       model: resolvedModel,
       input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode },
       output: userMessage,
-      metadata: { type: "initial_generation", title },
+      metadata: { type: "initial_generation", title: buildSpec.title, template: buildSpec.templateId },
     });
 
-    return NextResponse.json({ chatId: chat.id, lastMessageId: lastMessage.id });
+    return NextResponse.json({
+      chatId: chat.id,
+      lastMessageId: lastMessage.id,
+      buildSpec,
+      artifacts: buildSpec.artifactFiles,
+      seededArtifacts,
+    });
   } catch (error) {
     console.error("Error creating chat:", error);
     const isDev = process.env.NODE_ENV !== "production";

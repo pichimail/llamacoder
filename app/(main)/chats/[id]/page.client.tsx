@@ -4,6 +4,7 @@ import { createMessage } from "@/app/(main)/actions";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { mergeArtifactFiles } from "@/lib/code-patch";
+import { formatGeneratedCodeIssues, validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { useTheme } from "@/components/theme-provider";
@@ -260,9 +261,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     }
   }, [workspaceRequest]);
 
-  const requestFix = useCallback(async ({ error, auto, attempt, fallback }: { error: string; auto: boolean; attempt: number; fallback: boolean }) => {
+  const requestFix = useCallback(async ({ error, auto, attempt, fallback, files }: { error: string; auto: boolean; attempt: number; fallback: boolean; files?: RawGeneratedFile[] }) => {
     const prefix = auto ? (fallback ? "Rebuild the generated app cleanly. Fix this preview error and return the full working files." : "Apply a minimal patch to fix this preview error and return only changed files.") : "The code is not working. Fix it.";
-    const fileManifest = artifactFiles.map((file) => `- ${file.path}`).join("\n");
+    const fileManifest = (files ?? artifactFiles).map((file) => `- ${file.path}`).join("\n");
     const text = `${prefix}\n\nAttempt: ${attempt}\n\nCurrent artifact files:\n${fileManifest || "- no files parsed"}\n\nPreview error:\n${error.trimStart()}`;
     const message = await createMessage(chat.id, text, "user");
     const controller = new AbortController();
@@ -282,6 +283,53 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     router.refresh();
   }, [artifactFiles, chat.id, chat.model, router]);
 
+  const triggerAutoFix = useCallback(async ({ error, files, fallback = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean }) => {
+    if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
+    if (!autoFixEnabled) {
+      lastAutoFixErrorRef.current = error.trim();
+      setBuilderStatus("failed");
+      return;
+    }
+
+    const normalized = error.trim();
+    const now = Date.now();
+    const same = normalized === lastAutoFixErrorRef.current;
+    if (same && now - lastAutoFixAtRef.current < 4500) return;
+    if (same && autoFixAttemptRef.current > 0) {
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      return;
+    }
+    if (!same) autoFixAttemptRef.current = 0;
+
+    const nextAttempt = autoFixAttemptRef.current + 1;
+    if (nextAttempt > 1) {
+      autoFixAttemptRef.current = nextAttempt;
+      setAutoFixAttempt(1);
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      autoFixPendingRef.current = false;
+      return;
+    }
+
+    autoFixAttemptRef.current = nextAttempt;
+    autoFixPendingRef.current = true;
+    lastAutoFixErrorRef.current = normalized;
+    lastAutoFixAtRef.current = now;
+    setAutoFixAttempt(nextAttempt);
+    setAutoFixStatus("fixing");
+    setBuilderStatus("fixing");
+    startTransition(async () => {
+      try {
+        await requestFix({ error: normalized, auto: true, attempt: nextAttempt, fallback, files });
+      } catch {
+        autoFixPendingRef.current = false;
+        setAutoFixStatus("watching");
+        setBuilderStatus("validating");
+      }
+    });
+  }, [autoFixEnabled, requestFix]);
+
   const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
     setAutoFixEnabled(enabled);
     autoFixAttemptRef.current = 0;
@@ -294,48 +342,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
-    if (!autoFixEnabled) {
-      lastAutoFixErrorRef.current = error.trim();
-      setBuilderStatus("failed");
-      return;
-    }
-    const normalized = error.trim();
-    const now = Date.now();
-    const same = normalized === lastAutoFixErrorRef.current;
-    if (same && now - lastAutoFixAtRef.current < 4500) return;
-    if (same && autoFixAttemptRef.current > 0) {
-      setAutoFixStatus("idle");
-      setBuilderStatus("failed");
-      return;
-    }
-    if (!same) autoFixAttemptRef.current = 0;
-    const nextAttempt = autoFixAttemptRef.current + 1;
-    if (nextAttempt > 1) {
-      autoFixAttemptRef.current = nextAttempt;
-      setAutoFixAttempt(1);
-      setAutoFixStatus("idle");
-      setBuilderStatus("failed");
-      autoFixPendingRef.current = false;
-      return;
-    }
-    const fallback = false;
-    autoFixAttemptRef.current = nextAttempt;
-    autoFixPendingRef.current = true;
-    lastAutoFixErrorRef.current = normalized;
-    lastAutoFixAtRef.current = now;
-    setAutoFixAttempt(nextAttempt);
-    setAutoFixStatus("fixing");
-    setBuilderStatus("fixing");
-    startTransition(async () => {
-      try { await requestFix({ error, auto: true, attempt: nextAttempt, fallback }); }
-      catch {
-        autoFixPendingRef.current = false;
-        setAutoFixStatus("watching");
-        setBuilderStatus("validating");
-      }
-    });
-  }, [autoFixEnabled, requestFix]);
+    void triggerAutoFix({ error });
+  }, [triggerAutoFix]);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -471,6 +479,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
                 });
                 return;
               }
+              const validationIssues = await validateGeneratedCodeFiles(mergedFiles);
+              if (validationIssues.length > 0) {
+                const validationError = `Generated code validation failed before preview commit.\n\n${formatGeneratedCodeIssues(validationIssues)}`;
+                await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
+                isHandlingStreamRef.current = false;
+                setStreamPromise(undefined);
+                return;
+              }
               const message = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
               void syncWorkspaceFiles(mergedFiles);
               startTransition(() => {
@@ -532,6 +548,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     if (!activeMessage?.id || artifactFiles.length === 0) return;
     try {
       const result = await workspaceRequest("publish", { messageId: activeMessage.id, files: artifactFiles });
+      if (result.ok === false) {
+        toast({
+          title: "Publish blocked",
+          description: result.reason || "Fix validation errors before publishing.",
+          variant: "destructive",
+        });
+        return;
+      }
       const absoluteUrl = `${window.location.origin}${result.url}`;
       setPublishedUrl(absoluteUrl);
       setDuplicateProtected(Boolean(result.duplicateProtected));
@@ -551,7 +575,11 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     try {
       const result = await workspaceRequest("create-pr", { files: artifactFiles });
       if (result.ok === false) {
-        toast({ title: "GitHub not ready", description: result.reason || "Connect GitHub first.", variant: "destructive" });
+        toast({
+          title: "PR blocked",
+          description: result.reason || "Connect GitHub first.",
+          variant: "destructive",
+        });
         return;
       }
       toast({ title: "PR request created", description: `${result.fileCount ?? artifactFiles.length} files prepared for GitHub.` });
