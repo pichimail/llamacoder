@@ -11,6 +11,7 @@ import { Fragment } from "react";
 import { Streamdown } from "streamdown";
 import { StickToBottom } from "use-stick-to-bottom";
 import { AppVersionButton } from "@/components/app-version-button";
+import NeonCode from "@/components/syntax-highlighter";
 import {
   Reasoning,
   ReasoningContent,
@@ -195,14 +196,22 @@ function AssistantMessage({
           }
 
           return (
-            <div
-              key={i}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
-              role="status"
-              aria-label={`Generated file ${seg.path}`}
-            >
-              <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
-              <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
+            <div key={i} className="space-y-2">
+              <div
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+                role="status"
+                aria-label={`Generated file ${seg.path}`}
+              >
+                <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
+                <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
+              </div>
+              {/\.(html|xhtml)$/i.test(seg.path) ? (
+                <NeonCode
+                  code={(allFiles.find((file) => file.path === seg.path)?.code ?? "").trim()}
+                  language="html"
+                  className="max-h-80"
+                />
+              ) : null}
             </div>
           );
         })}

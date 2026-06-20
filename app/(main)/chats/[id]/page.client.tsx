@@ -10,7 +10,7 @@ import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { useTheme } from "@/components/theme-provider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { ChatCompletionStreamClient } from "@/lib/chat-completion-stream-client";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
@@ -28,14 +28,16 @@ import { ModeDatabase } from "@/components/chats/mode-database";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
 import type { PreviewMode } from "@/components/code-runner-react";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: false });
-
-const MIN_CHAT_WIDTH = 260;
-const MAX_CHAT_WIDTH = 720;
 
 type BuilderMode = "preview" | "code" | "design" | "database";
 type MobilePanel = "chat" | "code" | "preview";
@@ -96,13 +98,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       .at(-1),
   );
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
-  const [chatPanelWidth, setChatPanelWidth] = useState(420);
-
   const streamPromiseRef = useRef(streamPromise);
   const streamTextRef = useRef(streamText);
   const isHandlingStreamRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const dragRef = useRef<{ startX: number; startChat: number } | null>(null);
   const autoFixAttemptRef = useRef(0);
   const autoFixPendingRef = useRef(false);
   const lastAutoFixErrorRef = useRef("");
@@ -378,36 +377,6 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [streamPromise, stopStreaming, setModeSafely, showUnsavedOverlay]);
-
-  useEffect(() => {
-    setChatPanelWidth((width) => Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, Math.round(window.innerWidth * 0.3) || width)));
-    const move = (e: MouseEvent) => {
-      if (!dragRef.current) return;
-      const { startX, startChat } = dragRef.current;
-      setChatPanelWidth(Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, startChat + e.clientX - startX)));
-    };
-    const up = () => {
-      dragRef.current = null;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-  }, []);
-
-  const onSplitterMouseDown = (e: ReactMouseEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startChat: chatPanelWidth };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  };
-
-  const onSplitterKeyDown = (e: ReactKeyboardEvent) => {
-    const step = e.shiftKey ? 48 : 16;
-    if (e.key === "ArrowLeft") { e.preventDefault(); setChatPanelWidth((w) => Math.max(MIN_CHAT_WIDTH, w - step)); }
-    if (e.key === "ArrowRight") { e.preventDefault(); setChatPanelWidth((w) => Math.min(MAX_CHAT_WIDTH, w + step)); }
-  };
 
   useEffect(() => {
     async function readStream() {
@@ -749,17 +718,24 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
             </div>
           </header>
 
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <section style={{ ["--chat-w" as any]: chatPanelWidth + "px" }} className={`${mobilePanel === "chat" ? "flex" : "hidden"} h-full w-full flex-col overflow-hidden bg-transparent ${chatCollapsed ? "md:hidden" : "md:flex"} md:h-auto md:w-[var(--chat-w)] md:min-w-[260px] md:max-w-[720px] md:border-r md:border-border/70`} aria-label="Chat panel">
-              {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-              <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
-              <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
-            </section>
+          <ResizablePanelGroup id="chat-builder-split" orientation="horizontal" className="min-h-0 flex-1 overflow-hidden">
+            {!chatCollapsed ? (
+              <>
+                <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
+                  <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
+                    {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+                    <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
+                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                  </section>
+                </ResizablePanel>
+                <ResizableHandle withHandle className="hidden md:flex" />
+              </>
+            ) : null}
 
-            <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label="Resize chat panel" aria-valuemin={MIN_CHAT_WIDTH} aria-valuemax={MAX_CHAT_WIDTH} aria-valuenow={chatPanelWidth} onMouseDown={onSplitterMouseDown} onKeyDown={onSplitterKeyDown} className={`${chatCollapsed ? "hidden" : "hidden md:block"} group relative z-10 w-px flex-shrink-0 cursor-col-resize bg-border/70 transition focus-visible:outline-none`} />
-
-            <section className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:flex md:min-w-[360px]`} aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
-          </div>
+            <ResizablePanel id="builder-panel" minSize="45%" className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-transparent md:flex`}>
+              <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
 
         <ChatsContextMenu

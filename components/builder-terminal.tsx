@@ -13,6 +13,53 @@ import {
 
 type Line = { kind: "in" | "out" | "err"; text: string };
 
+function tokenizeTerminalLine(text: string) {
+  const segments: Array<{ text: string; className?: string }> = [];
+  const pattern = /(\$|>|✓|✗|\b\d+(?:\.\d+)?\b)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index) });
+    }
+
+    const token = match[0];
+    const className =
+      token === "$"
+        ? "text-fuchsia-400"
+        : token === ">"
+          ? "text-cyan-400"
+          : token === "✓"
+            ? "text-emerald-400"
+            : token === "✗"
+              ? "text-red-400"
+              : "text-sky-400";
+
+    segments.push({ text: token, className });
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex) });
+  }
+
+  return segments;
+}
+
+function NeonTerminalLine({ text }: { text: string }) {
+  const segments = useMemo(() => tokenizeTerminalLine(text), [text]);
+  return (
+    <span className="whitespace-pre-wrap break-words">
+      {segments.map((segment, index) => (
+        <span key={`${segment.text}-${index}`} className={segment.className}>
+          {segment.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function BuilderTerminal({
   files,
   onCreateFile,
@@ -190,10 +237,10 @@ export default function BuilderTerminal({
             {line.kind === "in" ? (
               <span>
                 <span className="text-emerald-400">➜ </span>
-                {line.text}
+                <NeonTerminalLine text={line.text} />
               </span>
             ) : (
-              line.text
+              <NeonTerminalLine text={line.text} />
             )}
           </div>
         ))}

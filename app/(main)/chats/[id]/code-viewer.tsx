@@ -58,6 +58,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { Switch } from "@/components/ui/switch";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -315,8 +320,6 @@ export default function CodeViewer({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
   const [showTerminal, setShowTerminal] = useState(false);
-  const [terminalHeight, setTerminalHeight] = useState(180);
-  const [treeWidth, setTreeWidth] = useState(220);
   const [creating, setCreating] = useState<null | "file" | "folder">(null);
   const [newName, setNewName] = useState("");
   const [explorerPanel, setExplorerPanel] = useState<ExplorerPanel>("files");
@@ -332,11 +335,6 @@ export default function CodeViewer({
   const [renameValue, setRenameValue] = useState("");
   const [deletePath, setDeletePath] = useState<string | null>(null);
   const editorApiRef = useRef<{ undo: () => void; redo: () => void } | null>(null);
-  const dragState = useRef<
-    | { type: "tree"; startX: number; start: number }
-    | { type: "term"; startY: number; start: number }
-    | null
-  >(null);
 
   const baseKey = useMemo(() => {
     const fileKey = baseFiles.map((f) => `${f.path}:${streamText ? f.code.length : 0}:${f.isPartial ? 1 : 0}`).join("|");
@@ -468,26 +466,6 @@ export default function CodeViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [saveAll]);
 
-  useEffect(() => {
-    const move = (event: MouseEvent) => {
-      const state = dragState.current;
-      if (!state) return;
-      if (state.type === "tree") setTreeWidth(Math.max(150, Math.min(380, state.start + event.clientX - state.startX)));
-      if (state.type === "term") setTerminalHeight(Math.max(90, Math.min(420, state.start - (event.clientY - state.startY))));
-    };
-    const up = () => {
-      dragState.current = null;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, []);
-
   const searchResults = useMemo(() => {
     const query = matchCase ? searchQuery : searchQuery.toLowerCase();
     if (!query) return [];
@@ -529,6 +507,74 @@ export default function CodeViewer({
   const iconBtn = "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40";
   const panelIconBtn = "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground data-[active=true]:text-foreground";
   const menuButton = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+
+  const renderPrimaryEditor = () => {
+    if (!selectedFile) return <EmptyState isStreaming={isStreaming} />;
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs">
+          <Snippet code={selectedFile.path} className="min-w-0 flex-1 border-0 bg-transparent shadow-none">
+            <SnippetInput className="truncate text-xs text-muted-foreground" aria-label="Active file path" />
+            <SnippetAddon align="inline-end">
+              <SnippetCopyButton onCopy={() => toast({ title: "Path copied" })} />
+            </SnippetAddon>
+          </Snippet>
+          {dirty.has(selectedFile.path) ? <span className="shrink-0 text-amber-500">●</span> : null}
+        </div>
+        <CodeEditor path={selectedFile.path} value={selectedFile.code} onChange={(value) => updateFile(selectedFile.path, value)} onEditorReady={(api) => (editorApiRef.current = api)} showMinimap={showMinimap} wordWrap={wordWrap} />
+      </div>
+    );
+  };
+
+  const renderSplitCompanion = () => {
+    if (codeLayout === "split-preview") {
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-8 shrink-0 items-center border-b border-border/70 px-3 text-xs text-muted-foreground"><LayoutPanelTop className="mr-2 size-3.5" aria-hidden="true" />Live preview</div>
+          <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} />
+        </div>
+      );
+    }
+
+    if (codeLayout === "split-editor" && sideFile) {
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs">
+            <span className="truncate font-mono text-muted-foreground">{sideFile.path}</span>
+            <button type="button" className="ml-auto rounded p-1 text-muted-foreground hover:text-foreground" onClick={() => setCodeLayout("editor")} aria-label="Close side editor"><PanelRightClose className="size-3.5" aria-hidden="true" /></button>
+          </div>
+          <CodeEditor path={`side-${sideFile.path}`} value={sideFile.code} onChange={(value) => updateFile(sideFile.path, value)} showMinimap={showMinimap} wordWrap={wordWrap} />
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const renderEditorWorkspace = () => {
+    const splitCompanion = renderSplitCompanion();
+
+    if (!selectedFile || !splitCompanion) {
+      return renderPrimaryEditor();
+    }
+
+    return (
+      <>
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden lg:hidden">
+          {renderPrimaryEditor()}
+        </div>
+        <ResizablePanelGroup id="code-viewer-editor-split" orientation="horizontal" className="hidden min-h-0 flex-1 overflow-hidden lg:flex">
+          <ResizablePanel id="primary-editor" defaultSize="54%" minSize="30%" className="min-w-0 overflow-hidden">
+            {renderPrimaryEditor()}
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel id="secondary-editor" defaultSize="46%" minSize="30%" className="min-w-0 overflow-hidden">
+            {splitCompanion}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </>
+    );
+  };
 
   return (
     <TooltipProvider>
@@ -587,8 +633,9 @@ export default function CodeViewer({
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {activeTab === "code" ? (
-            <>
-              <nav style={{ width: treeWidth }} className="hidden shrink-0 flex-col overflow-hidden border-r border-border/70 bg-transparent sm:flex" aria-label="Project workspace">
+            <ResizablePanelGroup id="code-viewer-workspace-split" orientation="horizontal" className="min-h-0">
+              <ResizablePanel id="file-explorer" defaultSize="22%" minSize="14%" maxSize="34%" className="hidden min-w-0 flex-col overflow-hidden bg-transparent sm:flex">
+                <nav className="flex h-full min-h-0 flex-col overflow-hidden border-r border-border/70 bg-transparent" aria-label="Project workspace">
                 <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/70 px-2">
                   <Tip label="Files"><button data-active={explorerPanel === "files"} className={panelIconBtn} onClick={() => setExplorerPanel("files")} aria-label="Files"><FileCode2 className="size-3.5" aria-hidden="true" /></button></Tip>
                   <Tip label="Search and replace"><button data-active={explorerPanel === "search"} className={panelIconBtn} onClick={() => setExplorerPanel("search")} aria-label="Search and replace"><Search className="size-3.5" aria-hidden="true" /></button></Tip>
@@ -650,71 +697,53 @@ export default function CodeViewer({
                 {explorerPanel === "extensions" ? (
                   <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2 text-xs">
                     <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Component library</p><div className="space-y-1.5">{["button", "input", "card", "dialog", "sheet", "dropdown-menu"].map((name) => { const importPath = `components/ui/${name}`; return <Snippet key={name} code={importPath} className="h-8 text-[11px]"><SnippetText className="pl-1.5 text-[10px]">@/</SnippetText><SnippetInput className="text-[11px]" aria-label={`Import path for ${name}`} /><SnippetAddon align="inline-end"><SnippetCopyButton onCopy={() => toast({ title: "Path copied" })} /></SnippetAddon></Snippet>; })}</div></div>
-                    <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Add preview dependency</p><div className="space-y-1">{["framer-motion", "lucide-react", "recharts", "date-fns", "clsx"].map((pkg) => <button key={pkg} className="flex w-full items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left hover:border-foreground/30" onClick={() => installDependency(pkg)}><PackagePlus className="size-3.5 text-muted-foreground" aria-hidden="true" /><span className="font-mono">{pkg}</span></button>)}</div></div>
+                    <div><p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Add preview dependency</p><div className="space-y-1">{["framer-motion", "gsap", "animejs", "three", "lucide-react", "recharts", "date-fns", "clsx"].map((pkg) => <button key={pkg} className="flex w-full items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left hover:border-foreground/30" onClick={() => installDependency(pkg)}><PackagePlus className="size-3.5 text-muted-foreground" aria-hidden="true" /><span className="font-mono">{pkg}</span></button>)}</div></div>
                     <div className="border-t border-border/70 pt-2"><p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground">Installed in preview</p>{Object.keys(extraDeps).length ? Object.entries(extraDeps).map(([name, version]) => <p key={name} className="truncate font-mono text-[11px] text-foreground">{name}@{version}</p>) : <p className="text-[11px] text-muted-foreground">No extra dependencies added.</p>}</div>
                   </div>
                 ) : null}
-              </nav>
-
-              <div role="separator" aria-orientation="vertical" aria-label="Resize file tree" tabIndex={0} onMouseDown={(event) => { event.preventDefault(); dragState.current = { type: "tree", startX: event.clientX, start: treeWidth }; document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; }} onKeyDown={(event) => { if (event.key === "ArrowLeft") setTreeWidth((width) => Math.max(150, width - 12)); if (event.key === "ArrowRight") setTreeWidth((width) => Math.min(380, width + 12)); }} className="group relative hidden w-px shrink-0 cursor-col-resize bg-transparent transition focus-visible:outline-none sm:block">
-                <div className="absolute inset-y-0 left-0 w-px bg-border/80 transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" aria-hidden="true" />
-              </div>
-            </>
-          ) : null}
-
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            {activeTab === "preview" ? (
-              <div role="tabpanel" aria-label="Live preview" className="min-h-0 flex-1 overflow-hidden">
-                {runnerFiles.length > 0 ? (
-                  <CodeRunner
-                    key={`${refresh}-${previewMode}`}
-                    files={runnerFiles}
-                    extraDependencies={extraDeps}
-                    onRequestFix={onRequestFix}
-                    onPreviewError={onPreviewError}
-                    onPreviewReady={onPreviewReady}
-                    previewMode={previewMode}
-                    onPreviewModeChange={onPreviewModeChange}
-                    showWebPreviewChrome
-                    showDeviceToggle
-                    onRefresh={() => setRefresh((value) => value + 1)}
-                    sandpackOptions={sandpackOptions}
-                  />
-                ) : (
-                  <EmptyState isStreaming={isStreaming} />
-                )}
-              </div>
-            ) : (
-              <div role="tabpanel" aria-label="Code editor" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="flex min-h-0 flex-1 overflow-hidden">
-                  {selectedFile ? (
-                    <>
-                      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs">
-                          <Snippet code={selectedFile.path} className="min-w-0 flex-1 border-0 bg-transparent shadow-none">
-                            <SnippetInput className="truncate text-xs text-muted-foreground" aria-label="Active file path" />
-                            <SnippetAddon align="inline-end">
-                              <SnippetCopyButton onCopy={() => toast({ title: "Path copied" })} />
-                            </SnippetAddon>
-                          </Snippet>
-                          {dirty.has(selectedFile.path) ? <span className="shrink-0 text-amber-500">●</span> : null}
-                        </div>
-                        <CodeEditor path={selectedFile.path} value={selectedFile.code} onChange={(value) => updateFile(selectedFile.path, value)} onEditorReady={(api) => (editorApiRef.current = api)} showMinimap={showMinimap} wordWrap={wordWrap} />
-                      </div>
-                      {codeLayout === "split-preview" ? <div className="hidden min-w-0 flex-1 flex-col overflow-hidden border-l border-border/70 lg:flex"><div className="flex h-8 shrink-0 items-center border-b border-border/70 px-3 text-xs text-muted-foreground"><LayoutPanelTop className="mr-2 size-3.5" aria-hidden="true" />Live preview</div><CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} /></div> : null}
-                      {codeLayout === "split-editor" && sideFile ? <div className="hidden min-w-0 flex-1 flex-col overflow-hidden border-l border-border/70 lg:flex"><div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/70 px-3 text-xs"><span className="truncate font-mono text-muted-foreground">{sideFile.path}</span><button type="button" className="ml-auto rounded p-1 text-muted-foreground hover:text-foreground" onClick={() => setCodeLayout("editor")} aria-label="Close side editor"><PanelRightClose className="size-3.5" aria-hidden="true" /></button></div><CodeEditor path={`side-${sideFile.path}`} value={sideFile.code} onChange={(value) => updateFile(sideFile.path, value)} showMinimap={showMinimap} wordWrap={wordWrap} /></div> : null}
-                    </>
-                  ) : <EmptyState isStreaming={isStreaming} />}
+                </nav>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="hidden sm:flex" />
+              <ResizablePanel id="code-workspace" minSize="45%" className="min-w-0 overflow-hidden">
+                <div role="tabpanel" aria-label="Code editor" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                  {showTerminal ? (
+                    <ResizablePanelGroup id="code-viewer-terminal-split" orientation="vertical" className="min-h-0 flex-1 overflow-hidden">
+                      <ResizablePanel id="editor-stack" defaultSize="72%" minSize="35%" className="min-h-0 overflow-hidden">
+                        {renderEditorWorkspace()}
+                      </ResizablePanel>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel id="terminal" defaultSize="28%" minSize="16%" maxSize="45%" className="min-h-0 overflow-hidden">
+                        <BuilderTerminal files={draft} deps={extraDeps} onCreateFile={createFile} onDeleteFile={deleteFile} onInstall={(pkg, version) => setExtraDeps((dependencies) => ({ ...dependencies, [pkg]: version || "latest" }))} />
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  ) : (
+                    renderEditorWorkspace()
+                  )}
                 </div>
-                {showTerminal ? (
-                  <>
-                    <div role="separator" aria-orientation="horizontal" aria-label="Resize terminal" tabIndex={0} onMouseDown={(event) => { event.preventDefault(); dragState.current = { type: "term", startY: event.clientY, start: terminalHeight }; document.body.style.cursor = "row-resize"; document.body.style.userSelect = "none"; }} onKeyDown={(event) => { if (event.key === "ArrowUp") setTerminalHeight((height) => Math.min(420, height + 16)); if (event.key === "ArrowDown") setTerminalHeight((height) => Math.max(90, height - 16)); }} className="group relative h-px shrink-0 cursor-row-resize bg-transparent transition focus-visible:outline-none"><div className="absolute left-0 top-0 h-px w-full bg-border/80 transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" aria-hidden="true" /></div>
-                    <div style={{ height: terminalHeight }} className="shrink-0"><BuilderTerminal files={draft} deps={extraDeps} onCreateFile={createFile} onDeleteFile={deleteFile} onInstall={(pkg, version) => setExtraDeps((dependencies) => ({ ...dependencies, [pkg]: version || "latest" }))} /></div>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            <div role="tabpanel" aria-label="Live preview" className="min-h-0 flex-1 overflow-hidden">
+              {runnerFiles.length > 0 ? (
+                <CodeRunner
+                  key={`${refresh}-${previewMode}`}
+                  files={runnerFiles}
+                  extraDependencies={extraDeps}
+                  onRequestFix={onRequestFix}
+                  onPreviewError={onPreviewError}
+                  onPreviewReady={onPreviewReady}
+                  previewMode={previewMode}
+                  onPreviewModeChange={onPreviewModeChange}
+                  showWebPreviewChrome
+                  showDeviceToggle
+                  onRefresh={() => setRefresh((value) => value + 1)}
+                  sandpackOptions={sandpackOptions}
+                />
+              ) : (
+                <EmptyState isStreaming={isStreaming} />
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border/70 px-3 text-[11px] text-muted-foreground">
