@@ -833,16 +833,16 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
-  return <button type="button" role="tab" aria-selected={active} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true">{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
 }
 
 function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
   const active = current === panel;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground hover:text-foreground"}`} aria-label={label}><span aria-hidden="true">{icon}</span><span className="sr-only">{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
 }
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
-  return <button type="button" onClick={onClick} disabled={disabled} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-left text-xs text-foreground disabled:opacity-40">{icon}<span>{label}</span></button>;
+  return <button type="button" onClick={onClick} disabled={disabled} className="flex items-center gap-2 rounded-md border border-fuchsia-500/15 bg-zinc-950/80 px-3 py-2 text-left text-xs text-foreground shadow-[0_0_0_1px_rgba(168,85,247,0.08)] transition hover:border-violet-400/25 hover:bg-zinc-900 disabled:opacity-40"><span className="text-amber-300">{icon}</span><span>{label}</span></button>;
 }
 
 function OpenAppMenuAction({ onOpen }: { onOpen: () => void }) {

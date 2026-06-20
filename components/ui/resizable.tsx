@@ -44,15 +44,15 @@ const ResizableHandle = ({
 }: ResizableHandleProps) => (
   <PanelResizeHandle
     className={cn(
-      "group relative z-10 flex w-px shrink-0 items-center justify-center bg-border/70 outline-none transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 hover:bg-foreground/35 focus-visible:bg-ring data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:inset-x-0 data-[panel-group-direction=vertical]:after:inset-y-auto data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:top-1/2 data-[panel-group-direction=vertical]:after:h-3 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
+      "group relative z-10 flex w-px shrink-0 items-center justify-center bg-fuchsia-500/12 outline-none transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 hover:bg-violet-400/25 focus-visible:bg-ring data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:inset-x-0 data-[panel-group-direction=vertical]:after:inset-y-auto data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:top-1/2 data-[panel-group-direction=vertical]:after:h-3 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
       className
     )}
     aria-label="Resize panel"
     {...props}
   >
     {withHandle ? (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-background shadow-sm">
-        <GripVertical className="size-2.5" aria-hidden="true" />
+      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border border-fuchsia-400/30 bg-zinc-950 shadow-[0_0_12px_rgba(244,114,182,0.2)]">
+        <GripVertical className="size-2.5 text-amber-300" aria-hidden="true" />
       </div>
     ) : null}
   </PanelResizeHandle>

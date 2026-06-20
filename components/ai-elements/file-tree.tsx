@@ -182,7 +182,7 @@ export const FileTreeFolder = ({
               >
                 <ChevronRightIcon
                   className={cn(
-                    "size-4 shrink-0 text-muted-foreground transition-transform",
+                    "size-4 shrink-0 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.32)] transition-transform",
                     isExpanded && "rotate-90"
                   )}
                 />
@@ -195,9 +195,9 @@ export const FileTreeFolder = ({
             >
               <FileTreeIcon>
                 {isExpanded ? (
-                  <FolderOpenIcon className="size-4 text-blue-500" />
+                  <FolderOpenIcon className="size-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.34)]" />
                 ) : (
-                  <FolderIcon className="size-4 text-blue-500" />
+                  <FolderIcon className="size-4 text-violet-300 drop-shadow-[0_0_10px_rgba(196,181,253,0.32)]" />
                 )}
               </FileTreeIcon>
               <FileTreeName>{name}</FileTreeName>
@@ -273,7 +273,7 @@ export const FileTreeFile = ({
             {/* Spacer for alignment */}
             <span className="size-4 shrink-0" />
             <FileTreeIcon>
-              {icon ?? <FileIcon className="size-4 text-muted-foreground" />}
+              {icon ?? <FileIcon className="size-4 text-fuchsia-300 drop-shadow-[0_0_10px_rgba(244,114,182,0.34)]" />}
             </FileTreeIcon>
             <FileTreeName>{name}</FileTreeName>
           </>

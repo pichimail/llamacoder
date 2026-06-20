@@ -16,8 +16,10 @@ type Line = { kind: "in" | "out" | "err"; text: string };
 function tokenizeTerminalLine(text: string) {
   const segments: Array<{ text: string; className?: string }> = [];
   const pattern = /(\$|>|✓|✗|\b\d+(?:\.\d+)?\b)/g;
+  const numberClasses = ["text-sky-400", "text-amber-300", "text-violet-300"];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
+  let numberIndex = 0;
 
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
@@ -27,14 +29,14 @@ function tokenizeTerminalLine(text: string) {
     const token = match[0];
     const className =
       token === "$"
-        ? "text-fuchsia-400"
+        ? "text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,0.45)]"
         : token === ">"
-          ? "text-cyan-400"
+          ? "text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.42)]"
           : token === "✓"
-            ? "text-emerald-400"
+            ? "text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.38)]"
             : token === "✗"
-              ? "text-red-400"
-              : "text-sky-400";
+              ? "text-yellow-300 drop-shadow-[0_0_10px_rgba(253,224,71,0.4)]"
+              : `${numberClasses[numberIndex++ % numberClasses.length]} drop-shadow-[0_0_8px_rgba(244,114,182,0.18)]`;
 
     segments.push({ text: token, className });
     lastIndex = match.index + token.length;
@@ -210,33 +212,33 @@ export default function BuilderTerminal({
     <Terminal
       output={outputText}
       onClear={() => setLines([])}
-      className="h-full rounded-none border-0 border-t border-zinc-800"
+      className="h-full rounded-none border-0 border-t border-fuchsia-500/20 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),#09090b]"
       onClick={() => inputRef.current?.focus()}
       role="region"
       aria-label="Workspace terminal"
     >
-      <TerminalHeader className="border-zinc-800 bg-zinc-950 px-3 py-1.5">
-        <TerminalTitle className="text-xs">Workspace shell</TerminalTitle>
+      <TerminalHeader className="border-fuchsia-500/20 bg-zinc-950/90 px-3 py-1.5 backdrop-blur">
+        <TerminalTitle className="text-xs text-zinc-200">Workspace shell</TerminalTitle>
         <TerminalActions>
           <TerminalCopyButton />
           <TerminalClearButton />
         </TerminalActions>
       </TerminalHeader>
-      <TerminalContent className="max-h-none min-h-0 flex-1 px-3 py-2 text-[12px]">
+      <TerminalContent className="max-h-none min-h-0 flex-1 bg-transparent px-3 py-2 text-[12px]">
         {lines.map((line, index) => (
           <div
             key={index}
             className={
               line.kind === "in"
-                ? "text-zinc-100"
+                ? "text-zinc-50"
                 : line.kind === "err"
-                  ? "whitespace-pre-wrap text-red-400"
-                  : "whitespace-pre-wrap text-zinc-400"
+                  ? "whitespace-pre-wrap text-orange-300"
+                  : "whitespace-pre-wrap text-zinc-300"
             }
           >
             {line.kind === "in" ? (
               <span>
-                <span className="text-emerald-400">➜ </span>
+                <span className="text-fuchsia-300 drop-shadow-[0_0_10px_rgba(244,114,182,0.5)]">➜ </span>
                 <NeonTerminalLine text={line.text} />
               </span>
             ) : (
@@ -246,8 +248,8 @@ export default function BuilderTerminal({
         ))}
         <div ref={endRef} />
       </TerminalContent>
-      <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800 bg-zinc-950 px-3 py-1.5">
-        <span className="text-emerald-400">➜</span>
+      <div className="flex shrink-0 items-center gap-2 border-t border-fuchsia-500/20 bg-zinc-950/90 px-3 py-1.5">
+        <span className="text-fuchsia-300 drop-shadow-[0_0_10px_rgba(244,114,182,0.5)]">➜</span>
         <input
           ref={inputRef}
           value={input}
@@ -272,7 +274,7 @@ export default function BuilderTerminal({
           }}
           placeholder="help"
           aria-label="Terminal command input"
-          className="w-full bg-transparent text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+          className="w-full bg-transparent text-zinc-100 placeholder:text-zinc-500 caret-violet-300 focus:outline-none"
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"

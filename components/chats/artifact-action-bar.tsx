@@ -46,7 +46,7 @@ interface ArtifactActionBarProps {
   onDownload: () => void;
 }
 
-const iconButton = "inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40";
+const iconButton = "inline-flex size-8 items-center justify-center rounded-md border border-fuchsia-500/12 bg-zinc-950/75 text-violet-300 shadow-[0_0_0_1px_rgba(168,85,247,0.06)] transition hover:border-violet-400/25 hover:bg-zinc-900 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40 [&_svg]:drop-shadow-[0_0_8px_rgba(168,85,247,0.26)]";
 const menuItem = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45";
 
 export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVersionLabel, versions, files, onSwitchVersion, onDownload }: ArtifactActionBarProps) {
@@ -238,12 +238,12 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
         onPublish={handlePublish}
       />
       {versions.length > 0 && (
-        <label className="hidden items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground sm:flex">
+        <label className="hidden items-center gap-1 rounded-md border border-fuchsia-500/15 bg-zinc-950/75 px-2 py-1 text-xs text-violet-200 shadow-[0_0_0_1px_rgba(168,85,247,0.06)] sm:flex">
           <span className="sr-only">Version</span>
           <select value={activeMessageId || ""} onChange={(event) => onSwitchVersion(event.target.value)} className="max-w-[110px] bg-transparent text-xs text-foreground outline-none" aria-label="Switch generated version">
             {versions.slice().reverse().map((version) => <option key={version.id} value={version.id}>{version.label}</option>)}
           </select>
-          <ChevronDown className="size-3" aria-hidden="true" />
+          <ChevronDown className="size-3 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.32)]" aria-hidden="true" />
         </label>
       )}
 
@@ -251,7 +251,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
       <Tip label="Upload asset"><button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset"><Upload className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Export zip"><button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files"><Download className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
-      <Tip label="Publish site"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
+      <Tip label="Publish site"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
       {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
       <Tip label="More project actions"><button ref={moreButtonRef} type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu" aria-controls={menuId} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
 

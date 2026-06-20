@@ -208,11 +208,11 @@ function renderFileTree(
         >
           <span className="size-4 shrink-0" aria-hidden="true" />
           <FileTreeIcon>
-            <FileCode2 className="size-3.5 text-emerald-500" aria-hidden="true" />
+            <FileCode2 className="size-3.5 text-fuchsia-300 drop-shadow-[0_0_10px_rgba(244,114,182,0.4)]" aria-hidden="true" />
           </FileTreeIcon>
           <FileTreeName className="font-mono text-[11px]">{child.name}</FileTreeName>
-          {options.dirty.has(child.path) ? <span className="ml-1 size-1.5 shrink-0 rounded-full bg-amber-400" aria-label="Unsaved changes" /> : null}
-          {options.streamingPath === child.path ? <Loader2 className="ml-1 size-3 shrink-0 animate-spin text-amber-500" aria-label="Writing file" /> : null}
+          {options.dirty.has(child.path) ? <span className="ml-1 size-1.5 shrink-0 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(253,224,71,0.5)]" aria-label="Unsaved changes" /> : null}
+          {options.streamingPath === child.path ? <Loader2 className="ml-1 size-3 shrink-0 animate-spin text-violet-300 drop-shadow-[0_0_10px_rgba(196,181,253,0.45)]" aria-label="Writing file" /> : null}
           <FileTreeActions className="opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
             <button
               type="button"
@@ -220,10 +220,10 @@ function renderFileTree(
                 event.stopPropagation();
                 options.onMenu(child.path);
               }}
-              className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+              className="inline-flex size-6 items-center justify-center rounded-md border border-transparent bg-zinc-950/70 text-amber-300 shadow-[0_0_0_1px_rgba(251,191,36,0.08)] transition hover:border-fuchsia-400/25 hover:text-fuchsia-200"
               aria-label={`Open actions for ${child.path}`}
             >
-              <MoreHorizontal className="size-3.5" aria-hidden="true" />
+              <MoreHorizontal className="size-3.5 drop-shadow-[0_0_8px_rgba(251,191,36,0.35)]" aria-hidden="true" />
             </button>
           </FileTreeActions>
         </FileTreeFile>
@@ -504,8 +504,8 @@ export default function CodeViewer({
     toast({ title: "Dependency added", description: `${name}@${version} will be used in preview.` });
   };
 
-  const iconBtn = "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40";
-  const panelIconBtn = "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground data-[active=true]:text-foreground";
+  const iconBtn = "inline-flex size-7 items-center justify-center rounded-md border border-transparent bg-zinc-950/55 text-violet-300 shadow-[0_0_0_1px_rgba(168,85,247,0.06)] transition hover:border-violet-400/20 hover:bg-zinc-900 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40 [&_svg]:drop-shadow-[0_0_8px_rgba(168,85,247,0.25)]";
+  const panelIconBtn = "inline-flex size-7 items-center justify-center rounded-md border border-transparent bg-zinc-950/55 text-violet-300 shadow-[0_0_0_1px_rgba(168,85,247,0.06)] transition hover:border-violet-400/20 hover:bg-zinc-900 hover:text-amber-300 data-[active=true]:border-fuchsia-400/30 data-[active=true]:bg-[linear-gradient(135deg,rgba(244,114,182,0.16),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] data-[active=true]:text-amber-300 [&_svg]:drop-shadow-[0_0_8px_rgba(168,85,247,0.25)]";
   const menuButton = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
   const renderPrimaryEditor = () => {
@@ -578,8 +578,8 @@ export default function CodeViewer({
 
   return (
     <TooltipProvider>
-      <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
-        <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 px-2 text-sm">
+      <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.08),transparent_20%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_18%),transparent] text-foreground">
+        <div className="flex h-10 shrink-0 items-center justify-between border-b border-fuchsia-500/15 bg-zinc-950/65 px-2 text-sm backdrop-blur">
           <div className="flex items-center gap-0.5" role="tablist" aria-label="Output view">
             {(["code", "preview"] as const).map((tab) => (
               <button
@@ -587,8 +587,8 @@ export default function CodeViewer({
                 role="tab"
                 aria-selected={activeTab === tab}
                 onClick={() => onTabChange(tab)}
-                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-                  activeTab === tab ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.5)]" : "text-muted-foreground hover:text-foreground"
+                className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+                  activeTab === tab ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.14)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"
                 }`}
               >
                 {tab}
@@ -617,12 +617,12 @@ export default function CodeViewer({
                     {codeLayout === "split-editor" ? <PanelRightClose className="size-3.5" aria-hidden="true" /> : <PanelRightOpen className="size-3.5" aria-hidden="true" />}
                   </button>
                 </Tip>
-                <Tip label="Toggle minimap"><button className={`${iconBtn} ${showMinimap ? "text-foreground" : ""}`} onClick={() => setShowMinimap((value) => !value)} aria-pressed={showMinimap} aria-label="Toggle minimap"><MapIcon className="size-3.5" aria-hidden="true" /></button></Tip>
-                <Tip label="Toggle word wrap"><button className={`${iconBtn} ${wordWrap ? "text-foreground" : ""}`} onClick={() => setWordWrap((value) => !value)} aria-pressed={wordWrap} aria-label="Toggle word wrap"><WrapText className="size-3.5" aria-hidden="true" /></button></Tip>
-                {hasUnsaved ? <Tip label="Save changes as new version (⌘S)"><button onClick={saveAll} className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-transparent px-2 text-xs font-medium text-foreground transition hover:border-foreground/30" aria-label="Save changes"><Save className="size-3.5" aria-hidden="true" /> Save</button></Tip> : null}
+                <Tip label="Toggle minimap"><button className={`${iconBtn} ${showMinimap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowMinimap((value) => !value)} aria-pressed={showMinimap} aria-label="Toggle minimap"><MapIcon className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle word wrap"><button className={`${iconBtn} ${wordWrap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setWordWrap((value) => !value)} aria-pressed={wordWrap} aria-label="Toggle word wrap"><WrapText className="size-3.5" aria-hidden="true" /></button></Tip>
+                {hasUnsaved ? <Tip label="Save changes as new version (⌘S)"><button onClick={saveAll} className="inline-flex h-7 items-center gap-1 rounded-md border border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] px-2 text-xs font-medium text-zinc-50 shadow-[0_0_16px_rgba(244,114,182,0.14)] transition hover:border-fuchsia-300/40" aria-label="Save changes"><Save className="size-3.5 text-amber-300" aria-hidden="true" /> Save</button></Tip> : null}
                 <Tip label="Undo (⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.undo()} aria-label="Undo"><Undo2 className="size-3.5" aria-hidden="true" /></button></Tip>
                 <Tip label="Redo (⇧⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.redo()} aria-label="Redo"><Redo2 className="size-3.5" aria-hidden="true" /></button></Tip>
-                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "text-foreground" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
               </>
             ) : null}
             {activeTab === "code" ? (
@@ -636,7 +636,7 @@ export default function CodeViewer({
             <ResizablePanelGroup id="code-viewer-workspace-split" orientation="horizontal" className="min-h-0">
               <ResizablePanel id="file-explorer" defaultSize="22%" minSize="14%" maxSize="34%" className="hidden min-w-0 flex-col overflow-hidden bg-transparent sm:flex">
                 <nav className="flex h-full min-h-0 flex-col overflow-hidden border-r border-border/70 bg-transparent" aria-label="Project workspace">
-                <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/70 px-2">
+                <div className="flex h-9 shrink-0 items-center gap-1 border-b border-fuchsia-500/15 bg-zinc-950/55 px-2">
                   <Tip label="Files"><button data-active={explorerPanel === "files"} className={panelIconBtn} onClick={() => setExplorerPanel("files")} aria-label="Files"><FileCode2 className="size-3.5" aria-hidden="true" /></button></Tip>
                   <Tip label="Search and replace"><button data-active={explorerPanel === "search"} className={panelIconBtn} onClick={() => setExplorerPanel("search")} aria-label="Search and replace"><Search className="size-3.5" aria-hidden="true" /></button></Tip>
                   <Tip label="Extensions and components"><button data-active={explorerPanel === "extensions"} className={panelIconBtn} onClick={() => setExplorerPanel("extensions")} aria-label="Extensions and components"><Boxes className="size-3.5" aria-hidden="true" /></button></Tip>
@@ -666,7 +666,7 @@ export default function CodeViewer({
                         <button className={menuButton} onClick={async () => { await navigator.clipboard.writeText(fileMenuPath).catch(() => undefined); toast({ title: "Path copied" }); setFileMenuPath(null); }}><Copy className="size-3.5" aria-hidden="true" /> Copy path</button>
                         <button className={menuButton} onClick={() => openRenameDialog(fileMenuPath)}><Pencil className="size-3.5" aria-hidden="true" /> Rename</button>
                         <button className={menuButton} onClick={() => { const file = draft.find((item) => item.path === fileMenuPath); if (file) downloadSingleFile(file); setFileMenuPath(null); }}><Download className="size-3.5" aria-hidden="true" /> Download file</button>
-                        <button className={`${menuButton} text-red-500 hover:text-red-400`} onClick={() => openDeleteDialog(fileMenuPath)}><Trash2 className="size-3.5" aria-hidden="true" /> Delete</button>
+                        <button className={`${menuButton} text-orange-300 hover:text-yellow-200`} onClick={() => openDeleteDialog(fileMenuPath)}><Trash2 className="size-3.5" aria-hidden="true" /> Delete</button>
                       </div>
                     ) : null}
                   </>
@@ -746,7 +746,7 @@ export default function CodeViewer({
           )}
         </div>
 
-        <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border/70 px-3 text-[11px] text-muted-foreground">
+        <div className="flex h-7 shrink-0 items-center gap-3 border-t border-fuchsia-500/15 bg-zinc-950/65 px-3 text-[11px] text-muted-foreground">
           <span>{draft.filter((file) => !file.path.endsWith(".gitkeep")).length} files</span>
           {isStreaming && streamingPath ? <span className="truncate font-mono text-amber-500">writing {streamingPath}</span> : null}
           {hasUnsaved ? <span className="text-amber-500">● unsaved</span> : null}
