@@ -8,9 +8,18 @@ import {
   toTitleCase,
 } from "@/lib/utils";
 import { Fragment } from "react";
-import { Streamdown } from "streamdown";
-import { StickToBottom } from "use-stick-to-bottom";
 import { AppVersionButton } from "@/components/app-version-button";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message as AIMessage,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import { BrailleLoader } from "@/components/ui/braille-loader";
 import NeonCode from "@/components/syntax-highlighter";
 import {
   Reasoning,
@@ -42,23 +51,19 @@ export default function ChatLog({
   );
 
   return (
-    <StickToBottom
+    <Conversation
       className="relative h-full overflow-y-auto overscroll-contain bg-transparent"
-      resize="smooth"
-      initial="smooth"
+      aria-label="Conversation history"
     >
-      <StickToBottom.Content
+      <ConversationContent
         className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6"
-        role="log"
-        aria-label="Conversation history"
         aria-live="polite"
       >
-        {/* Initial user prompt - clean modern bubble */}
-        <div className="flex justify-end">
-          <div className="max-w-[75%] rounded-2xl bg-primary text-primary-foreground px-4 py-3 text-sm shadow-sm">
+        <AIMessage from="user">
+          <MessageContent className="max-w-[75%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
             {chat.prompt}
-          </div>
-        </div>
+          </MessageContent>
+        </AIMessage>
 
         {chat.totalMessages > chat.messages.length && (
           <div className="py-1 text-center text-xs text-muted-foreground">
@@ -69,11 +74,11 @@ export default function ChatLog({
         {chat.messages.slice(2).map((message) => (
           <Fragment key={message.id}>
             {message.role === "user" ? (
-              <div className="flex justify-end">
-                <div className="max-w-[75%] rounded-2xl bg-primary text-primary-foreground px-4 py-3 text-sm shadow-sm">
+              <AIMessage from="user">
+                <MessageContent className="max-w-[75%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
                   {message.content}
-                </div>
-              </div>
+                </MessageContent>
+              </AIMessage>
             ) : (
               <AssistantMessage
                 content={message.content}
@@ -90,6 +95,21 @@ export default function ChatLog({
             )}
           </Fragment>
         ))}
+
+        {isReasoningStreaming && !reasoningText && !streamText ? (
+          <AIMessage from="assistant">
+            <MessageContent className="flex items-center gap-3 text-muted-foreground">
+              <BrailleLoader
+                variant="helix"
+                speed="normal"
+                fontSize={24}
+                label="Processing your request"
+                className="text-fuchsia-300"
+              />
+              <span className="text-sm text-zinc-400">Processing your request</span>
+            </MessageContent>
+          </AIMessage>
+        ) : null}
 
         {(reasoningText || isReasoningStreaming) && (
           <Reasoning isStreaming={isReasoningStreaming} className="mb-0">
@@ -116,8 +136,9 @@ export default function ChatLog({
             />
           )
         ) : null}
-      </StickToBottom.Content>
-    </StickToBottom>
+      </ConversationContent>
+      <ConversationScrollButton />
+    </Conversation>
   );
 }
 
@@ -185,57 +206,69 @@ function AssistantMessage({
 
   if (displayFileCount > 0) {
     return (
-      <div className="space-y-3">
-        {segments.map((seg, i) => {
-          if (seg.type === "text") {
-            return (
-              <div key={i} className="typography typography-sm max-w-none text-foreground/90">
-                <Streamdown>{seg.content}</Streamdown>
-              </div>
-            );
-          }
+      <AIMessage from="assistant">
+        <MessageContent className="w-full max-w-full">
+          <div className="space-y-3">
+            {segments.map((seg, i) => {
+              if (seg.type === "text") {
+                return (
+                  <div key={i} className="typography typography-sm max-w-none text-foreground/90">
+                    <MessageResponse>{seg.content}</MessageResponse>
+                  </div>
+                );
+              }
 
-          return (
-            <div key={i} className="space-y-2">
-              <div
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
-                role="status"
-                aria-label={`Generated file ${seg.path}`}
-              >
-                <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
-                <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
-              </div>
-              {/\.(html|xhtml)$/i.test(seg.path) ? (
-                <NeonCode
-                  code={(allFiles.find((file) => file.path === seg.path)?.code ?? "").trim()}
-                  language="html"
-                  className="max-h-80"
-                />
-              ) : null}
-            </div>
-          );
-        })}
+              return (
+                <div key={i} className="space-y-2">
+                  <div
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+                    role="status"
+                    aria-label={`Generated file ${seg.path}`}
+                  >
+                    <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
+                    <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
+                  </div>
+                  {/\.(html|xhtml)$/i.test(seg.path) ? (
+                    <NeonCode
+                      code={(allFiles.find((file) => file.path === seg.path)?.code ?? "").trim()}
+                      language="html"
+                      className="max-h-80"
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
 
-        <AppVersionButton
-          version={version}
-          fileCount={displayFileCount}
-          appTitle={appTitle}
-          generating={false}
-          disabled={!message || isStreaming}
-          onClick={message ? () => onMessageClick(message) : undefined}
-          isActive={isActive}
-        />
-      </div>
+            <AppVersionButton
+              version={version}
+              fileCount={displayFileCount}
+              appTitle={appTitle}
+              generating={false}
+              disabled={!message || isStreaming}
+              onClick={message ? () => onMessageClick(message) : undefined}
+              isActive={isActive}
+            />
+          </div>
+        </MessageContent>
+      </AIMessage>
     );
   }
 
   if (isPlanResponse(content)) {
-    return <PlanResponseCard content={content} isStreaming={isStreaming} />;
+    return (
+      <AIMessage from="assistant">
+        <MessageContent className="w-full max-w-full">
+          <PlanResponseCard content={content} isStreaming={isStreaming} />
+        </MessageContent>
+      </AIMessage>
+    );
   }
 
   return (
-    <div className="typography typography-sm max-w-none text-foreground/90">
-      <Streamdown>{content}</Streamdown>
-    </div>
+    <AIMessage from="assistant">
+      <MessageContent className="typography typography-sm max-w-none text-foreground/90">
+        <MessageResponse>{content}</MessageResponse>
+      </MessageContent>
+    </AIMessage>
   );
 }

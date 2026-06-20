@@ -50,7 +50,7 @@ const TEMPLATE_MATCHERS: TemplateMatch[] = [
     title: "Motion landing scaffold",
     summary: "Cinematic hero, stacked sections, and motion-first composition.",
     keywords: ["landing", "marketing", "hero", "motion", "parallax", "gsap", "three", "anime"],
-    dependencies: ["framer-motion", "lucide-react"],
+    dependencies: ["framer-motion", "gsap", "animejs", "three", "lucide-react"],
     envHints: ["NEXT_PUBLIC_SITE_URL"],
     routes: ["/", "/api/health"],
     makeFiles: (input) => createMotionLandingFiles(input),

@@ -42,6 +42,9 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
+const MAX_AUTO_FIX_ATTEMPTS = 3;
+const FIX_CONTEXT_FILE_LIMIT = 18;
+const FIX_CONTEXT_CHAR_BUDGET = 70000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
@@ -54,6 +57,40 @@ function normalizeFile(file: RawGeneratedFile): ArtifactFile {
   const code = typeof file.code === "string" ? file.code : file.content || "";
   const language = file.language || path.split(".").pop() || "tsx";
   return { path, code, language };
+}
+
+function hasMessageFiles(message: Message) {
+  return (
+    message.role === "assistant" &&
+    ((Array.isArray(message.files) && (message.files as unknown[]).length > 0) ||
+      extractAllCodeBlocks(message.content).length > 0)
+  );
+}
+
+function formatFixFileContext(files: RawGeneratedFile[]) {
+  let remaining = FIX_CONTEXT_CHAR_BUDGET;
+  const blocks: string[] = [];
+
+  for (const rawFile of files.slice(0, FIX_CONTEXT_FILE_LIMIT)) {
+    if (remaining <= 0) break;
+    const file = normalizeFile(rawFile);
+    if (!file.path || !file.code.trim()) continue;
+
+    const budgetForFile = Math.max(1200, Math.min(remaining, 14000));
+    const clipped =
+      file.code.length > budgetForFile
+        ? `${file.code.slice(0, budgetForFile)}\n/* ...truncated for fix context... */`
+        : file.code;
+
+    blocks.push(`\`\`\`${file.language || "tsx"}{path=${file.path}}\n${clipped}\n\`\`\``);
+    remaining -= clipped.length;
+  }
+
+  if (files.length > FIX_CONTEXT_FILE_LIMIT) {
+    blocks.push(`/* ${files.length - FIX_CONTEXT_FILE_LIMIT} additional files omitted from fix context. Preserve existing untouched files unless they must change. */`);
+  }
+
+  return blocks.join("\n\n");
 }
 
 export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; sidebarChats?: SidebarChat[] }) {
@@ -261,9 +298,38 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   }, [workspaceRequest]);
 
   const requestFix = useCallback(async ({ error, auto, attempt, fallback, files }: { error: string; auto: boolean; attempt: number; fallback: boolean; files?: RawGeneratedFile[] }) => {
-    const prefix = auto ? (fallback ? "Rebuild the generated app cleanly. Fix this preview error and return the full working files." : "Apply a minimal patch to fix this preview error and return only changed files.") : "The code is not working. Fix it.";
-    const fileManifest = (files ?? artifactFiles).map((file) => `- ${file.path}`).join("\n");
-    const text = `${prefix}\n\nAttempt: ${attempt}\n\nCurrent artifact files:\n${fileManifest || "- no files parsed"}\n\nPreview error:\n${error.trimStart()}`;
+    const sourceFiles = files && files.length > 0 ? files : artifactFiles;
+    const normalizedFiles = sourceFiles.map(normalizeFile);
+    const singleFileArtifact = normalizedFiles.length <= 1 || (normalizedFiles.length === 1 && normalizedFiles[0]?.path === "app/page.tsx");
+    const shouldRebuild = fallback || singleFileArtifact || attempt > 1;
+    const prefix = auto
+      ? shouldRebuild
+        ? "Rebuild the generated app cleanly. Return a complete corrected multi-file project, splitting large app/page.tsx code into focused components, data/helpers, and preview-safe backend-shaped files where useful."
+        : "Apply the smallest working fix for this preview error. Return only changed files and any newly required support files."
+      : shouldRebuild
+        ? "The code is not working. Rebuild it as a complete corrected multi-file project."
+        : "The code is not working. Fix it with the smallest working patch.";
+    const fileManifest = normalizedFiles.map((file) => `- ${file.path}`).join("\n");
+    const sourceContext = formatFixFileContext(normalizedFiles);
+    const text = `${prefix}
+
+Attempt: ${attempt}
+
+Current artifact files:
+${fileManifest || "- no files parsed"}
+
+Preview error:
+${error.trimStart()}
+
+Current artifact source:
+${sourceContext || "- no source parsed"}
+
+Fix requirements:
+- Output only fenced code blocks using \`\`\`tsx{path=...} format.
+- Keep app/page.tsx renderable, but do not pack the whole application into app/page.tsx.
+- If the current artifact has only app/page.tsx, return a complete multi-file structure with components and lib files.
+- Create every local component or helper file that is imported.
+- Preserve working existing files unless they must change for the fix.`;
     const message = await createMessage(chat.id, text, "user");
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -277,8 +343,16 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       return res.body;
     });
     setStreamPromise(nextStreamPromise);
-    setBuilderStatus(fallback ? "rebuilding" : "fixing");
+    setBuilderStatus(shouldRebuild ? "rebuilding" : "fixing");
+    setStreamText("");
+    streamTextRef.current = "";
+    setReasoningText("");
+    setStreamReasoningEnabled(false);
+    hasAutoSwitchedPreviewRef.current = false;
+    setActiveTab("code");
+    setBuilderMode("code");
     setMobilePanel("code");
+    setChatCollapsed(false);
     router.refresh();
   }, [artifactFiles, chat.id, chat.model, router]);
 
@@ -294,17 +368,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     const now = Date.now();
     const same = normalized === lastAutoFixErrorRef.current;
     if (same && now - lastAutoFixAtRef.current < 4500) return;
-    if (same && autoFixAttemptRef.current > 0) {
-      setAutoFixStatus("idle");
-      setBuilderStatus("failed");
-      return;
-    }
+    const currentFiles = files && files.length > 0 ? files : artifactFiles;
     if (!same) autoFixAttemptRef.current = 0;
+    const shouldForceFallback = fallback || currentFiles.length <= 1 || autoFixAttemptRef.current > 0;
 
     const nextAttempt = autoFixAttemptRef.current + 1;
-    if (nextAttempt > 1) {
+    if (nextAttempt > MAX_AUTO_FIX_ATTEMPTS) {
       autoFixAttemptRef.current = nextAttempt;
-      setAutoFixAttempt(1);
+      setAutoFixAttempt(MAX_AUTO_FIX_ATTEMPTS);
       setAutoFixStatus("idle");
       setBuilderStatus("failed");
       autoFixPendingRef.current = false;
@@ -320,14 +391,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     setBuilderStatus("fixing");
     startTransition(async () => {
       try {
-        await requestFix({ error: normalized, auto: true, attempt: nextAttempt, fallback, files });
+        await requestFix({ error: normalized, auto: true, attempt: nextAttempt, fallback: shouldForceFallback, files: currentFiles });
       } catch {
         autoFixPendingRef.current = false;
         setAutoFixStatus("watching");
         setBuilderStatus("validating");
       }
     });
-  }, [autoFixEnabled, requestFix]);
+  }, [artifactFiles, autoFixEnabled, requestFix]);
 
   const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
     setAutoFixEnabled(enabled);
@@ -341,8 +412,8 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    void triggerAutoFix({ error });
-  }, [triggerAutoFix]);
+    void triggerAutoFix({ error, files: artifactFiles });
+  }, [artifactFiles, triggerAutoFix]);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -434,7 +505,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               return;
             }
             startTransition(async () => {
-              const previousFiles = chat.messages.filter((m) => m.role === "assistant" && extractAllCodeBlocks(m.content).length > 0).flatMap((m) => getMessageFiles(m));
+              const previousFiles = chat.messages.filter(hasMessageFiles).flatMap((m) => getMessageFiles(m));
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
               const mergedFiles = mergeArtifactFiles(previousFiles, currentFiles);
               if (mergedFiles.length === 0) {
@@ -451,9 +522,14 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
               const validationIssues = await validateGeneratedCodeFiles(mergedFiles);
               if (validationIssues.length > 0) {
                 const validationError = `Generated code validation failed before preview commit.\n\n${formatGeneratedCodeIssues(validationIssues)}`;
-                await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
                 isHandlingStreamRef.current = false;
+                abortControllerRef.current = null;
+                streamPromiseRef.current = undefined;
+                streamTextRef.current = "";
+                setStreamText("");
                 setStreamPromise(undefined);
+                setStreamReasoningEnabled(false);
+                await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
                 return;
               }
               const message = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
@@ -484,7 +560,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       }
     }
     readStream();
-  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles]);
+  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
 
   const handleSaveFiles = useCallback((files: { path: string; code: string; language: string }[]) => {
     startTransition(async () => {
@@ -576,7 +652,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           chatId={chat.id}
           files={artifactFiles}
           isStreaming={!!streamPromise}
-          onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
+          onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: artifactFiles.length <= 1, files: artifactFiles }))}
           onPreviewError={handlePreviewError}
           onPreviewReady={handlePreviewReady}
           onDirtyChange={setDesignDirty}
@@ -611,7 +687,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           setBuilderMode(tab);
           setMobilePanel(tab === "preview" ? "preview" : "code");
         }}
-        onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: false }))}
+        onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: artifactFiles.length <= 1, files: artifactFiles }))}
         onPreviewError={handlePreviewError}
         onPreviewReady={handlePreviewReady}
         onSaveFiles={handleSaveFiles}
@@ -725,7 +801,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
                     {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
                     <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
-                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamReasoningEnabled(options?.reasoning ?? false); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                   </section>
                 </ResizablePanel>
                 <ResizableHandle withHandle className="hidden md:flex" />
