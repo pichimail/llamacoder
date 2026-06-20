@@ -97,7 +97,7 @@ export function DesignWorkspace({
 
   const previewFiles = liveFiles.map((file) => ({ path: file.path, content: file.code }))
   const previewRunner = (
-    <div className="h-full min-h-0 min-w-0 overflow-hidden">
+    <div className="h-full min-h-0 w-full min-w-0 overflow-hidden">
       <CodeRunner
         files={previewFiles}
         onRequestFix={onRequestFix}
@@ -113,7 +113,7 @@ export function DesignWorkspace({
   const previewPane = (
     <section
       ref={previewContainerRef}
-      className="relative h-full min-h-0 min-w-0 overflow-hidden bg-transparent"
+      className="relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-transparent"
       aria-label="Live design preview"
     >
       <DesignInspectorBridge
@@ -127,7 +127,7 @@ export function DesignWorkspace({
       {liveFiles.length > 0 ? (
         inspectorActive ? (
           <CursorProvider global={false}>
-            <CursorContainer className="relative h-full min-w-0 overflow-hidden">
+            <CursorContainer className="relative h-full w-full min-w-0 overflow-hidden">
               {previewRunner}
             </CursorContainer>
             <Cursor className="size-5 text-primary" />
