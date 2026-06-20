@@ -97,65 +97,70 @@ export function DesignWorkspace({
 
   const previewFiles = liveFiles.map((file) => ({ path: file.path, content: file.code }))
   const previewRunner = (
-    <CodeRunner
-      files={previewFiles}
-      onRequestFix={onRequestFix}
-      onPreviewError={onPreviewError}
-      onPreviewReady={onPreviewReady}
-      showDeviceToggle={false}
-      previewMode={previewMode}
-      sandpackOptions={previewSandpackOptions}
-    />
+    <div className="h-full min-h-0 min-w-0 overflow-hidden">
+      <CodeRunner
+        files={previewFiles}
+        onRequestFix={onRequestFix}
+        onPreviewError={onPreviewError}
+        onPreviewReady={onPreviewReady}
+        showDeviceToggle={false}
+        previewMode={previewMode}
+        sandpackOptions={previewSandpackOptions}
+      />
+    </div>
   )
 
   const previewPane = (
     <section
       ref={previewContainerRef}
-      className="relative h-full min-h-0 overflow-hidden bg-transparent"
+      className="relative h-full min-h-0 min-w-0 overflow-hidden bg-transparent"
       aria-label="Live design preview"
     >
-        <DesignInspectorBridge
-          enabled={inspectorActive && liveFiles.length > 0}
-          selectedElementId={selectedElementId}
-          onSelectElement={handleInspectorSelect}
-          onHoverElement={setHoverElementId}
-          containerRef={previewContainerRef}
-        />
+      <DesignInspectorBridge
+        enabled={inspectorActive && liveFiles.length > 0}
+        selectedElementId={selectedElementId}
+        onSelectElement={handleInspectorSelect}
+        onHoverElement={setHoverElementId}
+        containerRef={previewContainerRef}
+      />
 
-        {liveFiles.length > 0 ? (
-          inspectorActive ? (
-            <CursorProvider global={false}>
-              <CursorContainer className="relative h-full w-full">
-                {previewRunner}
-              </CursorContainer>
-              <Cursor className="size-5 text-primary" />
-              <CursorFollow className="bg-primary px-2 py-0.5 text-[11px] text-primary-foreground">
-                {inspectorSelection
-                  ? `${inspectorSelection.tag}${inspectorSelection.label ? ` · ${inspectorSelection.label}` : ''}`
-                  : hoverElementId
-                    ? 'Click to inspect'
-                    : 'Inspector · click any element'}
-              </CursorFollow>
-              <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-primary/30 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
-                Click elements in the preview to inspect. Edits are live — save to write code.
-              </div>
-            </CursorProvider>
-          ) : (
-            previewRunner
-          )
+      {liveFiles.length > 0 ? (
+        inspectorActive ? (
+          <CursorProvider global={false}>
+            <CursorContainer className="relative h-full min-w-0 overflow-hidden">
+              {previewRunner}
+            </CursorContainer>
+            <Cursor className="size-5 text-primary" />
+            <CursorFollow className="bg-primary px-2 py-0.5 text-[11px] text-primary-foreground">
+              {inspectorSelection
+                ? `${inspectorSelection.tag}${inspectorSelection.label ? ` · ${inspectorSelection.label}` : ''}`
+                : hoverElementId
+                  ? 'Click to inspect'
+                  : 'Inspector · click any element'}
+            </CursorFollow>
+            <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[min(34rem,calc(100%-1.5rem))] rounded-md border border-primary/30 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
+              Click elements in the preview to inspect. Edits are live — save to write code.
+            </div>
+          </CursorProvider>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-            {isStreaming && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
-            <p aria-live={isStreaming ? 'polite' : undefined}>
-              {isStreaming ? 'Generating your app…' : 'No files yet. Send a prompt to generate an app.'}
-            </p>
-          </div>
-        )}
-      </section>
+          previewRunner
+        )
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+          {isStreaming && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
+          <p aria-live={isStreaming ? 'polite' : undefined}>
+            {isStreaming ? 'Generating your app…' : 'No files yet. Send a prompt to generate an app.'}
+          </p>
+        </div>
+      )}
+    </section>
   )
 
   const inspectorPane = (
-    <aside className="h-full min-h-0 overflow-hidden bg-transparent" aria-label="Design inspector">
+    <aside
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background/95 text-foreground shadow-[inset_1px_0_0_hsl(var(--border)/0.8)]"
+      aria-label="Design inspector panel"
+    >
       <ModeDesign
         chatId={chatId}
         files={files}
@@ -174,15 +179,18 @@ export function DesignWorkspace({
 
   return (
     <div className="min-h-0 flex-1 overflow-hidden bg-transparent">
-      <ResizablePanelGroup id="design-workspace-split" orientation="horizontal" className="hidden h-full min-h-0 xl:flex">
-        <ResizablePanel id="design-preview" defaultSize={76} minSize={48} className="min-w-0 overflow-hidden">
+      <div
+        className="hidden h-full min-h-0 min-w-0 overflow-hidden xl:grid"
+        style={{ gridTemplateColumns: 'minmax(0, 1fr) 1px clamp(340px, 28vw, 430px)' }}
+      >
+        <div className="min-h-0 min-w-0 overflow-hidden">
           {previewPane}
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel id="design-inspector" defaultSize={24} minSize={18} maxSize={38} className="min-w-[300px] overflow-hidden border-l border-border/70">
+        </div>
+        <div aria-hidden="true" className="h-full w-px bg-border/70" />
+        <div className="min-h-0 min-w-0 overflow-hidden">
           {inspectorPane}
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </div>
+      </div>
 
       <ResizablePanelGroup id="design-workspace-mobile-split" orientation="vertical" className="h-full min-h-0 xl:hidden">
         <ResizablePanel id="design-preview-mobile" defaultSize={62} minSize={35} className="min-h-0 overflow-hidden">
