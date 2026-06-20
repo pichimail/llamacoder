@@ -20,13 +20,19 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import { BrailleLoader } from "@/components/ui/braille-loader";
-import NeonCode from "@/components/syntax-highlighter";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
 import { isPlanResponse, PlanResponseCard } from "@/components/plan-mode-panel";
+import {
+  EnvironmentVariable,
+  EnvironmentVariableCopyButton,
+  EnvironmentVariableName,
+  EnvironmentVariableRequired,
+  EnvironmentVariables,
+  EnvironmentVariablesContent,
+  EnvironmentVariablesHeader,
+  EnvironmentVariablesTitle,
+  EnvironmentVariablesToggle,
+  EnvironmentVariableValue,
+} from "@/components/ai-elements/environment-variables";
 
 export default function ChatLog({
   chat,
@@ -74,11 +80,7 @@ export default function ChatLog({
         {chat.messages.slice(2).map((message) => (
           <Fragment key={message.id}>
             {message.role === "user" ? (
-              <AIMessage from="user">
-                <MessageContent className="max-w-[75%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
-                  {message.content}
-                </MessageContent>
-              </AIMessage>
+              <UserMessage content={message.content} />
             ) : (
               <AssistantMessage
                 content={message.content}
@@ -111,15 +113,6 @@ export default function ChatLog({
           </AIMessage>
         ) : null}
 
-        {(reasoningText || isReasoningStreaming) && (
-          <Reasoning isStreaming={isReasoningStreaming} className="mb-0">
-            <ReasoningTrigger />
-            {reasoningText ? (
-              <ReasoningContent>{reasoningText}</ReasoningContent>
-            ) : null}
-          </Reasoning>
-        )}
-
         {streamText ? (
           isPlanResponse(streamText) ? (
             <PlanResponseCard content={streamText} isStreaming />
@@ -142,6 +135,91 @@ export default function ChatLog({
   );
 }
 
+function compactUserContent(content: string) {
+  const trimmed = content.trim();
+  if (/Generated code validation failed before preview commit|Preview error:/i.test(trimmed)) {
+    return "Fixing preview error";
+  }
+  if (/The code is not working|Apply the smallest working fix|Rebuild the generated app cleanly|Current artifact source:/i.test(trimmed)) {
+    return "Applying requested fix";
+  }
+  if (/Apply the following change as a precise, minimal patch/i.test(trimmed)) {
+    return trimmed
+      .replace(/Apply the following change as a precise, minimal patch to the existing app \(only output files that actually need to change\):/i, "")
+      .split("\n\nAttachments:")[0]
+      .trim() || "Applying requested change";
+  }
+  if (/You are in \*\*PLAN mode\*\*/i.test(trimmed)) {
+    return trimmed.split("Ready to build?").at(-1)?.trim() || "Planning the build";
+  }
+  if (/You are a helpful full-stack coding assistant/i.test(trimmed)) {
+    return trimmed.split("For full apps or major changes, recommend the main agent flow for high-fidelity working output.").at(-1)?.trim() || "Asking a question";
+  }
+  return trimmed.length > 700 ? `${trimmed.slice(0, 700).trim()}...` : trimmed;
+}
+
+function UserMessage({ content }: { content: string }) {
+  const compact = compactUserContent(content);
+  const isInternal = compact !== content.trim();
+  return (
+    <AIMessage from="user">
+      <MessageContent className="max-w-[75%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
+        {isInternal ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-primary-foreground/70" aria-hidden="true" />
+            {compact}
+          </span>
+        ) : (
+          compact
+        )}
+      </MessageContent>
+    </AIMessage>
+  );
+}
+
+function extractEnvNames(content: string, files: Array<{ path?: string; code?: string; content?: string }> = []) {
+  const haystack = [
+    content,
+    ...files.map((file) => `${file.path || ""}\n${file.code || file.content || ""}`),
+  ].join("\n");
+  const names = new Set<string>();
+  const explicit = haystack.match(/\b[A-Z][A-Z0-9_]{2,}(?:API_KEY|TOKEN|SECRET|DATABASE_URL|WEBHOOK_URL|CLIENT_ID|CLIENT_SECRET|URL)\b/g) || [];
+  explicit.forEach((name) => {
+    if (!name.startsWith("NEXT_") || /KEY|TOKEN|SECRET|URL|ID/.test(name)) names.add(name);
+  });
+  if (/openai/i.test(haystack)) names.add("OPENAI_API_KEY");
+  if (/gemini|google ai/i.test(haystack)) names.add("GEMINI_API_KEY");
+  if (/database|prisma|postgres|neon/i.test(haystack)) names.add("DATABASE_URL");
+  if (/webhook/i.test(haystack)) names.add("WEBHOOK_URL");
+  return Array.from(names).slice(0, 8);
+}
+
+function EnvVarsCard({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <EnvironmentVariables className="overflow-hidden border-border/70 bg-card/70">
+      <EnvironmentVariablesHeader className="px-3 py-2">
+        <EnvironmentVariablesTitle className="text-xs">Environment variables</EnvironmentVariablesTitle>
+        <EnvironmentVariablesToggle />
+      </EnvironmentVariablesHeader>
+      <EnvironmentVariablesContent>
+        {names.map((name) => (
+          <EnvironmentVariable key={name} name={name} value={`your_${name.toLowerCase()}_here`} className="px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <EnvironmentVariableName className="truncate text-xs" />
+              <EnvironmentVariableRequired className="h-5 px-1.5 text-[10px]">Optional</EnvironmentVariableRequired>
+            </div>
+            <div className="flex min-w-0 items-center gap-1">
+              <EnvironmentVariableValue className="max-w-[180px] truncate text-xs" />
+              <EnvironmentVariableCopyButton copyFormat="name" />
+            </div>
+          </EnvironmentVariable>
+        ))}
+      </EnvironmentVariablesContent>
+    </EnvironmentVariables>
+  );
+}
+
 function AssistantMessage({
   content,
   version,
@@ -160,6 +238,25 @@ function AssistantMessage({
   const allFiles = extractAllCodeBlocks(content);
   const segments = parseReplySegments(content);
   const fileSegments = segments.filter((s) => s.type === "file");
+  const storedFiles = (message?.files as Array<{ path?: string; code?: string; content?: string }> | null) || [];
+  const envNames = extractEnvNames(content, storedFiles.length ? storedFiles : allFiles);
+  const displayFiles = allFiles.length > 0
+    ? allFiles
+    : fileSegments.length > 0
+      ? fileSegments.map((f) => ({
+          code: f.code,
+          language: f.language,
+          path: f.path,
+          fullMatch: "",
+        }))
+      : storedFiles
+          .filter((file): file is { path: string; code?: string; content?: string } => Boolean(file.path))
+          .map((file) => ({
+            code: file.code || file.content || "",
+            language: file.path.split(".").pop() || "tsx",
+            path: file.path,
+            fullMatch: "",
+          }));
 
   // Generate app title for multiple files
   const generateAppTitle = (files: typeof allFiles) => {
@@ -191,53 +288,26 @@ function AssistantMessage({
     return "App";
   };
 
-  const appTitle = generateAppTitle(
-    allFiles.length > 0
-      ? allFiles
-      : (fileSegments.map((f) => ({
-          code: f.code,
-          language: f.language,
-          path: f.path,
-          fullMatch: "",
-        })) as any),
-  );
+  const appTitle = generateAppTitle(displayFiles);
 
-  const displayFileCount = fileSegments.length;
+  const displayFileCount = displayFiles.length;
 
   if (displayFileCount > 0) {
+    const fileList = displayFiles.map((file) => file.path);
     return (
       <AIMessage from="assistant">
         <MessageContent className="w-full max-w-full">
           <div className="space-y-3">
-            {segments.map((seg, i) => {
-              if (seg.type === "text") {
-                return (
-                  <div key={i} className="typography typography-sm max-w-none text-foreground/90">
-                    <MessageResponse>{seg.content}</MessageResponse>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={i} className="space-y-2">
-                  <div
-                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
-                    role="status"
-                    aria-label={`Generated file ${seg.path}`}
-                  >
-                    <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">📄</span>
-                    <span className="font-medium truncate max-w-[220px]">{seg.path}</span>
-                  </div>
-                  {/\.(html|xhtml)$/i.test(seg.path) ? (
-                    <NeonCode
-                      code={(allFiles.find((file) => file.path === seg.path)?.code ?? "").trim()}
-                      language="html"
-                      className="max-h-80"
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
+            <details className="rounded-xl border border-border/70 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer text-foreground">Generated files are collapsed</summary>
+              <div className="mt-2 grid gap-1 font-mono">
+                {fileList.slice(0, 24).map((path) => (
+                  <span key={path} className="truncate">{path}</span>
+                ))}
+                {fileList.length > 24 ? <span>+{fileList.length - 24} more files</span> : null}
+              </div>
+            </details>
+            <EnvVarsCard names={envNames} />
 
             <AppVersionButton
               version={version}
@@ -248,6 +318,15 @@ function AssistantMessage({
               onClick={message ? () => onMessageClick(message) : undefined}
               isActive={isActive}
             />
+            {message && !isStreaming ? (
+              <button
+                type="button"
+                onClick={() => onMessageClick(message)}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-border/70 bg-transparent px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-fuchsia-400/30 hover:text-foreground"
+              >
+                Restore checkpoint {version}
+              </button>
+            ) : null}
           </div>
         </MessageContent>
       </AIMessage>
@@ -268,6 +347,7 @@ function AssistantMessage({
     <AIMessage from="assistant">
       <MessageContent className="typography typography-sm max-w-none text-foreground/90">
         <MessageResponse>{content}</MessageResponse>
+        <EnvVarsCard names={envNames} />
       </MessageContent>
     </AIMessage>
   );

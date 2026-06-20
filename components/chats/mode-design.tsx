@@ -303,10 +303,10 @@ export function ModeDesign({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 px-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inspector</span>
-        <div className="flex items-center gap-1">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-transparent text-foreground">
+      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3">
+        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inspector</span>
+        <div className="flex shrink-0 items-center gap-1">
           <Button variant={inspectorActive ? 'outline' : 'ghost'} size="sm" className="h-7 w-7 bg-transparent p-0" onClick={() => onInspectorActiveChange?.(!inspectorActive)} aria-label="Toggle visual inspector">
             <MousePointer2 className="h-3.5 w-3.5" />
           </Button>
@@ -320,18 +320,18 @@ export function ModeDesign({
         </div>
       </div>
 
-      <Tabs defaultValue="style" className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue="style" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TabsList className="grid h-10 shrink-0 grid-cols-4 rounded-none border-b border-border/70 bg-transparent">
-          <TabsTrigger value="style" className="bg-transparent text-xs"><Palette className="mr-1 h-3 w-3" />Style</TabsTrigger>
-          <TabsTrigger value="type" className="bg-transparent text-xs"><Type className="mr-1 h-3 w-3" />Type</TabsTrigger>
-          <TabsTrigger value="asset" className="bg-transparent text-xs"><ImageIcon className="mr-1 h-3 w-3" />Asset</TabsTrigger>
-          <TabsTrigger value="code" className="bg-transparent text-xs"><Layers className="mr-1 h-3 w-3" />Code</TabsTrigger>
+          <TabsTrigger value="style" className="min-w-0 bg-transparent px-1 text-xs"><Palette className="mr-1 h-3 w-3 shrink-0" /><span className="truncate">Style</span></TabsTrigger>
+          <TabsTrigger value="type" className="min-w-0 bg-transparent px-1 text-xs"><Type className="mr-1 h-3 w-3 shrink-0" /><span className="truncate">Type</span></TabsTrigger>
+          <TabsTrigger value="asset" className="min-w-0 bg-transparent px-1 text-xs"><ImageIcon className="mr-1 h-3 w-3 shrink-0" /><span className="truncate">Asset</span></TabsTrigger>
+          <TabsTrigger value="code" className="min-w-0 bg-transparent px-1 text-xs"><Layers className="mr-1 h-3 w-3 shrink-0" /><span className="truncate">Code</span></TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <TabsContent value="style" className="m-0 space-y-4 p-3">
+        <ScrollArea className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
+          <TabsContent value="style" className="m-0 min-w-0 space-y-4 overflow-x-hidden p-3">
             {selectedElement ? (
-              <div className="flex items-center gap-1 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-[10px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-[10px] text-muted-foreground">
                 <span className="truncate font-mono text-foreground">{selectedElement.filePath}</span>
                 <ChevronRight className="size-3 shrink-0" />
                 <span className="truncate font-mono text-primary">{selectedElement.tag}</span>
@@ -349,11 +349,11 @@ export function ModeDesign({
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center justify-between gap-2">
                 <Label className="text-xs">Layers</Label>
                 <span className="text-[10px] text-muted-foreground">{elements.length} nodes</span>
               </div>
-              <div ref={layerListRef} className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-transparent p-1">
+              <div ref={layerListRef} className="max-h-36 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden rounded-md border border-border/70 bg-transparent p-1">
                 {elements.length ? elements.slice(0, 64).map((element) => (
                   <button
                     key={element.id}
@@ -371,8 +371,8 @@ export function ModeDesign({
             </div>
 
             {selectedElement && (
-              <div className="space-y-3 rounded-md border border-border/70 bg-transparent p-2">
-                <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 space-y-3 rounded-md border border-border/70 bg-transparent p-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <Label className="text-xs">Selected element</Label>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 bg-transparent px-2 text-[11px]" onClick={selectParentElement} disabled={!parentElement} aria-label="Select parent element">
@@ -383,11 +383,11 @@ export function ModeDesign({
                 </div>
                 <Input value={selectedElement.tag} readOnly className="h-8 bg-transparent font-mono text-xs" aria-label="Selected element tag" />
                 <Label className="text-xs">Tailwind classes</Label>
-                <Textarea value={selectedElement.className} onChange={(event) => updateSelectedElementClass(event.target.value)} className="min-h-20 bg-transparent font-mono text-xs" aria-label="Edit selected element class utilities" />
+                <Textarea value={selectedElement.className} onChange={(event) => updateSelectedElementClass(event.target.value)} className="min-h-20 max-w-full resize-y overflow-x-hidden bg-transparent font-mono text-xs" aria-label="Edit selected element class utilities" />
                 <Label className="text-xs">Layout presets</Label>
-                <div className="grid grid-cols-2 gap-1">
+                <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
                   {LAYOUT_PRESETS.map((preset) => (
-                    <Button key={preset.label} variant="outline" size="sm" className="h-7 bg-transparent text-[11px]" onClick={() => updateSelectedElementClass(`${selectedElement.className} ${preset.value}`.trim())}>
+                    <Button key={preset.label} variant="outline" size="sm" className="h-7 min-w-0 bg-transparent px-2 text-[11px]" onClick={() => updateSelectedElementClass(`${selectedElement.className} ${preset.value}`.trim())}>
                       {preset.label}
                     </Button>
                   ))}
@@ -400,8 +400,8 @@ export function ModeDesign({
                     </Button>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-1">
-                  {['flex', 'grid', 'hidden', 'relative', 'absolute', 'overflow-hidden', 'rounded-lg', 'border', 'shadow-sm', 'opacity-80'].map((utility) => <Button key={utility} variant="outline" size="sm" className="bg-transparent text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>)}
+                <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
+                  {['flex', 'grid', 'hidden', 'relative', 'absolute', 'overflow-hidden', 'rounded-lg', 'border', 'shadow-sm', 'opacity-80'].map((utility) => <Button key={utility} variant="outline" size="sm" className="min-w-0 bg-transparent px-2 text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>)}
                 </div>
                 {selectedElement.text && (
                   <>
@@ -414,7 +414,7 @@ export function ModeDesign({
 
             <div className="space-y-2">
               <Label className="text-xs">Colors</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
                 {colorTokens.slice(0, 12).map((token) => (
                   <button key={`${token.name}-${token.value}`} onClick={() => setSelectedTokenName(token.name)} className={`rounded-md border border-border/70 bg-transparent p-2 text-left transition hover:border-foreground/30 ${selectedToken?.name === token.name ? 'shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]' : ''}`}>
                     <div className="mb-2 h-8 rounded border border-border/70" style={{ background: token.value }} />
@@ -442,10 +442,10 @@ export function ModeDesign({
             </div>
           </TabsContent>
 
-          <TabsContent value="type" className="m-0 space-y-3 p-3">
+          <TabsContent value="type" className="m-0 min-w-0 space-y-3 overflow-x-hidden p-3">
             <Label className="text-xs">Font family</Label>
             {fontOptions.map((font) => <Button key={font} variant="outline" size="sm" className="w-full justify-start bg-transparent text-xs" onClick={() => appendUtility(`font-[${font.replace(/\s+/g, '_')}]`)}>{font}</Button>)}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {['text-xs', 'text-sm', 'text-base', 'text-lg', 'font-medium', 'font-semibold', 'leading-tight', 'leading-relaxed'].map((utility) => (
                 <Button key={utility} variant="outline" size="sm" className="bg-transparent text-xs" onClick={() => appendUtility(utility)}>{utility}</Button>
               ))}
@@ -458,7 +458,7 @@ export function ModeDesign({
             ))}
           </TabsContent>
 
-          <TabsContent value="asset" className="m-0 space-y-3 p-3">
+          <TabsContent value="asset" className="m-0 min-w-0 space-y-3 overflow-x-hidden p-3">
             <p className="text-xs leading-5 text-muted-foreground">Asset controls patch the selected element or file and update the live preview immediately. Save commits them as a new version.</p>
             <Button variant="outline" size="sm" className="w-full justify-start bg-transparent text-xs" onClick={() => appendUtility('overflow-hidden')}>Prevent overflow</Button>
             <Button variant="outline" size="sm" className="w-full justify-start bg-transparent text-xs" onClick={() => appendUtility('object-cover')}>Image object-cover</Button>
@@ -466,7 +466,7 @@ export function ModeDesign({
             <Button variant="outline" size="sm" className="w-full justify-start bg-transparent text-xs" onClick={() => replaceUtility(['bg-', 'from-', 'to-'], 'bg-transparent')}>Remove filled background</Button>
           </TabsContent>
 
-          <TabsContent value="code" className="m-0 space-y-3 p-3">
+          <TabsContent value="code" className="m-0 min-w-0 space-y-3 overflow-x-hidden p-3">
             <Label className="text-xs">File</Label>
             <select value={selectedFile?.path || ''} onChange={(event) => setSelectedFilePath(event.target.value)} className="h-8 w-full rounded-md border border-border/70 bg-transparent px-2 text-xs text-foreground" aria-label="Select file to edit">
               {workspaceFiles.map((file) => <option key={file.path} value={file.path}>{file.path}</option>)}
@@ -476,14 +476,14 @@ export function ModeDesign({
         </ScrollArea>
       </Tabs>
 
-      <div className="shrink-0 border-t border-border/70 p-3">
+      <div className="shrink-0 border-t border-border/70 bg-background/80 p-3">
         <div className="mb-2 flex flex-wrap gap-1.5">
           {DEFAULT_INSTRUCTION_CHIPS.map((chip) => (
             <button key={chip} type="button" onClick={() => setInstructions((value) => `${value} ${chip}`.trim())} className="rounded-full border border-border/70 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">{chip}</button>
           ))}
         </div>
-        <Textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') applyInstructions() }} placeholder="Add instructions for this element… (⌘↵ to apply)" aria-label="Design instructions for selected element" className="mb-2 min-h-20 bg-transparent text-xs" />
-        <div className="grid grid-cols-3 gap-2">
+        <Textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') applyInstructions() }} placeholder="Add instructions for this element… (⌘↵ to apply)" aria-label="Design instructions for selected element" className="mb-2 min-h-16 max-w-full resize-y overflow-x-hidden bg-transparent text-xs" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button type="button" variant="outline" size="sm" onClick={resetChanges} className="bg-transparent text-xs"><RefreshCw className="mr-1 h-3.5 w-3.5" />Reset</Button>
           <Button type="button" variant="outline" size="sm" onClick={previewChanges} className="bg-transparent text-xs"><Eye className="mr-1 h-3.5 w-3.5" />Preview</Button>
           <Button type="button" variant="outline" size="sm" onClick={applyInstructions} className="bg-transparent text-xs"><Check className="mr-1 h-3.5 w-3.5" />Apply</Button>

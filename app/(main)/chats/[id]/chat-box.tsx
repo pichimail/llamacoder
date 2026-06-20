@@ -2,9 +2,9 @@
 
 import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Undo2, Zap } from "lucide-react";
+import { Brain, Code2, Database, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
 import { MODELS } from "@/lib/constants";
@@ -12,9 +12,8 @@ import { useAvailableModels } from "@/lib/use-available-models";
 import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
-import { BuilderToggles } from "@/components/builder-toggles";
-import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 import { PlanModePanel } from "@/components/plan-mode-panel";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 
 const ghostTrigger =
   "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
@@ -73,16 +72,12 @@ export default function ChatBox({
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
-  const [shadcnEnabled, setShadcnEnabled] = useState(chat.shadcn);
-  const [reasoningEnabled, setReasoningEnabled] = useState(false);
   const availableModels = useAvailableModels();
 
   const isScreenshotUploadAvailable = blobUploadConfigured === true;
 
   const persistBuilderSettings = async (updates: {
-    shadcn?: boolean;
     model?: string;
-    quality?: "low" | "high";
   }) => {
     await fetch(`/api/chats/${chat.id}/builder-settings`, {
       method: "PATCH",
@@ -91,21 +86,51 @@ export default function ChatBox({
     }).catch(() => undefined);
   };
 
-  const persistShadcn = async (enabled: boolean) => {
-    setShadcnEnabled(enabled);
-    await persistBuilderSettings({ shadcn: enabled });
-  };
-
   const handleModelChange = (nextModel: string) => {
     setModel(nextModel);
     void persistBuilderSettings({ model: nextModel });
   };
 
-  const handleQualityChange = (nextQuality: string) => {
-    const normalized = nextQuality === "high" ? "high" : "low";
-    setQuality(normalized);
-    void persistBuilderSettings({ quality: normalized });
-  };
+  const suggestionItems = useMemo(
+    () => [
+      {
+        label: "Improve UI hierarchy",
+        value: "Improve the current artifact UI hierarchy with stronger spacing, clearer sections, sharper typography, and polished dark/light states.",
+        icon: <Palette className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add empty/loading/error states",
+        value: "Add complete empty, loading, and error states for every major data surface in this artifact.",
+        icon: <Sparkles className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add filters and search",
+        value: "Add working local search, filtering, sorting, and view controls to the current dashboard/app data surfaces.",
+        icon: <Code2 className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add backend scaffold",
+        value: "Add preview-safe backend-shaped files for API routes, typed data access, and environment variable placeholders without breaking the live preview.",
+        icon: <Database className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add role permissions",
+        value: "Add a role permissions workflow with local state, protected actions, audit-friendly UI, and clear admin/operator states.",
+        icon: <Shield className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add OpenAI assistant",
+        value: "Integrate an OpenAI assistant feature with an optional OPENAI_API_KEY environment variable placeholder, local preview fallback, and required UI states.",
+        icon: <Brain className="size-3.5" aria-hidden="true" />,
+      },
+      {
+        label: "Add Gemini analysis",
+        value: "Integrate a Gemini analysis panel with an optional GEMINI_API_KEY environment variable placeholder, local preview fallback, and required UI states.",
+        icon: <Brain className="size-3.5" aria-hidden="true" />,
+      },
+    ],
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -263,7 +288,7 @@ export default function ChatBox({
         body: JSON.stringify({
           messageId: message.id,
           model,
-          reasoning: reasoningEnabled,
+          reasoning: false,
           quality,
         }),
       })
@@ -287,7 +312,7 @@ export default function ChatBox({
           throw err;
         });
 
-      onNewStreamPromise(streamPromise, { reasoning: reasoningEnabled });
+      onNewStreamPromise(streamPromise, { reasoning: false });
       startTransition(() => {
         router.refresh();
         setPrompt("");
@@ -328,6 +353,21 @@ export default function ChatBox({
         />
 
         {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
+
+        <Suggestions className="mb-2 px-1">
+          {suggestionItems.map((item) => (
+            <Suggestion
+              key={item.label}
+              suggestion={item.value}
+              onClick={(value) => setPrompt(value)}
+              disabled={disabled}
+              className="h-8 shrink-0 gap-1.5 border-border/70 bg-zinc-950/70 px-3 text-xs text-muted-foreground hover:border-fuchsia-400/30 hover:bg-zinc-900 hover:text-foreground"
+            >
+              {item.icon}
+              {item.label}
+            </Suggestion>
+          ))}
+        </Suggestions>
 
         <InputBar
           value={prompt}
@@ -373,20 +413,6 @@ export default function ChatBox({
           }
           rightActions={
             <div className="flex items-center gap-1">
-              <BuilderToggles
-                compact
-                shadcnEnabled={shadcnEnabled}
-                onShadcnChange={persistShadcn}
-                reasoningEnabled={reasoningEnabled}
-                onReasoningChange={setReasoningEnabled}
-              />
-              <PromptRewriteButton
-                prompt={prompt}
-                mode={mode}
-                model={model}
-                onRewrite={setPrompt}
-                disabled={disabled}
-              />
               <OptionDropdown
                 value={model}
                 onValueChange={handleModelChange}
@@ -408,30 +434,12 @@ export default function ChatBox({
                 }))}
               />
 
-              <OptionDropdown
-                value={quality}
-                onValueChange={handleQualityChange}
-                aria-label="Select generation quality"
-                tip={quality === "high" ? "Quality: high (slower)" : "Quality: fast"}
-                triggerLabel={
-                  <Zap
-                    className={`size-3.5 ${quality === "high" ? "text-amber-400" : ""}`}
-                    aria-hidden="true"
-                  />
-                }
-                triggerClassName={ghostTrigger}
-                options={[
-                  { value: "low", label: "Fast" },
-                  { value: "high", label: "High quality" },
-                ]}
-              />
-
               {versions.length > 0 && onSwitchVersion && (
                 <OptionDropdown
                   value={currentVersionId || versions[versions.length - 1]?.id || ""}
                   onValueChange={onSwitchVersion}
-                  aria-label="Switch app version"
-                  tip="Switch version"
+                  aria-label="Restore checkpoint"
+                  tip="Restore checkpoint"
                   disabled={disabled}
                   triggerLabel={
                     versions.find((version) => version.id === currentVersionId)?.label ??
@@ -443,7 +451,7 @@ export default function ChatBox({
                     .reverse()
                     .map((version) => ({
                       value: version.id,
-                      label: version.label,
+                      label: `Restore ${version.label}`,
                     }))}
                 />
               )}

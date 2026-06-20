@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentProps, KeyboardEvent, MouseEvent } from 'react'
+import type { ComponentProps } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import {
@@ -18,6 +18,11 @@ import type { SandpackBuildOptions } from '@/lib/sandpack-config'
 import { DesignInspectorBridge } from './design-inspector-bridge'
 import { ModeDesign } from './mode-design'
 import type { PreviewMode } from '@/components/code-runner-react'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 
 type InspectorSelection = { tag: string; label: string }
 
@@ -39,9 +44,6 @@ interface DesignWorkspaceProps {
   sandpackOptions?: SandpackBuildOptions
 }
 
-const MIN_INSPECTOR_WIDTH = 300
-const MAX_INSPECTOR_WIDTH = 560
-
 export function DesignWorkspace({
   chatId,
   files,
@@ -56,13 +58,11 @@ export function DesignWorkspace({
   sandpackOptions,
 }: DesignWorkspaceProps) {
   const [liveFiles, setLiveFiles] = useState(files)
-  const [inspectorWidth, setInspectorWidth] = useState(400)
   const [inspectorActive, setInspectorActive] = useState(true)
   const [selectedElementId, setSelectedElementId] = useState('')
   const [hoverElementId, setHoverElementId] = useState<string | null>(null)
   const [inspectorSelection, setInspectorSelection] = useState<InspectorSelection | null>(null)
   const previewContainerRef = useRef<HTMLElement | null>(null)
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const filesKey = files.map((file) => `${file.path}:${file.code.length}`).join('|')
 
   useEffect(() => {
@@ -78,51 +78,6 @@ export function DesignWorkspace({
     }),
     [inspectorActive, sandpackOptions],
   )
-
-  const onSplitterMouseDown = (event: MouseEvent) => {
-    event.preventDefault()
-    dragRef.current = { startX: event.clientX, startWidth: inspectorWidth }
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }
-
-  const onSplitterKeyDown = (event: KeyboardEvent) => {
-    const step = event.shiftKey ? 48 : 16
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      setInspectorWidth((width) => Math.min(MAX_INSPECTOR_WIDTH, width + step))
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      setInspectorWidth((width) => Math.max(MIN_INSPECTOR_WIDTH, width - step))
-    }
-  }
-
-  useEffect(() => {
-    const onMouseMove = (event: globalThis.MouseEvent) => {
-      if (!dragRef.current) return
-      const delta = dragRef.current.startX - event.clientX
-      setInspectorWidth(
-        Math.max(
-          MIN_INSPECTOR_WIDTH,
-          Math.min(MAX_INSPECTOR_WIDTH, dragRef.current.startWidth + delta),
-        ),
-      )
-    }
-    const onMouseUp = () => {
-      if (!dragRef.current) return
-      dragRef.current = null
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [])
 
   const handlePreviewFiles = useCallback((nextFiles: ArtifactFile[]) => {
     setLiveFiles(nextFiles)
@@ -153,13 +108,12 @@ export function DesignWorkspace({
     />
   )
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent xl:flex-row">
-      <section
-        ref={previewContainerRef}
-        className="relative min-h-0 flex-1 overflow-hidden bg-transparent"
-        aria-label="Live design preview"
-      >
+  const previewPane = (
+    <section
+      ref={previewContainerRef}
+      className="relative h-full min-h-0 overflow-hidden bg-transparent"
+      aria-label="Live design preview"
+    >
         <DesignInspectorBridge
           enabled={inspectorActive && liveFiles.length > 0}
           selectedElementId={selectedElementId}
@@ -198,41 +152,47 @@ export function DesignWorkspace({
           </div>
         )}
       </section>
+  )
 
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize design inspector"
-        aria-valuemin={MIN_INSPECTOR_WIDTH}
-        aria-valuemax={MAX_INSPECTOR_WIDTH}
-        aria-valuenow={inspectorWidth}
-        tabIndex={0}
-        onMouseDown={onSplitterMouseDown}
-        onKeyDown={onSplitterKeyDown}
-        className="group relative hidden w-px shrink-0 cursor-col-resize bg-transparent focus-visible:outline-none xl:block"
-      >
-        <div className="absolute inset-y-0 left-0 w-px bg-border/80 transition group-hover:bg-primary/50 group-focus-visible:bg-primary/60" aria-hidden="true" />
-      </div>
+  const inspectorPane = (
+    <aside className="h-full min-h-0 overflow-hidden bg-transparent" aria-label="Design inspector">
+      <ModeDesign
+        chatId={chatId}
+        files={files}
+        onDirtyChange={onDirtyChange}
+        onPreviewFiles={handlePreviewFiles}
+        onSaved={handleSaved}
+        saveRequest={saveRequest}
+        inspectorActive={inspectorActive}
+        onInspectorActiveChange={setInspectorActive}
+        onInspectorSelectionChange={setInspectorSelection}
+        selectedElementId={selectedElementId}
+        onSelectedElementIdChange={setSelectedElementId}
+      />
+    </aside>
+  )
 
-      <aside
-        style={{ width: inspectorWidth }}
-        className="min-h-0 h-[44dvh] shrink-0 overflow-hidden border-t border-border/70 bg-transparent xl:h-auto xl:border-l xl:border-t-0"
-        aria-label="Design inspector"
-      >
-        <ModeDesign
-          chatId={chatId}
-          files={files}
-          onDirtyChange={onDirtyChange}
-          onPreviewFiles={handlePreviewFiles}
-          onSaved={handleSaved}
-          saveRequest={saveRequest}
-          inspectorActive={inspectorActive}
-          onInspectorActiveChange={setInspectorActive}
-          onInspectorSelectionChange={setInspectorSelection}
-          selectedElementId={selectedElementId}
-          onSelectedElementIdChange={setSelectedElementId}
-        />
-      </aside>
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden bg-transparent">
+      <ResizablePanelGroup id="design-workspace-split" orientation="horizontal" className="hidden h-full min-h-0 xl:flex">
+        <ResizablePanel id="design-preview" defaultSize={76} minSize={48} className="min-w-0 overflow-hidden">
+          {previewPane}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel id="design-inspector" defaultSize={24} minSize={18} maxSize={38} className="min-w-[300px] overflow-hidden border-l border-border/70">
+          {inspectorPane}
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
+      <ResizablePanelGroup id="design-workspace-mobile-split" orientation="vertical" className="h-full min-h-0 xl:hidden">
+        <ResizablePanel id="design-preview-mobile" defaultSize={62} minSize={35} className="min-h-0 overflow-hidden">
+          {previewPane}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel id="design-inspector-mobile" defaultSize={38} minSize={24} className="min-h-0 overflow-hidden border-t border-border/70">
+          {inspectorPane}
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

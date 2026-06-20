@@ -119,6 +119,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [designSaveRequest, setDesignSaveRequest] = useState(0);
   const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
   const [showUnsavedOverlay, setShowUnsavedOverlay] = useState(false);
+  const [designSaving, setDesignSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   const [autoFixEnabled, setAutoFixEnabled] = useState(true);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
@@ -217,6 +218,26 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     }
     applyMode(mode);
   }, [applyMode, builderMode, designDirty]);
+
+  const cancelDesignModeSwitch = useCallback(() => {
+    if (designSaving) return;
+    setShowUnsavedOverlay(false);
+    setPendingMode(null);
+  }, [designSaving]);
+
+  const discardDesignChangesAndSwitch = useCallback(() => {
+    if (designSaving) return;
+    setDesignDirty(false);
+    setShowUnsavedOverlay(false);
+    if (pendingMode) applyMode(pendingMode);
+    setPendingMode(null);
+  }, [applyMode, designSaving, pendingMode]);
+
+  const saveDesignChangesAndSwitch = useCallback(() => {
+    if (designSaving) return;
+    setDesignSaving(true);
+    setDesignSaveRequest((value) => value + 1);
+  }, [designSaving]);
 
   const switchMobilePanel = useCallback((panel: MobilePanel) => {
     setMobilePanel(panel);
@@ -657,6 +678,7 @@ Fix requirements:
           onPreviewReady={handlePreviewReady}
           onDirtyChange={setDesignDirty}
           onSaved={(message, savedFiles) => {
+            setDesignSaving(false);
             setDesignDirty(false);
             setShowUnsavedOverlay(false);
             if (message) setActiveMessage(message as Message);
@@ -886,20 +908,20 @@ Fix requirements:
               <h2 id="unsaved-design-title" className="text-sm font-semibold text-foreground">Save design changes?</h2>
               <p id="unsaved-design-description" className="mt-2 text-sm leading-5 text-muted-foreground">You have live visual edits that are not committed as a version yet.</p>
               <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => { setShowUnsavedOverlay(false); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Cancel</button>
-                <button type="button" onClick={() => { setDesignDirty(false); setShowUnsavedOverlay(false); if (pendingMode) applyMode(pendingMode); setPendingMode(null); }} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent">Discard</button>
-                <button type="button" onClick={() => setDesignSaveRequest((value) => value + 1)} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500">Save Changes</button>
+                <button type="button" onClick={cancelDesignModeSwitch} disabled={designSaving} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={discardDesignChangesAndSwitch} disabled={designSaving} className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-50">Discard</button>
+                <button type="button" onClick={saveDesignChangesAndSwitch} disabled={designSaving} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-60">{designSaving ? "Saving..." : "Save Changes"}</button>
               </div>
             </div>
           </div>
         )}
-        <Drawer open={showUnsavedOverlay} onOpenChange={setShowUnsavedOverlay} shouldScaleBackground={false} snapPoints={[0.3, 0.5]}>
+        <Drawer open={showUnsavedOverlay} onOpenChange={(open) => { if (!open) cancelDesignModeSwitch(); else setShowUnsavedOverlay(true); }} shouldScaleBackground={false} snapPoints={[0.3, 0.5]}>
           <DrawerContent showOverlay className="md:hidden h-[42dvh] rounded-t-2xl border-border/70 bg-background/95 px-4 pb-4">
             <DrawerHeader className="px-0 text-left"><DrawerTitle className="text-sm">Save design changes?</DrawerTitle><DrawerDescription>You have live visual edits that are not committed yet.</DrawerDescription></DrawerHeader>
             <div className="grid gap-2">
-              <button type="button" onClick={() => setDesignSaveRequest((value) => value + 1)} className="rounded-md border border-border px-3 py-2 text-sm text-foreground">Save Changes</button>
-              <button type="button" onClick={() => { setDesignDirty(false); setShowUnsavedOverlay(false); if (pendingMode) applyMode(pendingMode); setPendingMode(null); }} className="rounded-md border border-border px-3 py-2 text-sm text-foreground">Discard Changes</button>
-              <button type="button" onClick={() => { setShowUnsavedOverlay(false); setPendingMode(null); }} className="rounded-md px-3 py-2 text-sm text-muted-foreground">Cancel</button>
+              <button type="button" onClick={saveDesignChangesAndSwitch} disabled={designSaving} className="rounded-md border border-border px-3 py-2 text-sm text-foreground disabled:opacity-50">{designSaving ? "Saving..." : "Save Changes"}</button>
+              <button type="button" onClick={discardDesignChangesAndSwitch} disabled={designSaving} className="rounded-md border border-border px-3 py-2 text-sm text-foreground disabled:opacity-50">Discard Changes</button>
+              <button type="button" onClick={cancelDesignModeSwitch} disabled={designSaving} className="rounded-md px-3 py-2 text-sm text-muted-foreground disabled:opacity-50">Cancel</button>
             </div>
           </DrawerContent>
         </Drawer>
