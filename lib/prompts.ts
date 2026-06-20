@@ -77,6 +77,27 @@ Required landing-page quality bar:
 - Still compile first. Every import must resolve in the preview sandbox, and every effect must clean up timers, animation contexts, canvas renderers, and event listeners.
 `;
 
+const premiumProductAppPrompt = dedent`
+## PREMIUM PRODUCT APP / DASHBOARD MODE
+Build like a current high-end vibe-coding output: v0.dev, Lovable, Bolt, Linear, Vercel, Stripe, and Raycast-level polish. The result must feel like a modern product surface, not an old admin template.
+
+House design system when the user did not request another style:
+- Dark mode is the default first impression: near-black #000/#0A0A0A base, not slate-900.
+- Include a real Light / Dark / System theme toggle in every generated app. Persist the choice and make System follow prefers-color-scheme.
+- Use exactly one intentional accent color per app. Do not ship an all-gray Tailwind palette, generic purple-pink gradients, or random multi-accent dashboards.
+- Use 12px radius, 1px hairline separators, restrained depth, and one clean surface level. No stacked drop-shadows, nested card-on-card clutter, or double backgrounds behind icons/buttons.
+- Use deliberate type hierarchy, dense but breathable spacing, sharp contrast, and professional data density.
+
+Dashboard/admin quality bar:
+- Start with a real app shell: sidebar or rail navigation, top command/action bar, search, filters, view switcher, user/workspace controls, and clear page title/actions.
+- Include rich operational surfaces: KPI strips with context, charts or trend panels, data tables with sorting/filter/search, detail drawer/dialog, settings or status panel, and empty/loading/error states.
+- Build domain-specific sections from the user request. Do not emit generic "Users / Revenue / Health" unless the prompt asks for those exact metrics.
+- Every visible control must have local state behavior: tabs switch, filters affect rows, search filters data, dialogs/sheets open, toggles change state, and buttons give meaningful UI feedback.
+- Prefer shadcn-style controls when enabled: Button, Card only when appropriate, Table, Tabs, Dialog, Sheet, Select, DropdownMenu, Badge, Input, Switch, Tooltip, and chart/data components.
+- Avoid marketing-page layout patterns in dashboards. No centered hero, no three equal feature cards, no vague abstract cards. Prioritize scannable work surfaces and repeated daily-use ergonomics.
+- Keep mobile first-class: collapsible nav, horizontal-safe tables/cards, no overlapping text, no hover-only required actions.
+`;
+
 export const planModePrompt = dedent`
 You are in **PLAN mode**. Output ONLY this exact short structure (no code):
 
@@ -139,8 +160,8 @@ export function getMainCodingPrompt(
     if (hasCodeFile) p += "\n\n**CODE FILE CONTEXT**: Refactor the uploaded code into a clean working app while preserving the best parts.";
     if (isLanding) {
       p += "\n\n" + premiumLandingPagePrompt;
-    } else if (lower.includes("admin") || lower.includes("dashboard") || lower.includes("saas") || lower.includes("management")) {
-      p += "\n\n**APP/DASHBOARD MODE**: Include working local data flows, tables, filters, dialogs, sheets, and settings. Keep the visible preview independent of real database/auth imports.";
+    } else if (lower.includes("admin") || lower.includes("dashboard") || lower.includes("saas") || lower.includes("management") || lower.includes("crm") || lower.includes("analytics")) {
+      p += "\n\n" + premiumProductAppPrompt;
     }
     return dedent(p);
   }
