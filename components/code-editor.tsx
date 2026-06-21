@@ -42,8 +42,16 @@ export default function CodeEditor({
       value={value}
       theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
       onChange={(v) => onChange(v ?? "")}
-      onMount={(editor) => {
+      onMount={(editor, monaco) => {
         editorRef.current = editor;
+        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+          noSyntaxValidation: false,
+        });
+        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+          noSyntaxValidation: false,
+        });
         onEditorReady?.({
           undo: () => editor.trigger("toolbar", "undo", null),
           redo: () => editor.trigger("toolbar", "redo", null),
