@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { detectArtifactRuntime } from "@/lib/artifact-runtime";
+import { withArtifactRuntimeCompat } from "@/lib/artifact-runtime-compat";
 import CodeRunnerReact from "./code-runner-react";
 import type { PreviewMode } from "./code-runner-react";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
@@ -60,7 +61,7 @@ export default function CodeRunner({
 
   return (
     <CodeRunnerReact
-      files={actualFiles}
+      files={withArtifactRuntimeCompat(actualFiles)}
       extraDependencies={extraDependencies}
       onRequestFix={onRequestFix}
       onPreviewError={onPreviewError}
