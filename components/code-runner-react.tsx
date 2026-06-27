@@ -16,7 +16,7 @@ import {
   Smartphone,
   Wand2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   WebPreview,
   WebPreviewConsole,
@@ -33,6 +33,15 @@ type ConsoleLog = {
   message: string;
   timestamp: Date;
 };
+
+type VisualPreviewState = {
+  ready: boolean;
+  reason?: string;
+  inaccessible?: boolean;
+};
+
+const VISUAL_PREVIEW_TIMEOUT_MS = 7000;
+const VISUAL_PREVIEW_POLL_MS = 300;
 
 const previewModes: Array<{
   value: PreviewMode;
@@ -78,6 +87,74 @@ function previewUrlToRoute(url: string) {
     const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
   }
+}
+
+function isElementVisiblyRendered(element: Element) {
+  const ownerWindow = element.ownerDocument.defaultView;
+  if (!ownerWindow) return false;
+  const style = ownerWindow.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+  const rect = (element as HTMLElement).getBoundingClientRect?.();
+  return Boolean(rect && rect.width > 2 && rect.height > 2);
+}
+
+function inspectPreviewDocument(document: Document): VisualPreviewState {
+  const body = document.body;
+  if (!body) return { ready: false, reason: "Preview document has no body yet." };
+
+  const bodyText = (body.innerText || "")
+    .replace(/\s+/g, " ")
+    .replace(/^(Loading|Document|Preview)$/i, "")
+    .trim();
+
+  const meaningfulElements = Array.from(
+    body.querySelectorAll(
+      "main,section,article,nav,header,footer,button,input,textarea,select,canvas,svg,img,[role],h1,h2,h3,p,li,a",
+    ),
+  ).filter(isElementVisiblyRendered).length;
+
+  const root = body.querySelector("#root");
+  const mountedRootChildren = root?.children.length ?? 0;
+  const visualMedia = Boolean(body.querySelector("canvas,svg,img,video"));
+
+  if (bodyText.length >= 2 || meaningfulElements >= 2 || (mountedRootChildren > 0 && visualMedia)) {
+    return { ready: true };
+  }
+
+  return {
+    ready: false,
+    reason: "Preview compiled but rendered no visible UI.",
+  };
+}
+
+function inspectSandpackPreview(): VisualPreviewState {
+  if (typeof document === "undefined") return { ready: true };
+
+  const iframes = Array.from(
+    document.querySelectorAll<HTMLIFrameElement>("iframe.sp-preview-iframe, .sp-preview-iframe iframe"),
+  );
+
+  if (iframes.length === 0) {
+    return { ready: false, reason: "Preview iframe is not mounted yet." };
+  }
+
+  for (const iframe of iframes) {
+    const rect = iframe.getBoundingClientRect();
+    if (rect.width < 20 || rect.height < 20) continue;
+    try {
+      const frameDocument = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!frameDocument) continue;
+      const inspected = inspectPreviewDocument(frameDocument);
+      if (inspected.ready) return inspected;
+    } catch {
+      return { ready: true, inaccessible: true };
+    }
+  }
+
+  return {
+    ready: false,
+    reason: "Preview compiled but the iframe has no visible mounted UI yet.",
+  };
 }
 
 export default function ReactCodeRunner({
@@ -316,10 +393,16 @@ function PreviewStatusMonitor({
   const { sandpack, listen } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
   const [lastRuntimeError, setLastRuntimeError] = useState<string>("");
+  const readyReportedRef = useRef(false);
+
+  useEffect(() => {
+    readyReportedRef.current = false;
+  }, [sandpack.activeFile, sandpack.visibleFiles]);
 
   useEffect(() => {
     if (sandpack.error) {
       const message = sandpack.error.message;
+      readyReportedRef.current = false;
       setLastRuntimeError(message);
       onLog?.("error", message);
       onPreviewError?.(message);
@@ -344,6 +427,37 @@ function PreviewStatusMonitor({
 
   useEffect(() => {
     let readyTimer: number | undefined;
+    let visualTimer: number | undefined;
+    let cancelled = false;
+
+    const clearTimers = () => {
+      window.clearTimeout(readyTimer);
+      window.clearTimeout(visualTimer);
+    };
+
+    const reportReadyWhenVisible = (startedAt: number) => {
+      if (cancelled || sandpack.error || readyReportedRef.current) return;
+      const visualState = inspectSandpackPreview();
+
+      if (visualState.ready) {
+        clearTimers();
+        readyReportedRef.current = true;
+        setLastRuntimeError("");
+        onPreviewReady?.();
+        return;
+      }
+
+      if (Date.now() - startedAt < VISUAL_PREVIEW_TIMEOUT_MS) {
+        visualTimer = window.setTimeout(() => reportReadyWhenVisible(startedAt), VISUAL_PREVIEW_POLL_MS);
+        return;
+      }
+
+      const errorText = visualState.reason || "Preview compiled but did not render a visible application.";
+      setLastRuntimeError(errorText);
+      onLog?.("warn", errorText);
+      onPreviewError?.(errorText);
+    };
+
     const unsubscribe = listen((message) => {
       if (message.type === "done") {
         const doneMessage = message as unknown as {
@@ -353,27 +467,25 @@ function PreviewStatusMonitor({
         const compileError = doneMessage.compilationError || doneMessage.compilatonError;
         if (compileError) {
           const errorText = typeof compileError === "string" ? compileError : JSON.stringify(compileError, null, 2);
+          readyReportedRef.current = false;
           setLastRuntimeError(errorText);
           onLog?.("error", errorText);
           onPreviewError?.(errorText);
-          window.clearTimeout(readyTimer);
+          clearTimers();
           return;
         }
-        window.clearTimeout(readyTimer);
-        readyTimer = window.setTimeout(() => {
-          if (!sandpack.error) {
-            setLastRuntimeError("");
-            onPreviewReady?.();
-          }
-        }, 1000);
+        clearTimers();
+        readyTimer = window.setTimeout(() => reportReadyWhenVisible(Date.now()), 600);
       }
       if (message.type === "action" && (message as any).action === "show-error") {
-        window.clearTimeout(readyTimer);
+        readyReportedRef.current = false;
+        clearTimers();
       }
     });
 
     return () => {
-      window.clearTimeout(readyTimer);
+      cancelled = true;
+      clearTimers();
       unsubscribe();
     };
   }, [listen, onLog, onPreviewError, onPreviewReady, sandpack.error]);
@@ -389,7 +501,7 @@ function PreviewStatusMonitor({
           Preview/runtime error
         </div>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          Auto-fix can patch missing imports, broken exports, invalid JSX, and dependency errors into a new version.
+          Auto-fix can patch missing imports, broken exports, invalid JSX, dependency errors, and blank rendered previews into a new version.
         </p>
         <pre className="mt-3 max-h-52 overflow-auto rounded-lg border border-border bg-transparent p-3 font-mono text-xs leading-relaxed text-red-100/90">
           {errorMessage}
