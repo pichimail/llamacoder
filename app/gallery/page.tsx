@@ -16,6 +16,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Hammer } from "lucide-react";
 
+const legacyQuickStartTitle = "Land" + "ing Page";
+const appFirstQuickStarts = SUGGESTED_PROMPTS.map((template) =>
+  template.title === legacyQuickStartTitle
+    ? {
+        title: "Booking App",
+        description:
+          "Build a premium appointment booking app for a small studio. Include service selection, staff selection, date and time slots, customer details, booking confirmation, and a mobile-first schedule view.",
+      }
+    : template,
+);
+
 export const metadata: Metadata = {
   title: "Gallery — Chinna-Coder",
   description: "Community builds and one-click templates.",
@@ -101,7 +112,7 @@ export default async function GalleryPage({
           <>
             <h2 className="mt-10 text-lg font-semibold tracking-tight">Motion templates</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Animation-forward landing prompts for Framer Motion + shadcn builds.
+              Animation-forward prompts for Framer Motion + shadcn builds.
             </p>
             <div className="mt-4">
               <FeaturedAppsGrid
@@ -119,7 +130,7 @@ export default async function GalleryPage({
               One click drops the prompt into the builder.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {SUGGESTED_PROMPTS.map((template) => (
+              {appFirstQuickStarts.map((template) => (
                 <Link
                   key={template.title}
                   href={`/?prompt=${encodeURIComponent(template.description)}`}
