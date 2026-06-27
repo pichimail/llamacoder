@@ -12,6 +12,63 @@ const PythonArtifactRunner = dynamic(
   { ssr: false },
 );
 
+type RuntimeFile = { path: string; content: string };
+
+function cleanRuntimePath(path: string) {
+  return path.trim().replace(/^\/+/, "").replace(/^src\//, "");
+}
+
+function importPathFor(path: string) {
+  return `./${cleanRuntimePath(path).replace(/\.(tsx|jsx|ts|js|css)$/i, "")}`;
+}
+
+function pickRenderableEntry(files: RuntimeFile[]) {
+  const normalized = files.map((file) => ({ ...file, cleanPath: cleanRuntimePath(file.path) }));
+  return (
+    normalized.find((file) => file.cleanPath === "app/page.tsx") ||
+    normalized.find((file) => file.cleanPath === "pages/index.tsx") ||
+    normalized.find((file) => file.cleanPath === "App.tsx") ||
+    normalized.find((file) => /\.(tsx|jsx)$/i.test(file.cleanPath) && /export\s+default|return\s*\(|<[A-Z]/.test(file.content))
+  );
+}
+
+function ensureSandpackEntry(files: RuntimeFile[]): RuntimeFile[] {
+  const hasExplicitAppEntry = files.some((file) => cleanRuntimePath(file.path) === "App.tsx");
+  if (hasExplicitAppEntry || files.length === 0) return files;
+
+  const entry = pickRenderableEntry(files);
+  if (!entry) return files;
+
+  const cssImports = files
+    .map((file) => cleanRuntimePath(file.path))
+    .filter((path) => path.endsWith(".css") && path !== "app/globals.css")
+    .map((path) => `import './${path}';`)
+    .join("\n");
+
+  return [
+    ...files,
+    {
+      path: "App.tsx",
+      content: `import React from 'react';
+import './app/globals.css';
+${cssImports}
+import { ensureTwind } from '@/lib/twind';
+import MainComponent from '${importPathFor(entry.cleanPath)}';
+
+ensureTwind();
+
+export default function App() {
+  return (
+    <div className="min-h-dvh bg-background text-foreground">
+      <MainComponent />
+    </div>
+  );
+}
+`,
+    },
+  ];
+}
+
 export default function CodeRunner({
   language,
   code,
@@ -59,9 +116,11 @@ export default function CodeRunner({
     return <PythonArtifactRunner files={actualFiles} runtime={runtime} />;
   }
 
+  const previewFiles = ensureSandpackEntry(withArtifactRuntimeCompat(actualFiles));
+
   return (
     <CodeRunnerReact
-      files={withArtifactRuntimeCompat(actualFiles)}
+      files={previewFiles}
       extraDependencies={extraDependencies}
       onRequestFix={onRequestFix}
       onPreviewError={onPreviewError}

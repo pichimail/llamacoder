@@ -83,14 +83,11 @@ export default async function SharePage({
   }
 
   return (
-    <div className="flex h-full w-full grow flex-col">
-      <div className="flex h-full grow items-center justify-center">
-        <CodeRunner
-          files={files.map((f) => ({ path: f.path, content: f.code }))}
-        />
+    <main className="relative flex min-h-dvh w-full overflow-hidden bg-background text-foreground">
+      <div className="absolute inset-0">
+        <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code }))} />
       </div>
 
-      {/* Floating desktop banner */}
       <div className="fixed bottom-4 right-4 z-50 hidden md:block">
         <a
           className="inline-flex shrink-0 items-center rounded-full border-[0.5px] border-[#BABABA] bg-white px-3.5 py-1.5 text-xs text-black shadow-lg transition-shadow hover:shadow-sm dark:border-white/20 dark:bg-zinc-900 dark:text-white"
@@ -101,7 +98,7 @@ export default async function SharePage({
           </span>
         </a>
       </div>
-    </div>
+    </main>
   );
 }
 
