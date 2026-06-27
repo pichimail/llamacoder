@@ -19,6 +19,7 @@ export const MODEL_ALIASES: Record<string, string> = {
   "MiniMaxAI/MiniMax-M2.5": "MiniMaxAI/MiniMax-M2.7",
   "glm-5": "zai-org/GLM-5",
   "glm-5.1": "zai-org/GLM-5.1",
+  "glm-5.2": "zai-org/GLM-5.2",
 };
 
 export const MODELS: ModelConfig[] = [
@@ -39,6 +40,15 @@ export const MODELS: ModelConfig[] = [
     status: "ready",
     recommended: true,
     description: "Primary fallback model",
+  },
+  {
+    label: "GLM 5.2",
+    value: "zai-org/GLM-5.2",
+    nativeModel: "zai-org/GLM-5.2",
+    provider: "together",
+    status: "ready",
+    recommended: true,
+    description: "Newest GLM builder model",
   },
   {
     label: "OpenRouter Auto",
@@ -208,9 +218,9 @@ export const SUGGESTED_PROMPTS = [
       "Create a Kanban-style project board with columns for To Do, In Progress, and Done. Let users add, edit, and drag tasks between columns. Include task labels, due dates, and a clean minimal design.",
   },
   {
-    title: "Landing Page",
+    title: "Booking App",
     description:
-      "Build a modern landing page for an AI startup with a bold hero section, an animated feature grid, a pricing table with three tiers, a testimonials carousel, and a waitlist signup form. Use smooth scroll animations and a sleek dark theme.",
+      "Build a premium appointment booking app for a small studio. Include service selection, staff selection, date and time slots, customer details, booking confirmation, and a mobile-first schedule view.",
   },
   {
     title: "Habit Tracker",
