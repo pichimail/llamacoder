@@ -13,9 +13,9 @@ import {
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { patchModeSystemHint } from "@/lib/code-patch";
 
-function optimizeMessagesForTokens(
-  messages: { role: "system" | "user" | "assistant"; content: string }[],
-): { role: "system" | "user" | "assistant"; content: string }[] {
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+function optimizeMessagesForTokens(messages: ChatMessage[]): ChatMessage[] {
   const assistantIndices: number[] = [];
   for (let i = messages.length - 1; i >= 0 && assistantIndices.length < 2; i--) {
     if (messages[i].role === "assistant") assistantIndices.push(i);
@@ -35,6 +35,47 @@ function optimizeMessagesForTokens(
   });
 }
 
+function isSyntheticMessage(content: string) {
+  return (
+    content.startsWith("Previous conversation summary.") ||
+    content.startsWith("[COMPRESSED HISTORY SUMMARY]") ||
+    content.startsWith("[Previous version summary:") ||
+    content.startsWith("[earlier version omitted]")
+  );
+}
+
+function latestUserPrompt(messages: ChatMessage[]) {
+  return (
+    [...messages]
+      .reverse()
+      .find((m) => m.role === "user" && !isSyntheticMessage(m.content))
+      ?.content?.trim() || "Build the requested application."
+  );
+}
+
+function addPromptLock(messages: ChatMessage[]): ChatMessage[] {
+  const latestPrompt = latestUserPrompt(messages);
+  return [
+    ...messages,
+    {
+      role: "system" as const,
+      content: [
+        "PURE VIBE CODING MODE.",
+        "Build exactly the latest real user request below.",
+        "Do not turn unrelated app/tool/game/tracker/editor requests into a generic landing page.",
+        "Landing pages, dashboards, auth, payments, admin, backend routes and database screens are included only when requested or necessary.",
+        "Use shadcn-style components when useful for the requested UI, especially forms, dashboards, tables, dialogs, settings and admin screens.",
+        "Return complete runnable files only, with no TODOs, dead buttons, fake metrics or placeholder-only UI.",
+        "",
+        "LATEST REAL USER REQUEST:",
+        "<<<USER_PROMPT_START",
+        latestPrompt,
+        "USER_PROMPT_END>>>",
+      ].join("\n"),
+    },
+  ];
+}
+
 async function compressHistoryWithSmallModel(
   oldMessages: { role: "user" | "assistant"; content: string }[],
 ): Promise<string> {
@@ -52,7 +93,7 @@ async function compressHistoryWithSmallModel(
         {
           role: "system",
           content:
-            "Compress this app-building chat history into one dense paragraph under 350 tokens. Preserve the user's current goal, selected features, what was already changed, errors/fixes, and current artifact state. Output only the summary.",
+            "Compress this app-building chat history into one dense paragraph under 350 tokens. Preserve the user's requested product type, current goal, selected features, what changed, errors/fixes, and current artifact state. Output only the summary.",
         },
         { role: "user", content: historyText },
       ],
@@ -76,7 +117,7 @@ const requestSchema = z.object({
   quality: z.enum(["low", "high"]).optional().default("low"),
 });
 
-function improveAutofixPrompt(messages: { role: "system" | "user" | "assistant"; content: string }[]) {
+function improveAutofixPrompt(messages: ChatMessage[]) {
   const last = messages.at(-1);
   const isFix = last?.role === "user" && /preview error|runtime error|missing import|failed to compile|rebuild|fix/i.test(last.content);
   if (!isFix) return messages;
@@ -86,7 +127,7 @@ function improveAutofixPrompt(messages: { role: "system" | "user" | "assistant";
     {
       role: "system" as const,
       content:
-        "Auto-fix mode is active. Diagnose the exact runtime/build failure. Prefer minimal diffs when possible. Fix missing imports, wrong shadcn paths, unavailable packages, invalid JSX, client/server boundary issues, and broken exports. If the same error repeats, return the complete corrected file set. Do not explain; output only changed or complete files in fenced blocks with path metadata.",
+        "Auto-fix mode is active. Diagnose the exact runtime/build failure. Fix missing imports, wrong shadcn paths, unavailable packages, invalid JSX, client/server boundary issues, and broken exports. Preserve the requested app type. Output only changed or complete files in fenced blocks with path metadata.",
     },
   ];
 }
@@ -123,7 +164,7 @@ export async function POST(req: Request) {
 
   let messages = z
     .array(z.object({ role: z.enum(["system", "user", "assistant"]), content: z.string() }))
-    .parse(messagesRes);
+    .parse(messagesRes) as ChatMessage[];
 
   messages = optimizeMessagesForTokens(messages);
 
@@ -201,17 +242,19 @@ export async function POST(req: Request) {
       {
         role: "system" as const,
         content:
-          "High-quality mode: be thorough, verify imports and dependencies, return complete working files, and proactively fix edge cases. Prefer complete corrected files over partial patches when uncertain.",
+          "High-quality mode: verify imports and dependencies, return complete working files, and proactively fix edge cases. Preserve the requested app type exactly.",
       },
     ];
   }
 
+  messages = addPromptLock(messages);
   const requestedModel = resolveModel(model);
+  const latestPrompt = latestUserPrompt(messages);
 
   logGeneration({
     chatId: message.chatId,
     model: requestedModel,
-    input: { messagesCount: messages.length, lastUser: messages[messages.length - 1]?.content?.slice(0, 300) },
+    input: { messagesCount: messages.length, lastUser: latestPrompt.slice(0, 300) },
     output: "[streamed]",
     metadata: { type: "followup", messageId, fallbackModel: getFallbackModel().value },
   });
@@ -220,7 +263,7 @@ export async function POST(req: Request) {
     const result = await createChatStreamWithFallback({
       model: requestedModel,
       messages: messages.map((m) => ({ role: m.role, content: m.content })) as GenerationMessage[],
-      temperature: 0.4,
+      temperature: Number(process.env.GENERATION_TEMPERATURE || 0.25),
       maxTokens: 9000,
       reasoningEnabled: reasoning,
     });

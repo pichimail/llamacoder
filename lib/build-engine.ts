@@ -26,106 +26,21 @@ export type BuildSpec = {
   systemContext: string;
 };
 
-type TemplateMatch = {
-  templateId: BuildTemplateId;
-  title: string;
-  summary: string;
-  keywords: string[];
-  dependencies: string[];
-  envHints: string[];
-  routes: string[];
-  makeFiles: (input: BuildInput) => ArtifactFile[];
-  makeContext: (input: BuildInput) => string;
-};
-
 type BuildInput = {
   prompt: string;
   mode: BuildMode;
   shadcn: boolean;
 };
 
-const TEMPLATE_MATCHERS: TemplateMatch[] = [
-  {
-    templateId: "motion-landing",
-    title: "Motion landing scaffold",
-    summary: "Cinematic hero, stacked sections, and motion-first composition.",
-    keywords: ["landing", "marketing", "hero", "motion", "parallax", "gsap", "three", "anime"],
-    dependencies: ["framer-motion", "gsap", "animejs", "three", "lucide-react"],
-    envHints: ["NEXT_PUBLIC_SITE_URL"],
-    routes: ["/", "/api/health"],
-    makeFiles: (input) => createMotionLandingFiles(input),
-    makeContext: (input) =>
-      `Template: motion-landing. Build a premium landing page with cinematic rhythm, a strong hero, and strong visual hierarchy. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-  {
-    templateId: "saas-dashboard",
-    title: "Premium SaaS dashboard scaffold",
-    summary: "Modern product shell with command bar, dense data surfaces, filters, charts, and detail workflows.",
-    keywords: ["dashboard", "saas", "analytics", "crm", "workspace", "report", "metrics"],
-    dependencies: ["lucide-react"],
-    envHints: ["DATABASE_URL", "NEXT_PUBLIC_APP_URL"],
-    routes: ["/", "/api/health", "/api/metrics"],
-    makeFiles: (input) => createDashboardFiles(input),
-    makeContext: (input) =>
-      `Template: premium-saas-dashboard. Build a current v0/Lovable/Bolt-style product workspace: dark-first near-black app shell, one intentional accent, sidebar or rail navigation, top command/action bar, dense KPI strip, charts or trend panels, searchable/filterable data table, detail drawer/dialog, settings/status surface, and real empty/loading/error states. Use 12px radius, 1px separators, restrained depth, and no old generic admin-card styling. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-  {
-    templateId: "admin-console",
-    title: "Premium admin console scaffold",
-    summary: "Operator-grade dashboard with system state, permission workflows, audit surfaces, and settings.",
-    keywords: ["admin", "console", "settings", "users", "permissions", "billing", "moderation"],
-    dependencies: ["lucide-react"],
-    envHints: ["DATABASE_URL", "ADMIN_ID", "ADMIN_PASSWORD"],
-    routes: ["/", "/api/health", "/api/audit"],
-    makeFiles: (input) => createAdminFiles(input),
-    makeContext: (input) =>
-      `Template: premium-admin-console. Build a precise operator dashboard with modern product polish: dark-first near-black shell, one accent, sidebar/rail navigation, command bar, roles/permissions workflows, audit table, system health/status panels, settings drawer/dialog, and wired local interactions. Avoid basic old admin UI, generic gray card grids, fake metrics, and static decoration. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-  {
-    templateId: "auth-flow",
-    title: "Auth flow scaffold",
-    summary: "Split-screen sign in, validation states, and onboarding structure.",
-    keywords: ["auth", "login", "sign in", "sign up", "onboarding", "password", "verification"],
-    dependencies: ["lucide-react"],
-    envHints: ["NEXTAUTH_URL", "NEXTAUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
-    routes: ["/", "/api/health"],
-    makeFiles: (input) => createAuthFiles(input),
-    makeContext: (input) =>
-      `Template: auth-flow. Build an authentication and onboarding surface with a refined split-screen layout. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-  {
-    templateId: "ai-builder",
-    title: "AI builder scaffold",
-    summary: "Prompt workspace, tool rail, result area, and remix controls.",
-    keywords: ["ai", "chat", "builder", "prompt", "agent", "assistant", "studio"],
-    dependencies: ["lucide-react"],
-    envHints: ["TOGETHER_API_KEY", "OPENROUTER_API_KEY"],
-    routes: ["/", "/api/health", "/api/rewrite-prompt"],
-    makeFiles: (input) => createAIBuildFiles(input),
-    makeContext: (input) =>
-      `Template: ai-builder. Build an AI product workspace with a prompt bar, control rail, and visible build output. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-  {
-    templateId: "generic-app",
-    title: "Generic app scaffold",
-    summary: "A safe starter shell for unclassified build requests.",
-    keywords: [],
-    dependencies: ["lucide-react"],
-    envHints: [],
-    routes: ["/", "/api/health"],
-    makeFiles: (input) => createGenericFiles(input),
-    makeContext: (input) =>
-      `Template: generic-app. Build a clean, production-safe starter shell. Respect the user prompt: ${input.prompt.trim()}.`,
-  },
-];
-
 function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48) || "build";
+  return (
+    input
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "build"
+  );
 }
 
 function titleCase(input: string) {
@@ -137,305 +52,163 @@ function titleCase(input: string) {
     .join(" ");
 }
 
-function deriveHeadline(prompt: string) {
+function deriveTitle(prompt: string) {
   const cleaned = prompt
     .replace(/\s+/g, " ")
     .replace(/[^\w\s-/]/g, "")
     .trim();
-  if (!cleaned) return "Build";
-  return titleCase(cleaned).slice(0, 42);
+  if (!cleaned) return "Requested App";
+  return titleCase(cleaned).slice(0, 56) || "Requested App";
 }
 
-function normalizePrompt(prompt: string) {
-  return prompt.toLowerCase();
+function words(prompt: string) {
+  return prompt.toLowerCase().match(/[a-z0-9]+/g) || [];
 }
 
-function selectTemplate(input: BuildInput): TemplateMatch {
-  const prompt = normalizePrompt(input.prompt);
-  const pool = TEMPLATE_MATCHERS.filter((template) =>
-    template.keywords.some((keyword) => prompt.includes(keyword)),
-  );
-
-  if (pool.length === 0) return TEMPLATE_MATCHERS.at(-1)!;
-  if (input.mode === "plan") return pool.find((item) => item.templateId === "saas-dashboard") ?? pool[0];
-  if (input.mode === "ask") return pool.find((item) => item.templateId === "generic-app") ?? pool[0];
-  return pool[0];
+function hasAny(prompt: string, terms: string[]) {
+  const normalized = ` ${prompt.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  return terms.some((term) => normalized.includes(` ${term} `));
 }
 
-function starterPageShell(params: {
-  headline: string;
-  subheading: string;
-  accent: string;
-  sections: Array<{ label: string; value: string }>;
-  footer: string;
-  showToolbar?: boolean;
-}) {
-  const sections = params.sections
-    .map(
-      (section) =>
-        `<div className="rounded-3xl border border-white/10 bg-white/5 p-4"><div className="text-xs uppercase tracking-[0.24em] text-white/50">${section.label}</div><div className="mt-2 text-base text-white/90">${section.value}</div></div>`,
-    )
-    .join("");
-
-  return `\
-"use client";
-
-import { ArrowRight, Sparkles, PanelTop, LayoutDashboard, Shield, Bot, Database } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-
-const sections = [
-  ${params.sections
-    .map((section) => `{ label: ${JSON.stringify(section.label)}, value: ${JSON.stringify(section.value)} }`)
-    .join(",\n  ")},
-];
-
-export default function App() {
-  return (
-    <main className="min-h-screen bg-[#0b0d12] text-white">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_36%),radial-gradient(circle_at_bottom,_rgba(244,114,182,0.2),_transparent_36%)]" />
-        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-          ${params.showToolbar ? `<div className="flex items-center justify-between rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 backdrop-blur-xl"><span className="inline-flex items-center gap-2"><Sparkles className="size-4" /> ${params.footer}</span><span className="hidden items-center gap-2 sm:inline-flex"><PanelTop className="size-4" /> Live preview</span></div>` : ""}
-          <section className="grid flex-1 gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/60">${params.accent}</div>
-              <div className="space-y-4">
-                <h1 className="max-w-2xl text-5xl font-semibold tracking-tight sm:text-6xl">${params.headline}</h1>
-                <p className="max-w-xl text-base leading-7 text-white/70">${params.subheading}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button className="rounded-full bg-white text-slate-950 hover:bg-white/90">Remix in builder <ArrowRight className="ml-2 size-4" /></Button>
-                <Button variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">Open preview</Button>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">${sections}</div>
-            </div>
-            <Card className="border-white/10 bg-white/5 shadow-2xl shadow-black/30 backdrop-blur-xl">
-              <CardContent className="p-4 sm:p-6">
-                <div className="grid gap-4">
-                  <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-5">
-                    <div className="flex items-center gap-2 text-sm text-white/70"><LayoutDashboard className="size-4" /> Workspace</div>
-                    <div className="mt-4 grid gap-3">
-                      <div className="rounded-2xl bg-black/20 p-4"><div className="text-xs uppercase tracking-[0.24em] text-white/45">Build queue</div><p className="mt-2 text-sm text-white/85">Scaffold selected, workspace seeded, and preview-ready files are delivered automatically.</p></div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-black/20 p-4"><div className="text-xs uppercase tracking-[0.24em] text-white/45">Artifacts</div><p className="mt-2 text-sm text-white/85">Files, routes, and env hints land here.</p></div>
-                        <div className="rounded-2xl bg-black/20 p-4"><div className="text-xs uppercase tracking-[0.24em] text-white/45">Backend</div><p className="mt-2 text-sm text-white/85">Preview-safe + backend-shaped files are tracked separately.</p></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-        </div>
-      </div>
-    </main>
-  );
-}
-`;
+function isExplicitLanding(prompt: string) {
+  const text = prompt.toLowerCase();
+  return /\b(landing page|marketing site|marketing page|homepage|home page|website landing|saas landing|waitlist page|product page|sales page)\b/.test(text);
 }
 
-function createMotionLandingFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Build something cinematic";
+function isExplicitDashboard(prompt: string) {
+  return hasAny(prompt, ["dashboard", "analytics", "metrics", "reporting", "crm", "workspace"]);
+}
+
+function isExplicitAdmin(prompt: string) {
+  return hasAny(prompt, ["admin", "console", "moderation", "permissions", "roles"]);
+}
+
+function isExplicitAuth(prompt: string) {
+  const text = prompt.toLowerCase();
+  return /\b(auth|authentication|login|log in|sign in|signin|sign up|signup|onboarding|password|verification|protected route|session)\b/.test(text);
+}
+
+function isExplicitAiBuilder(prompt: string) {
+  const text = prompt.toLowerCase();
+  return /\b(ai builder|vibe coding|prompt to app|prompt-to-app|code generator|assistant workspace|chat builder)\b/.test(text);
+}
+
+function isExplicitFullStack(prompt: string) {
+  const text = prompt.toLowerCase();
+  return /\b(full stack|full-stack|backend|api route|database|prisma|supabase|neon|server action|server actions)\b/.test(text);
+}
+
+function selectTemplate(input: BuildInput): BuildTemplateId {
+  if (isExplicitLanding(input.prompt)) return "motion-landing";
+  if (isExplicitAdmin(input.prompt)) return "admin-console";
+  if (isExplicitAuth(input.prompt)) return "auth-flow";
+  if (isExplicitAiBuilder(input.prompt)) return "ai-builder";
+  if (isExplicitDashboard(input.prompt)) return "saas-dashboard";
+  return "generic-app";
+}
+
+function dependenciesFor(input: BuildInput, templateId: BuildTemplateId) {
+  const deps = new Set<string>();
+  const text = input.prompt.toLowerCase();
+
+  deps.add("lucide-react");
+  if (input.shadcn) deps.add("shadcn-style components");
+  if (templateId === "motion-landing" || /\b(animation|motion|framer|gsap|three|3d|canvas|parallax)\b/.test(text)) {
+    deps.add("framer-motion");
+  }
+  if (/\b(chart|charts|graph|analytics|metrics|dashboard)\b/.test(text)) deps.add("local chart-ready data helpers");
+  if (/\b(upload|file|image|attachment)\b/.test(text)) deps.add("file input handling");
+  if (/\b(export|download|pdf|csv|zip)\b/.test(text)) deps.add("export helpers");
+
+  return Array.from(deps);
+}
+
+function envHintsFor(input: BuildInput) {
+  const hints = new Set<string>();
+  const text = input.prompt.toLowerCase();
+
+  if (isExplicitFullStack(input.prompt)) hints.add("DATABASE_URL");
+  if (/\b(auth|login|sign in|signin|oauth|google)\b/.test(text)) {
+    hints.add("NEXTAUTH_SECRET");
+    hints.add("NEXTAUTH_URL");
+  }
+  if (/\b(payment|stripe|checkout|subscription|billing)\b/.test(text)) hints.add("STRIPE_SECRET_KEY");
+  if (/\b(ai|llm|openrouter|together|gemini|claude|gpt)\b/.test(text)) hints.add("MODEL_PROVIDER_API_KEY");
+
+  return Array.from(hints);
+}
+
+function routesFor(input: BuildInput, templateId: BuildTemplateId) {
+  const routes = new Set<string>(["/"]);
+  const text = input.prompt.toLowerCase();
+
+  if (isExplicitFullStack(input.prompt)) routes.add("/api/health");
+  if (/\b(admin|dashboard)\b/.test(text)) routes.add("/dashboard");
+  if (/\b(settings)\b/.test(text)) routes.add("/settings");
+  if (/\b(profile|account)\b/.test(text)) routes.add("/profile");
+  if (templateId === "auth-flow") routes.add("/auth");
+
+  return Array.from(routes);
+}
+
+function summaryFor(templateId: BuildTemplateId, prompt: string) {
+  const title = deriveTitle(prompt);
+
+  switch (templateId) {
+    case "motion-landing":
+      return `Explicit landing-page request for ${title}.`;
+    case "saas-dashboard":
+      return `Explicit dashboard/workspace request for ${title}.`;
+    case "admin-console":
+      return `Explicit admin/operator request for ${title}.`;
+    case "auth-flow":
+      return `Explicit authentication/onboarding request for ${title}.`;
+    case "ai-builder":
+      return `Explicit AI builder request for ${title}.`;
+    default:
+      return `Pure prompt-locked app request for ${title}.`;
+  }
+}
+
+function contextFor(input: BuildInput, templateId: BuildTemplateId) {
+  const exactPrompt = input.prompt.trim();
+  const uiLibraryRule = input.shadcn
+    ? "Shadcn-style components may be used when they improve forms, dashboards, dialogs, sheets, tabs, selects, tables, or settings."
+    : "Do not import shadcn components; build with plain React and Tailwind.";
+
   return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "A motion-forward landing page scaffold with a hero, proof blocks, and a premium product frame.",
-        accent: "Motion landing",
-        footer: "Motion scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Hero", value: "Cinematic first viewport" },
-          { label: "Motion", value: "GSAP-ready section rhythm" },
-          { label: "Output", value: "Preview-safe React shell" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/health/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, scope: "motion-landing" }); }`,
-    },
-    {
-      path: "lib/scaffold.ts",
-      code: `export const scaffoldName = "motion-landing"; export const scaffoldSummary = "Cinematic landing scaffold seeded by the build engine.";`,
-    },
-  ];
-}
-
-function createDashboardFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Ship your dashboard";
-  return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "A premium product workspace scaffold with command actions, dense analytics, filtered tables, and operator-grade states.",
-        accent: "Premium SaaS workspace",
-        footer: "Modern dashboard scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Shell", value: "Sidebar, topbar, search, and actions" },
-          { label: "Data", value: "Charts, table workflows, and filters" },
-          { label: "States", value: "Empty, loading, error, and detail views" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/metrics/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, activeUsers: 1248, revenue: 84200, services: "green" }); }`,
-    },
-    {
-      path: "lib/mock-metrics.ts",
-      code: `export const mockMetrics = [{ label: "Active users", value: "1,248" }, { label: "Revenue", value: "$84.2k" }, { label: "Uptime", value: "99.98%" }];`,
-    },
-  ];
-}
-
-function createAdminFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Operate with control";
-  return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "A premium operator console scaffold for permission workflows, audit trails, system state, and settings.",
-        accent: "Operator console",
-        footer: "Modern admin scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Access", value: "Roles, teams, invites, and policies" },
-          { label: "System", value: "Health, queues, deploys, and limits" },
-          { label: "Audit", value: "Searchable activity and config trails" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/audit/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, events: [] }); }`,
-    },
-    {
-      path: "lib/admin-shell.ts",
-      code: `export const adminShell = { sections: ["roles", "deployments", "audit"], source: "phase-1-build-engine" };`,
-    },
-  ];
-}
-
-function createAuthFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Secure the experience";
-  return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "An auth-first scaffold with a split-screen flow, validation-ready forms, and onboarding space.",
-        accent: "Auth flow",
-        footer: "Authentication scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Sign in", value: "Email, OAuth, magic link" },
-          { label: "Onboarding", value: "Workspace creation steps" },
-          { label: "Security", value: "Validation + session state" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/health/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, scope: "auth-flow" }); }`,
-    },
-    {
-      path: "lib/auth-scaffold.ts",
-      code: `export const authScaffold = { features: ["signin", "signup", "onboarding"], source: "phase-1-build-engine" };`,
-    },
-  ];
-}
-
-function createAIBuildFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Build in one flow";
-  return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "An AI builder scaffold with a prompt surface, control rail, and visible artifact delivery lane.",
-        accent: "AI builder",
-        footer: "Prompt-to-artifact scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Prompt", value: "Natural language input" },
-          { label: "Artifacts", value: "Files arrive automatically" },
-          { label: "Preview", value: "Ready for remix and ship" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/rewrite-prompt/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, scope: "ai-builder" }); }`,
-    },
-    {
-      path: "lib/builder-engine.ts",
-      code: `export const builderEngine = { version: "phase-1", mode: ${JSON.stringify(input.mode)}, shadcn: ${JSON.stringify(input.shadcn)} };`,
-    },
-  ];
-}
-
-function createGenericFiles(input: BuildInput): ArtifactFile[] {
-  const headline = deriveHeadline(input.prompt) || "Start building";
-  return [
-    {
-      path: "app/page.tsx",
-      code: starterPageShell({
-        headline,
-        subheading:
-          "A safe starter shell that keeps the preview working while the real app shape is selected.",
-        accent: "Generic scaffold",
-        footer: "Fallback scaffold",
-        showToolbar: true,
-        sections: [
-          { label: "Route", value: "Renderable app/page.tsx" },
-          { label: "Mode", value: input.mode },
-          { label: "Library", value: input.shadcn ? "shadcn on" : "plain React" },
-        ],
-      }),
-    },
-    {
-      path: "app/api/health/route.ts",
-      code: `import { NextResponse } from "next/server"; export function GET() { return NextResponse.json({ ok: true, scope: "generic-app" }); }`,
-    },
-    {
-      path: "lib/scaffold.ts",
-      code: `export const scaffoldName = "generic-app"; export const scaffoldSummary = "Fallback build scaffold chosen by phase 1.";`,
-    },
-  ];
+    "BUILD SPEC: PURE PROMPT-LOCKED GENERATION.",
+    `Selected intent: ${templateId}.`,
+    `Exact user prompt: ${exactPrompt}`,
+    "The generated app must be based on the exact user prompt, not this build spec title.",
+    "Do not seed, reuse, or preserve a generic landing page/template unless the exact prompt explicitly requested a landing page.",
+    "Do not add dashboard, admin, auth, payments, backend, database, or API screens unless the exact prompt asked for them or they are required for the requested product to make sense.",
+    "If the request is a tracker, build the tracker. If it is an editor, build the editor. If it is a game, build the game. If it is a marketplace, build the marketplace. If it is a landing page, build the landing page.",
+    "Build premium UI by default, but keep the visual language specific to the requested product category.",
+    uiLibraryRule,
+    "No placeholder TODOs, fake metrics, fake testimonials, dead buttons, or static decorative-only UI.",
+  ].join("\n");
 }
 
 export function buildPhaseOneSpec(input: BuildInput): BuildSpec {
-  const template = selectTemplate(input);
-  const artifactFiles = template.makeFiles(input);
-  const title = template.title;
-  const previewRoute = "/";
-  const id = `${slugify(input.prompt)}-${template.templateId}`;
+  const templateId = selectTemplate(input);
+  const title = deriveTitle(input.prompt);
+  const promptKeywords = Array.from(new Set(words(input.prompt).filter((word) => word.length > 3))).slice(0, 12);
 
   return {
-    id,
-    templateId: template.templateId,
+    id: `${slugify(input.prompt)}-${templateId}`,
+    templateId,
     title,
-    summary: template.summary,
+    summary: summaryFor(templateId, input.prompt),
     mode: input.mode,
     shadcn: input.shadcn,
-    keywords: template.keywords,
-    dependencies: template.dependencies,
-    envHints: template.envHints,
-    routes: template.routes,
-    previewRoute,
-    artifactFiles,
-    systemContext: template.makeContext(input),
+    keywords: promptKeywords,
+    dependencies: dependenciesFor(input, templateId),
+    envHints: envHintsFor(input),
+    routes: routesFor(input, templateId),
+    previewRoute: "/",
+    artifactFiles: [],
+    systemContext: contextFor(input, templateId),
   };
 }
 
@@ -443,13 +216,13 @@ export function buildPhaseOneSpecMessage(input: BuildInput) {
   const spec = buildPhaseOneSpec(input);
   return [
     `BUILD SPEC: ${spec.title}`,
-    `Template: ${spec.templateId}`,
+    `Intent: ${spec.templateId}`,
     `Summary: ${spec.summary}`,
     `Routes: ${spec.routes.join(", ")}`,
     `Dependencies: ${spec.dependencies.join(", ") || "none"}`,
     `Env hints: ${spec.envHints.join(", ") || "none"}`,
     `Preview route: ${spec.previewRoute}`,
-    `Artifact files: ${spec.artifactFiles.map((file) => file.path).join(", ")}`,
+    "Artifact files: none seeded; model must generate prompt-specific files from scratch.",
   ].join("\n");
 }
 
