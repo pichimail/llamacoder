@@ -293,53 +293,31 @@ export default function ReactCodeRunner({
       className="h-full rounded-none border-0 bg-transparent"
     >
       <WebPreviewNavigation className="border-border/70 bg-background px-2 py-1.5">
-        <WebPreviewNavigationButton
-          tooltip="Previous page"
-          aria-label="Previous page"
-          disabled={routes.length <= 1}
-          onClick={() => setRouteIndex((index) => (index - 1 + routes.length) % routes.length)}
-        >
+        <WebPreviewNavigationButton tooltip="Previous page" aria-label="Previous page" disabled={routes.length <= 1} onClick={() => setRouteIndex((index) => (index - 1 + routes.length) % routes.length)}>
           <ChevronLeft className="size-4" />
         </WebPreviewNavigationButton>
-        <WebPreviewNavigationButton
-          tooltip="Next page"
-          aria-label="Next page"
-          disabled={routes.length <= 1}
-          onClick={() => setRouteIndex((index) => (index + 1) % routes.length)}
-        >
+        <WebPreviewNavigationButton tooltip="Next page" aria-label="Next page" disabled={routes.length <= 1} onClick={() => setRouteIndex((index) => (index + 1) % routes.length)}>
           <ChevronRight className="size-4" />
         </WebPreviewNavigationButton>
-        <WebPreviewNavigationButton
-          tooltip="Refresh preview"
-          aria-label="Refresh preview"
-          onClick={() => onRefresh?.()}
-        >
+        <WebPreviewNavigationButton tooltip="Refresh preview" aria-label="Refresh preview" onClick={() => onRefresh?.()}>
           <RefreshCw className="size-4" />
         </WebPreviewNavigationButton>
         <WebPreviewUrl
           value={previewUrl}
           onChange={(event) => setPreviewUrl(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              handleUrlChange((event.target as HTMLInputElement).value);
-            }
+            if (event.key === "Enter") handleUrlChange((event.target as HTMLInputElement).value);
           }}
           aria-label="Preview route"
           className="font-mono text-xs"
         />
         {showDeviceToggle ? (
-          <WebPreviewNavigationButton
-            tooltip={`Switch to ${nextPreviewMode} preview`}
-            aria-label={`Switch to ${nextPreviewMode} preview`}
-            onClick={() => handlePreviewModeChange(nextPreviewMode)}
-          >
+          <WebPreviewNavigationButton tooltip={`Switch to ${nextPreviewMode} preview`} aria-label={`Switch to ${nextPreviewMode} preview`} onClick={() => handlePreviewModeChange(nextPreviewMode)}>
             <PreviewModeIcon className="size-4" />
           </WebPreviewNavigationButton>
         ) : null}
       </WebPreviewNavigation>
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/20">
-        {sandpackContent}
-      </div>
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/20">{sandpackContent}</div>
       <WebPreviewConsole logs={consoleLogs} />
     </WebPreview>
   );
@@ -348,13 +326,9 @@ export default function ReactCodeRunner({
 function ArtifactRouteControls({ routes, activeRoute, onPrevious, onNext }: { routes: string[]; activeRoute: string; onPrevious: () => void; onNext: () => void }) {
   return (
     <div className="pointer-events-auto absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border/70 bg-background/35 px-1.5 py-1 text-xs text-muted-foreground backdrop-blur-sm" aria-label="Artifact route navigation">
-      <button type="button" onClick={onPrevious} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Previous artifact page">
-        <ChevronLeft className="size-3.5" />
-      </button>
+      <button type="button" onClick={onPrevious} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Previous artifact page"><ChevronLeft className="size-3.5" /></button>
       <span className="max-w-[160px] truncate font-mono text-[11px] text-foreground" title={activeRoute}>{activeRoute}</span>
-      <button type="button" onClick={onNext} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Next artifact page">
-        <ChevronRight className="size-3.5" />
-      </button>
+      <button type="button" onClick={onNext} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label="Next artifact page"><ChevronRight className="size-3.5" /></button>
     </div>
   );
 }
@@ -363,41 +337,17 @@ function PreviewModeSwitcher({ activeMode, onChange }: { activeMode: PreviewMode
   const nextMode = activeMode === "web" ? "mobile" : "web";
   const Icon = activeMode === "web" ? Smartphone : Monitor;
   return (
-    <button
-      type="button"
-      aria-pressed={activeMode === "mobile"}
-      aria-label={`Switch to ${nextMode} preview`}
-      onClick={() => onChange(nextMode)}
-      className="inline-flex h-7 items-center justify-center rounded-md border border-border/70 bg-transparent px-2 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/30 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-    >
+    <button type="button" aria-pressed={activeMode === "mobile"} aria-label={`Switch to ${nextMode} preview`} onClick={() => onChange(nextMode)} className="inline-flex h-7 items-center justify-center rounded-md border border-border/70 bg-transparent px-2 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/30 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
       <Icon className="size-3.5" aria-hidden="true" />
     </button>
   );
 }
 
-function PreviewStatusMonitor({
-  onRequestFix,
-  onPreviewError,
-  onPreviewReady,
-  onLog,
-  captureConsole,
-  useConsoleOverlay,
-}: {
-  onRequestFix?: (e: string) => void;
-  onPreviewError?: (e: string) => void;
-  onPreviewReady?: () => void;
-  onLog?: (level: ConsoleLog["level"], message: string) => void;
-  captureConsole?: boolean;
-  useConsoleOverlay?: boolean;
-}) {
+function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, onLog, captureConsole, useConsoleOverlay }: { onRequestFix?: (e: string) => void; onPreviewError?: (e: string) => void; onPreviewReady?: () => void; onLog?: (level: ConsoleLog["level"], message: string) => void; captureConsole?: boolean; useConsoleOverlay?: boolean }) {
   const { sandpack, listen } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
   const [lastRuntimeError, setLastRuntimeError] = useState<string>("");
   const readyReportedRef = useRef(false);
-
-  useEffect(() => {
-    readyReportedRef.current = false;
-  }, [sandpack.activeFile, sandpack.visibleFiles]);
 
   useEffect(() => {
     if (sandpack.error) {
@@ -438,7 +388,6 @@ function PreviewStatusMonitor({
     const reportReadyWhenVisible = (startedAt: number) => {
       if (cancelled || sandpack.error || readyReportedRef.current) return;
       const visualState = inspectSandpackPreview();
-
       if (visualState.ready) {
         clearTimers();
         readyReportedRef.current = true;
@@ -446,12 +395,10 @@ function PreviewStatusMonitor({
         onPreviewReady?.();
         return;
       }
-
       if (Date.now() - startedAt < VISUAL_PREVIEW_TIMEOUT_MS) {
         visualTimer = window.setTimeout(() => reportReadyWhenVisible(startedAt), VISUAL_PREVIEW_POLL_MS);
         return;
       }
-
       const errorText = visualState.reason || "Preview compiled but did not render a visible application.";
       setLastRuntimeError(errorText);
       onLog?.("warn", errorText);
@@ -460,10 +407,7 @@ function PreviewStatusMonitor({
 
     const unsubscribe = listen((message) => {
       if (message.type === "done") {
-        const doneMessage = message as unknown as {
-          compilationError?: unknown;
-          compilatonError?: unknown;
-        };
+        const doneMessage = message as unknown as { compilationError?: unknown; compilatonError?: unknown };
         const compileError = doneMessage.compilationError || doneMessage.compilatonError;
         if (compileError) {
           const errorText = typeof compileError === "string" ? compileError : JSON.stringify(compileError, null, 2);
@@ -496,46 +440,16 @@ function PreviewStatusMonitor({
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/55 p-4 text-base backdrop-blur-sm" role="alert">
       <div className="w-full max-w-[560px] rounded-xl border border-red-500/40 bg-background/90 p-4 text-foreground shadow-2xl shadow-black/20">
-        <div className="flex items-center gap-2 text-sm font-semibold text-red-300">
-          <AlertTriangle className="size-4" aria-hidden="true" />
-          Preview/runtime error
-        </div>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          Auto-fix can patch missing imports, broken exports, invalid JSX, dependency errors, and blank rendered previews into a new version.
-        </p>
-        <pre className="mt-3 max-h-52 overflow-auto rounded-lg border border-border bg-transparent p-3 font-mono text-xs leading-relaxed text-red-100/90">
-          {errorMessage}
-        </pre>
+        <div className="flex items-center gap-2 text-sm font-semibold text-red-300"><AlertTriangle className="size-4" aria-hidden="true" />Preview/runtime error</div>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Auto-fix can patch missing imports, broken exports, invalid JSX, dependency errors, and blank rendered previews into a new version.</p>
+        <pre className="mt-3 max-h-52 overflow-auto rounded-lg border border-border bg-transparent p-3 font-mono text-xs leading-relaxed text-red-100/90">{errorMessage}</pre>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <button
-            onClick={async () => {
-              setDidCopy(true);
-              await window.navigator.clipboard.writeText(errorMessage);
-              await new Promise((resolve) => setTimeout(resolve, 1200));
-              setDidCopy(false);
-            }}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs text-foreground transition hover:border-foreground/40"
-            aria-label="Copy preview error"
-          >
-            {didCopy ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-            Copy log
+          <button onClick={async () => { setDidCopy(true); await window.navigator.clipboard.writeText(errorMessage); await new Promise((resolve) => setTimeout(resolve, 1200)); setDidCopy(false); }} className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs text-foreground transition hover:border-foreground/40" aria-label="Copy preview error">
+            {didCopy ? <CheckIcon size={14} /> : <CopyIcon size={14} />}Copy log
           </button>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.location.reload()}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs text-foreground transition hover:border-foreground/40"
-            >
-              <RefreshCw className="size-3.5" aria-hidden="true" /> Refresh
-            </button>
-            {onRequestFix ? (
-              <button
-                onClick={() => onRequestFix(errorMessage)}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-foreground transition hover:border-foreground/40"
-                aria-label="Try to automatically fix the error"
-              >
-                <Wand2 className="size-3.5" aria-hidden="true" /> Try fix
-              </button>
-            ) : null}
+            <button onClick={() => window.location.reload()} className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs text-foreground transition hover:border-foreground/40"><RefreshCw className="size-3.5" aria-hidden="true" /> Refresh</button>
+            {onRequestFix ? <button onClick={() => onRequestFix(errorMessage)} className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-foreground transition hover:border-foreground/40" aria-label="Try to automatically fix the error"><Wand2 className="size-3.5" aria-hidden="true" /> Try fix</button> : null}
           </div>
         </div>
       </div>
