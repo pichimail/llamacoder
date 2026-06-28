@@ -32,7 +32,7 @@ export function FeaturedAppsGrid({
   apps = FEATURED_APPS,
   limit,
   compact = false,
-  liveThumbs = true,
+  liveThumbs = false,
 }: FeaturedAppsGridProps) {
   const router = useRouter();
   const [selectedApp, setSelectedApp] = useState<FeaturedApp | null>(null);
@@ -58,8 +58,8 @@ export function FeaturedAppsGrid({
             type="button"
             onClick={() => setSelectedApp(app)}
             className={cn(
-              "group overflow-hidden rounded-[28px] border border-border/70 bg-card/50 text-left transition",
-              "hover:border-ring/40 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "group overflow-hidden rounded-[28px] border border-border/70 bg-card/50 text-left transition duration-300 ease-out",
+              "hover:-translate-y-1 hover:border-ring/40 hover:bg-card hover:shadow-[0_18px_45px_rgba(15,23,42,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
             )}
           >
             <div className="relative aspect-[1200/630] overflow-hidden border-b border-border/70 bg-muted/30">
@@ -78,18 +78,12 @@ export function FeaturedAppsGrid({
                 {app.pinned ? (
                   <Pin className="size-3.5 shrink-0 text-amber-500/90" aria-hidden="true" />
                 ) : (
-                  <Sparkles
-                    className="size-3.5 shrink-0 text-emerald-500/80"
-                    aria-hidden="true"
-                  />
+                  <Sparkles className="size-3.5 shrink-0 text-emerald-500/80" aria-hidden="true" />
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {app.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                  >
+                  <span key={tag} className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     {tag}
                   </span>
                 ))}
@@ -114,11 +108,7 @@ export function FeaturedAppsGrid({
             <div className="grid max-h-[90vh] gap-0 overflow-hidden lg:grid-cols-[1.05fr_0.95fr]">
               <div className="border-b border-border/70 bg-card/50 lg:border-b-0 lg:border-r">
                 <div className="relative aspect-[1200/900] min-h-[320px] overflow-hidden">
-                  <FeaturedSandboxThumb
-                    slug={selectedApp.slug}
-                    title={selectedApp.title}
-                    live={liveThumbs}
-                  />
+                  <FeaturedSandboxThumb slug={selectedApp.slug} title={selectedApp.title} live={liveThumbs} />
                 </div>
               </div>
               <div className="flex flex-col justify-between gap-6 p-6 sm:p-8">
@@ -143,10 +133,7 @@ export function FeaturedAppsGrid({
 
                   <div className="flex flex-wrap gap-2">
                     {selectedApp.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground"
-                      >
+                      <span key={tag} className="rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground">
                         {tag}
                       </span>
                     ))}
@@ -154,20 +141,11 @@ export function FeaturedAppsGrid({
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Link
-                    href={previewHref}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 px-4 text-sm font-medium text-foreground transition hover:bg-accent"
-                  >
+                  <Link href={previewHref} className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 px-4 text-sm font-medium text-foreground transition hover:bg-accent">
                     <ExternalLink className="size-4" />
                     Open preview
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      router.push(featuredAppBuilderHref(selectedApp.prompt));
-                    }}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90"
-                  >
+                  <button type="button" onClick={() => router.push(featuredAppBuilderHref(selectedApp.prompt))} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">
                     <Hammer className="size-4" />
                     Remix in builder
                   </button>
