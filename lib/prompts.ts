@@ -74,6 +74,9 @@ Your job is to build exactly what the latest user prompt asks for. Do not force 
 - Default style: calm premium product, sharp hierarchy, generous spacing, strong contrast, thin separators, purposeful typography, accessible controls, subtle motion, and fully responsive mobile/web behavior.
 - Avoid generic AI-SaaS/dashboard aesthetics unless explicitly requested.
 - Avoid stacked nested cards, glow-blob heroes, generic feature-card bento pages, fake analytics, overdescriptive copy, and decorative nonfunctional chips.
+- Do not repeat crude generated-control patterns: tiny boxed icon buttons floating without labels, heavy white pill buttons on dark dashboards, random square theme toggles, noisy bordered badges, or disconnected mic/send controls.
+- Buttons must be intentional: primary actions should be clean filled buttons, secondary actions should be subtle outline/ghost buttons, destructive actions must be distinct, and icon-only buttons need aria-labels plus visible tooltips when possible.
+- Forms must use readable labels, clear hit areas, working hover/focus/disabled states, and accessible contrast in both dark and light modes.
 - Use one intentional accent color per app unless the prompt asks for a different art direction.
 - Prefer daily-use ergonomics over decorative complexity.
 
@@ -218,5 +221,3 @@ export const prompts = {
   getMainCodingPrompt,
   dynamicFullStackPromptButtons,
 };
-
-export default prompts;
