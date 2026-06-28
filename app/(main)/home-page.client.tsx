@@ -24,6 +24,7 @@ import { useAvailableModels } from "@/lib/use-available-models";
 import type { FeaturedApp } from "@/lib/featured-apps";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 import { PlanModePanel } from "@/components/plan-mode-panel";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
@@ -469,6 +470,15 @@ export default function HomePageClient() {
     });
   };
 
+  const composerVoiceButton = (
+    <VoiceInputButton
+      onTranscript={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
+      disabled={isSubmitting || screenshotLoading}
+      className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+      label="Dictate prompt"
+    />
+  );
+
   return (
     <HomeShell>
       <div className="flex min-h-dvh flex-col text-foreground">
@@ -502,16 +512,19 @@ export default function HomePageClient() {
                     onThinkChange={setReasoningEnabled}
                     accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
                     toolbarEnd={
-                      showEnhance ? (
-                        <PromptRewriteButton
-                          prompt={prompt}
-                          mode={mode}
-                          model={model}
-                          onRewrite={setPrompt}
-                          disabled={isSubmitting || screenshotLoading}
-                          iconOnly
-                        />
-                      ) : null
+                      <div className="flex items-center gap-1.5">
+                        {showEnhance ? (
+                          <PromptRewriteButton
+                            prompt={prompt}
+                            mode={mode}
+                            model={model}
+                            onRewrite={setPrompt}
+                            disabled={isSubmitting || screenshotLoading}
+                            iconOnly
+                          />
+                        ) : null}
+                        {composerVoiceButton}
+                      </div>
                     }
                     footer={composerFooter}
                     shadcnEnabled={shadcnEnabled}
@@ -548,7 +561,7 @@ export default function HomePageClient() {
                   Featured templates
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Open a sandbox preview, then remix in the builder.
+                  Open a responsive preview, then remix in the builder.
                 </p>
               </div>
               <Link
