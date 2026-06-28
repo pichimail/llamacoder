@@ -102,16 +102,26 @@ export function NavUser({
               <>
                 <DropdownMenuGroup>
                   {user.isAdmin && isAuthenticated ? (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <Shield className="stroke-[1.8]" />
-                        Admin dashboard
-                      </Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin">
+                          <Shield className="stroke-[1.8]" />
+                          Admin dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/braintrust">
+                          <Sparkles className="stroke-[1.8]" />
+                          Braintrust logs
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   ) : null}
-                  <DropdownMenuItem disabled={!isAuthenticated}>
-                    <BadgeCheck className="stroke-[1.8]" />
-                    Account
+                  <DropdownMenuItem asChild>
+                    <Link href="/chats">
+                      <BadgeCheck className="stroke-[1.8]" />
+                      Projects and chats
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={!isAuthenticated}>
                     <CreditCard className="stroke-[1.8]" />
@@ -132,7 +142,7 @@ export function NavUser({
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
-                    <Link href="/api/auth/signin/google">
+                    <Link href="/login">
                       <LogIn className="stroke-[1.8]" />
                       Sign in with Google
                     </Link>
