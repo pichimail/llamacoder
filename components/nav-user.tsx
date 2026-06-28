@@ -8,6 +8,7 @@ import {
   CreditCard,
   LogIn,
   LogOut,
+  Shield,
   Sparkles,
 } from "lucide-react"
 
@@ -50,6 +51,7 @@ export function NavUser({
     name: string
     email: string
     avatar: string
+    isAdmin?: boolean
   }
   authEnabled?: boolean
   isAuthenticated?: boolean
@@ -99,13 +101,14 @@ export function NavUser({
             {authEnabled ? (
               <>
                 <DropdownMenuGroup>
-                  <DropdownMenuItem disabled>
-                    <Sparkles className="stroke-[1.8]" />
-                    Upgrade to Pro
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
+                  {user.isAdmin && isAuthenticated ? (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">
+                        <Shield className="stroke-[1.8]" />
+                        Admin dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem disabled={!isAuthenticated}>
                     <BadgeCheck className="stroke-[1.8]" />
                     Account

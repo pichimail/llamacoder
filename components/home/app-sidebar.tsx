@@ -7,6 +7,7 @@ import {
   Images,
   MessageSquare,
   Plus,
+  Shield,
   Sparkles,
 } from "lucide-react"
 
@@ -27,35 +28,49 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 
-const navMain = [
-  {
-    title: "Home",
-    url: "/",
-    icon: Home,
-    isActive: true,
-    items: [
-      { title: "New Chat", url: "/" },
-      { title: "All Chats", url: "/chats" },
-    ],
-  },
-  {
-    title: "Build",
-    url: "#prompt-composer",
-    icon: Sparkles,
-    items: [
-      { title: "Prompt Composer", url: "#prompt-composer" },
-      { title: "Examples", url: "#examples" },
-    ],
-  },
-  {
-    title: "Discover",
-    url: "/gallery",
-    icon: Images,
-    items: [
-      { title: "Gallery", url: "/gallery" },
-    ],
-  },
-]
+function getNavMain(isAdmin?: boolean) {
+  return [
+    {
+      title: "Home",
+      url: "/",
+      icon: Home,
+      isActive: true,
+      items: [
+        { title: "New build", url: "/" },
+        { title: "All chats", url: "/chats" },
+      ],
+    },
+    {
+      title: "Build",
+      url: "#prompt-composer",
+      icon: Sparkles,
+      items: [
+        { title: "Prompt composer", url: "#prompt-composer" },
+        { title: "Examples", url: "#examples" },
+      ],
+    },
+    {
+      title: "Discover",
+      url: "/gallery",
+      icon: Images,
+      items: [{ title: "Gallery", url: "/gallery" }],
+    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Admin",
+            url: "/admin",
+            icon: Shield,
+            items: [
+              { title: "Overview", url: "/admin" },
+              { title: "Feature flags", url: "/admin?section=flags" },
+              { title: "Deployment", url: "/admin?section=deploy" },
+            ],
+          },
+        ]
+      : []),
+  ]
+}
 
 export function HomeAppSidebar({
   chats,
@@ -109,7 +124,7 @@ export function HomeAppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="bg-[#1F2023] px-0 py-2">
-        <NavMain items={navMain} />
+        <NavMain items={getNavMain(user.isAdmin)} />
         <NavRecentChats chats={chats} loading={loading} />
       </SidebarContent>
       <SidebarFooter className="border-t border-white/8 bg-[#1F2023]/95">

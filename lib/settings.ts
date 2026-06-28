@@ -11,7 +11,7 @@ export const SETTING_KEYS = {
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
 
 const DEFAULTS: Record<string, string> = {
-  saasMode: "off",
+  saasMode: "on",
   googleAuth: "on",
   gallery: "on",
   autoFixDefault: "on",
@@ -25,7 +25,6 @@ export async function getSettings(): Promise<Record<string, string>> {
     for (const r of rows) map[r.key] = r.value;
     return map;
   } catch {
-    // Table may not exist yet (run `prisma db push`) — fall back to defaults
     return { ...DEFAULTS };
   }
 }
