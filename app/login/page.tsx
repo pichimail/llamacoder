@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, GalleryVerticalEnd, LogIn } from "lucide-react";
 
 import { auth } from "@/lib/auth";
+import { continueWithGoogle } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -36,12 +37,12 @@ export default async function LoginPage() {
                 <Link href="/">Continue to app</Link>
               </Button>
             ) : (
-              <Button asChild className="w-full">
-                <a href="/api/auth/signin/google">
+              <form action={continueWithGoogle}>
+                <Button type="submit" className="w-full">
                   <LogIn className="size-4" />
                   Continue with Google
-                </a>
-              </Button>
+                </Button>
+              </form>
             )}
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
