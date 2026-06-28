@@ -14,6 +14,7 @@ import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { PlanModePanel } from "@/components/plan-mode-panel";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { VoiceInputButton } from "@/components/voice-input-button";
 
 const ghostTrigger =
   "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
@@ -405,7 +406,7 @@ export default function ChatBox({
               tip="Mode"
               triggerLabel={<span className="capitalize">{mode}</span>}
               triggerClassName={ghostTrigger}
-              options={(["ask", "plan", "agent"] as const).map((value) => ({
+              options={( ["ask", "plan", "agent"] as const).map((value) => ({
                 value,
                 label: <span className="capitalize">{value}</span>,
               }))}
@@ -413,6 +414,13 @@ export default function ChatBox({
           }
           rightActions={
             <div className="flex items-center gap-1">
+              <VoiceInputButton
+                onTranscript={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
+                disabled={disabled}
+                className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                label="Dictate chat prompt"
+              />
+
               <OptionDropdown
                 value={model}
                 onValueChange={handleModelChange}
