@@ -6,31 +6,21 @@ import { Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tip } from "@/components/ui/tooltip";
 
-type SpeechRecognitionConstructor = new () => SpeechRecognition;
-type SpeechRecognition = EventTarget & {
+type BrowserSpeechRecognition = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
   start: () => void;
   stop: () => void;
   abort: () => void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onresult: ((event: { resultIndex: number; results: any }) => void) | null;
   onend: (() => void) | null;
   onerror: (() => void) | null;
 };
-type SpeechRecognitionEvent = {
-  resultIndex: number;
-  results: ArrayLike<{
-    isFinal: boolean;
-    0: { transcript: string };
-  }>;
-};
 
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
+function getRecognitionConstructor() {
+  if (typeof window === "undefined") return null;
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 }
 
 export function VoiceInputButton({
@@ -46,13 +36,12 @@ export function VoiceInputButton({
   iconClassName?: string;
   label?: string;
 }) {
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const finalTextRef = useRef("");
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [recording, setRecording] = useState(false);
   const [supported, setSupported] = useState(true);
 
   useEffect(() => {
-    setSupported(typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
+    setSupported(Boolean(getRecognitionConstructor()));
     return () => recognitionRef.current?.abort();
   }, []);
 
@@ -62,15 +51,14 @@ export function VoiceInputButton({
   };
 
   const start = () => {
-    if (disabled || !supported || typeof window === "undefined") return;
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (disabled || !supported) return;
+    const Recognition = getRecognitionConstructor();
     if (!Recognition) {
       setSupported(false);
       return;
     }
 
-    finalTextRef.current = "";
-    const recognition = new Recognition();
+    const recognition = new Recognition() as BrowserSpeechRecognition;
     recognition.lang = navigator.language || "en-US";
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -80,10 +68,7 @@ export function VoiceInputButton({
         const result = event.results[index];
         if (result?.isFinal) finalTranscript += result[0]?.transcript ?? "";
       }
-      if (finalTranscript.trim()) {
-        finalTextRef.current += `${finalTranscript.trim()} `;
-        onTranscript(finalTranscript.trim());
-      }
+      if (finalTranscript.trim()) onTranscript(finalTranscript.trim());
     };
     recognition.onerror = () => setRecording(false);
     recognition.onend = () => setRecording(false);
