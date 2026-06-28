@@ -63,8 +63,8 @@ function getNavMain(isAdmin?: boolean) {
             icon: Shield,
             items: [
               { title: "Overview", url: "/admin" },
-              { title: "Feature flags", url: "/admin?section=flags" },
-              { title: "Deployment", url: "/admin?section=deploy" },
+              { title: "Braintrust logs", url: "/admin/braintrust" },
+              { title: "Deployment", url: "/admin" },
             ],
           },
         ]
@@ -128,18 +128,15 @@ export function HomeAppSidebar({
         <NavRecentChats chats={chats} loading={loading} />
       </SidebarContent>
       <SidebarFooter className="border-t border-white/8 bg-[#1F2023]/95">
-        <div className="flex items-center justify-between px-2">
-          <ThemeToggle className="size-9 rounded-xl border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
-          <span className="text-xs text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
-            Theme
-          </span>
+        <div className="px-2">
+          <ThemeToggle showLabel className="w-full justify-start rounded-xl border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
         </div>
         <SidebarSeparator />
         {authEnabled && !isAuthenticated ? (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild size="lg" className="bg-sidebar-accent/40">
-                <Link href="/api/auth/signin/google">
+                <Link href="/login">
                   <MessageSquare />
                   <span>Sign in with Google</span>
                 </Link>
