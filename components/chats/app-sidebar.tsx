@@ -53,8 +53,8 @@ function getNavMain(isAdmin?: boolean) {
             icon: Shield,
             items: [
               { title: "Overview", url: "/admin" },
-              { title: "Feature flags", url: "/admin?section=flags" },
-              { title: "Deployment", url: "/admin?section=deploy" },
+              { title: "Braintrust logs", url: "/admin/braintrust" },
+              { title: "Deployment", url: "/admin" },
             ],
           },
         ]
@@ -112,7 +112,7 @@ export function ChatsAppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild size="lg" className="rounded-xl border border-white/8 bg-white/5 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white">
-                <Link href="/api/auth/signin/google">
+                <Link href="/login">
                   <MessageSquare className="stroke-[1.8]" />
                   <span>Sign in with Google</span>
                 </Link>
