@@ -15,6 +15,7 @@ import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Hammer } from "lucide-react";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
 const legacyQuickStartTitle = "Land" + "ing Page";
 const appFirstQuickStarts = SUGGESTED_PROMPTS.map((template) =>
@@ -60,8 +61,13 @@ export default async function GalleryPage({
     return (
       <main className="flex h-dvh flex-col bg-background text-foreground">
         <Header />
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          The gallery is currently disabled.
+        <div className="flex flex-1 items-center justify-center px-4">
+          <Empty className="max-w-md">
+            <EmptyHeader>
+              <EmptyTitle>Gallery disabled</EmptyTitle>
+              <EmptyDescription>The gallery is currently disabled from admin settings.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </div>
       </main>
     );
@@ -89,7 +95,7 @@ export default async function GalleryPage({
       <div className="mx-auto max-w-5xl px-4 pb-16">
         <h1 className="text-2xl font-semibold tracking-tight">Gallery</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Featured sandbox templates, motion prompts, quick-starts, and community builds.
+          Featured scaffold previews, motion prompts, quick-starts, and community builds.
         </p>
 
         <Suspense fallback={null}>
@@ -100,7 +106,7 @@ export default async function GalleryPage({
           <>
             <h2 className="mt-8 text-lg font-semibold tracking-tight">Featured apps</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Curated templates and admin-pinned generations with live sandbox previews.
+              Curated templates and admin-pinned generations with stable responsive preview cards.
             </p>
             <div className="mt-4">
               <FeaturedAppsGrid apps={featuredApps} limit={source === "featured" ? undefined : 6} />
@@ -115,10 +121,7 @@ export default async function GalleryPage({
               Animation-forward prompts for Framer Motion + shadcn builds.
             </p>
             <div className="mt-4">
-              <FeaturedAppsGrid
-                apps={MOTION_TEMPLATES}
-                limit={source === "motion" ? undefined : 3}
-              />
+              <FeaturedAppsGrid apps={MOTION_TEMPLATES} limit={source === "motion" ? undefined : 3} />
             </div>
           </>
         ) : null}
@@ -134,7 +137,7 @@ export default async function GalleryPage({
                 <Link
                   key={template.title}
                   href={`/?prompt=${encodeURIComponent(template.description)}`}
-                  className="group rounded-xl border border-border/70 bg-card/50 p-4 transition hover:border-ring/40 hover:bg-card"
+                  className="group rounded-xl border border-border/70 bg-card/50 p-4 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-ring/40 hover:bg-card hover:shadow-sm"
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Hammer className="size-3.5 text-emerald-500" aria-hidden="true" />
@@ -158,26 +161,30 @@ export default async function GalleryPage({
               {filters.minFiles ? ` · ${filters.minFiles}+ files` : ""}.
             </p>
             {communityBuilds.length === 0 ? (
-              <p className="mt-4 text-sm text-muted-foreground">
-                No builds match these filters yet.
-              </p>
+              <Empty className="mt-4">
+                <EmptyHeader>
+                  <EmptyTitle>No builds match these filters</EmptyTitle>
+                  <EmptyDescription>Try another model filter, lower the file count, or create a new build from the home page.</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Link href="/" className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-3 text-sm transition hover:bg-accent">
+                    Create build
+                  </Link>
+                </EmptyContent>
+              </Empty>
             ) : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {communityBuilds.map((build) => (
-                  <div
-                    key={build.id}
-                    className="overflow-hidden rounded-xl border border-border/70 bg-card/50"
-                  >
+                  <div key={build.id} className="group overflow-hidden rounded-xl border border-border/70 bg-card/50 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-ring/40 hover:bg-card hover:shadow-sm">
                     {build.shareMessageId ? (
                       <div className="relative aspect-[1200/630] border-b border-border/70 bg-muted/40">
                         <Image
-                          src={buildOgImagePath({
-                            prompt: build.title,
-                            messageId: build.shareMessageId,
-                          })}
+                          src={buildOgImagePath({ prompt: build.title, messageId: build.shareMessageId })}
                           alt={`Preview card for ${build.title}`}
                           fill
-                          className="object-cover"
+                          sizes="(max-width: 768px) 92vw, (max-width: 1200px) 45vw, 30vw"
+                          loading="lazy"
+                          className="object-cover transition duration-500 group-hover:scale-[1.03]"
                           unoptimized
                         />
                       </div>
@@ -188,18 +195,10 @@ export default async function GalleryPage({
                         {build.model} · {build.fileCount} files
                       </div>
                       <div className="mt-3 flex items-center gap-2 text-xs">
-                        <a
-                          href={`/share/v2/${build.shareMessageId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                        >
+                        <a href={`/share/v2/${build.shareMessageId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground">
                           <ExternalLink className="size-3" aria-hidden="true" /> Live
                         </a>
-                        <Link
-                          href={`/chats/${build.id}`}
-                          className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                        >
+                        <Link href={`/chats/${build.id}`} className="inline-flex items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-muted-foreground transition hover:bg-accent hover:text-foreground">
                           Open in builder
                         </Link>
                       </div>
