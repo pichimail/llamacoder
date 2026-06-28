@@ -14,6 +14,7 @@ export type HomeSidebarUser = {
   name: string
   email: string
   avatar: string
+  isAdmin?: boolean
 }
 
 type HomeSidebarData = {
@@ -26,8 +27,9 @@ type HomeSidebarData = {
 
 const guestUser: HomeSidebarUser = {
   name: "Guest",
-  email: "Open build mode",
+  email: "Sign in with Google",
   avatar: "",
+  isAdmin: false,
 }
 
 export function useHomeSidebarData(): HomeSidebarData {
@@ -42,10 +44,18 @@ export function useHomeSidebarData(): HomeSidebarData {
 
     async function load() {
       try {
-        const [settingsRes, chatsResult] = await Promise.all([
-          fetch("/api/public-settings", { cache: "no-store" }),
-          getChatsList(),
-        ])
+        const settingsRes = await fetch("/api/public-settings", { cache: "no-store" })
+        const settings = settingsRes.ok ? await settingsRes.json() : null
+        const authOn = !!(settings?.saasMode && settings?.googleAuth)
+        let sessionUser: any = null
+
+        if (authOn) {
+          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" })
+          const session = sessionRes.ok ? await sessionRes.json() : null
+          sessionUser = session?.user ?? null
+        }
+
+        const chatsResult = sessionUser || !authOn ? await getChatsList() : { pinned: [], recent: [] }
 
         if (cancelled) return
 
@@ -63,34 +73,24 @@ export function useHomeSidebarData(): HomeSidebarData {
           }))
 
         setChats([...pinned, ...recent].slice(0, 8))
+        setAuthEnabled(authOn)
 
-        const settings = settingsRes.ok ? await settingsRes.json() : null
-        const saasEnabled = !!(settings?.saasMode && settings?.googleAuth)
-        setAuthEnabled(saasEnabled)
-
-        if (!saasEnabled) {
-          setUser(guestUser)
+        if (!authOn) {
+          setUser({ name: "Guest", email: "Open build mode", avatar: "", isAdmin: false })
           setIsAuthenticated(false)
           return
         }
-
-        const sessionRes = await fetch("/api/auth/session", { cache: "no-store" })
-        const session = sessionRes.ok ? await sessionRes.json() : null
-        const sessionUser = session?.user
 
         if (sessionUser) {
           setUser({
             name: sessionUser.name || "Account",
             email: sessionUser.email || "Signed in",
             avatar: sessionUser.image || "",
+            isAdmin: sessionUser.role === "admin" || sessionUser.isAdmin === true,
           })
           setIsAuthenticated(true)
         } else {
-          setUser({
-            name: "Guest",
-            email: "Sign in to sync chats",
-            avatar: "",
-          })
+          setUser(guestUser)
           setIsAuthenticated(false)
         }
       } catch {
