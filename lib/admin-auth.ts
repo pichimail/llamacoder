@@ -1,29 +1,27 @@
 import "server-only";
-import { createHash } from "crypto";
-import { cookies } from "next/headers";
 
-const ADMIN_ID = process.env.ADMIN_ID || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "123456";
-const DEMO_ADMIN_ID = "admin";
-const DEMO_ADMIN_PASSWORD = "123456";
-const SECRET = process.env.AUTH_SECRET || "chinna-coder-dev-secret";
+import { auth } from "@/lib/auth";
+import { ADMIN_EMAIL, isAdminEmail } from "@/lib/admin-config";
 
+export { ADMIN_EMAIL, isAdminEmail };
+
+// Kept only so old logout code can clear the previous cookie during rollout.
 export const ADMIN_COOKIE = "cc_admin";
 
-export function adminToken() {
-  return createHash("sha256")
-    .update(`${ADMIN_ID}:${ADMIN_PASSWORD}:${SECRET}`)
-    .digest("hex");
-}
-
-export function verifyAdminCredentials(id: string, password: string) {
-  return (
-    (id === ADMIN_ID && password === ADMIN_PASSWORD) ||
-    (id === DEMO_ADMIN_ID && password === DEMO_ADMIN_PASSWORD)
-  );
+export async function getAdminSession() {
+  const session = await auth();
+  return isAdminEmail(session?.user?.email) ? session : null;
 }
 
 export async function isAdminRequest() {
-  const store = await cookies();
-  return store.get(ADMIN_COOKIE)?.value === adminToken();
+  return Boolean(await getAdminSession());
+}
+
+// Password admin login is intentionally disabled. Admin access is Google OAuth only.
+export function adminToken() {
+  return "";
+}
+
+export function verifyAdminCredentials() {
+  return false;
 }
