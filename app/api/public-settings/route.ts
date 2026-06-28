@@ -4,9 +4,11 @@ import { isGoogleConfigured } from "@/lib/auth";
 
 export async function GET() {
   const s = await getSettings();
+  const googleReady = isGoogleConfigured();
   return NextResponse.json({
     saasMode: s.saasMode === "on",
-    googleAuth: s.googleAuth === "on" && isGoogleConfigured(),
+    googleAuth: s.googleAuth === "on" && googleReady,
+    authRequired: s.saasMode === "on" && s.googleAuth === "on" && googleReady,
     gallery: s.gallery !== "off",
     autoFixDefault: s.autoFixDefault === "on",
   });
