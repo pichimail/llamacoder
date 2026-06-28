@@ -3,11 +3,36 @@
 import type { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
-import { getCurrentUser } from '@/app/auth'
+import { auth as readSession, isGoogleConfigured } from '@/lib/auth'
+import { isAdminEmail } from '@/lib/admin-config'
 import { getPrisma } from '@/lib/prisma'
+
+async function readCurrentUser() {
+  const session = await readSession()
+  const raw = session?.user as any
+  if (!raw?.id) return null
+  const email = raw.email || null
+  return {
+    id: String(raw.id),
+    email,
+    isAdmin: isAdminEmail(email),
+  }
+}
+
+function authRequired() {
+  return process.env.REQUIRE_GOOGLE_AUTH !== 'false' && isGoogleConfigured()
+}
+
+function canUseProject(user: Awaited<ReturnType<typeof readCurrentUser>>, project: { userId: string; members: { userId: string }[] } | null) {
+  if (!user) return false
+  if (user.isAdmin) return true
+  if (!project) return false
+  return project.userId === user.id || project.members.some((member) => member.userId === user.id)
+}
 
 async function getScopedChatOrThrow(chatId: string) {
   const prisma = getPrisma()
+  const user = await readCurrentUser()
   const chat = await prisma.chat.findUnique({
     where: { id: chatId },
     include: {
@@ -20,24 +45,17 @@ async function getScopedChatOrThrow(chatId: string) {
   })
 
   if (!chat) throw new Error('Chat not found')
+  if (authRequired() && !user) throw new Error('Unauthorized')
+  if (!chat.project) {
+    if (!authRequired() || user?.isAdmin) return chat
+    throw new Error('Forbidden')
+  }
+  if (!canUseProject(user, chat.project)) throw new Error('Forbidden')
   return chat
 }
 
 async function ensureCanMutateChat(chatId: string) {
-  const chat = await getScopedChatOrThrow(chatId)
-
-  // Legacy chats in this repo may not have a project/user owner yet.
-  // Keep them usable until the auth provider and project assignment flow are wired.
-  if (!chat.project) return chat
-
-  const user = await getCurrentUser()
-  if (!user?.id) throw new Error('Unauthorized')
-
-  const isOwner = chat.project.userId === user.id
-  const isMember = chat.project.members.some((member) => member.userId === user.id)
-
-  if (!isOwner && !isMember) throw new Error('Forbidden')
-  return chat
+  return getScopedChatOrThrow(chatId)
 }
 
 function touchChatPaths(chatId?: string) {
@@ -51,6 +69,18 @@ export async function createChat(data: {
   model: string
 }) {
   const prisma = getPrisma()
+  const user = await readCurrentUser()
+  if (authRequired() && !user) throw new Error('Unauthorized')
+
+  const project = user
+    ? await prisma.project.create({
+        data: {
+          name: data.title || 'Untitled App',
+          description: data.prompt || null,
+          userId: user.id,
+        },
+      })
+    : null
 
   const chat = await prisma.chat.create({
     data: {
@@ -60,6 +90,7 @@ export async function createChat(data: {
       quality: 'high',
       shadcn: true,
       llamaCoderVersion: 'v2',
+      projectId: project?.id,
     },
   })
 
@@ -171,18 +202,27 @@ export async function duplicateChat(chatId: string) {
 
 export async function getChatsList() {
   const prisma = getPrisma()
-  const user = await getCurrentUser()
+  const user = await readCurrentUser()
+
+  if (authRequired() && !user) {
+    return { pinned: [], recent: [], all: [] }
+  }
+
+  const where = user?.isAdmin
+    ? undefined
+    : user
+      ? {
+          project: {
+            OR: [
+              { userId: user.id },
+              { members: { some: { userId: user.id } } },
+            ],
+          },
+        }
+      : { project: null }
 
   const chats = await prisma.chat.findMany({
-    where: user?.id
-      ? {
-          OR: [
-            { project: null },
-            { project: { userId: user.id } },
-            { project: { members: { some: { userId: user.id } } } },
-          ],
-        }
-      : undefined,
+    where,
     orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
     take: 100,
   })
@@ -194,41 +234,9 @@ export async function getChatsList() {
 }
 
 export async function getChatById(chatId: string) {
-  const prisma = getPrisma()
-
-  return prisma.chat.findUnique({
-    where: { id: chatId },
-  })
+  return getScopedChatOrThrow(chatId)
 }
 
 export async function getChat(id: string) {
-  const prisma = getPrisma()
-  const chat = await prisma.chat.findUnique({
-    where: { id },
-    include: {
-      messages: true,
-      project: {
-        include: {
-          files: true,
-          envVars: true,
-          integrations: true,
-          domains: true,
-          members: true,
-        },
-      },
-    },
-  })
-
-  if (!chat) throw new Error('Chat not found')
-
-  if (chat.project) {
-    const user = await getCurrentUser()
-    if (!user?.id) throw new Error('Unauthorized')
-
-    const isOwner = chat.project.userId === user.id
-    const isMember = chat.project.members.some((member) => member.userId === user.id)
-    if (!isOwner && !isMember) throw new Error('Forbidden')
-  }
-
-  return chat
+  return getScopedChatOrThrow(id)
 }
