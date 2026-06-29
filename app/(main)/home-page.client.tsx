@@ -3,7 +3,15 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { useRouter } from "next/navigation";
 import { use, useState, useRef, useTransition } from "react";
-import { ArrowUp, Paperclip } from "lucide-react";
+import { ArrowUp, Plus, Mic, Upload, Github, Search as SearchIcon, Brain, Palette } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
@@ -124,8 +132,15 @@ function PremiumPromptComposer({
   onShadcnChange,
   reasoningEnabled,
   onReasoningChange,
+  webSearchEnabled,
+  onWebSearchChange,
+  deepThinkingEnabled,
+  onDeepThinkingChange,
+  canvasEnabled,
+  onCanvasChange,
   onAttach,
   attachmentReady,
+  onImportGithub,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -141,109 +156,174 @@ function PremiumPromptComposer({
   onShadcnChange: (value: boolean) => void;
   reasoningEnabled: boolean;
   onReasoningChange: (value: boolean) => void;
+  webSearchEnabled: boolean;
+  onWebSearchChange: (value: boolean) => void;
+  deepThinkingEnabled: boolean;
+  onDeepThinkingChange: (value: boolean) => void;
+  canvasEnabled: boolean;
+  onCanvasChange: (value: boolean) => void;
   onAttach: () => void;
   attachmentReady?: boolean;
+  onImportGithub: () => void;
 }) {
   const hasValue = value.trim().length > 0 || attachmentReady;
-  const selectedModel = models.find((item: any) => item.value === model);
+  const selectedModel = models.find((item: any) => item.value === model) || { label: model };
 
   return (
     <div className="w-full">
-      <div className="rounded-[28px] border border-white/10 bg-[#1f1f22] p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
-        <textarea
-          value={value}
-          onChange={(event) => onValueChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              if (!disabled && hasValue) onSend(value);
-            }
-          }}
-          placeholder="Describe what to build"
-          aria-label="Describe what to build"
-          disabled={disabled}
-          rows={3}
-          className="min-h-[76px] w-full resize-none rounded-[20px] bg-[#1f1f22] px-2.5 py-2 text-[15px] leading-relaxed text-white outline-none placeholder:text-zinc-400 disabled:opacity-60"
-        />
-
-        {attachmentReady ? (
-          <div className="mb-2 ml-1 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] text-emerald-100">
-            Attachment ready
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div className="flex items-center gap-2 rounded-[28px] border border-white/10 bg-[#1f1f22] p-2 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
+        {/* + Dropdown - all features here */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
-              onClick={onAttach}
               disabled={disabled}
-              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-white"
             >
-              <Paperclip size={16} />
+              <Plus size={18} />
             </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56 bg-[#1f1f22] text-white border-white/10">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onAttach} className="gap-2">
+              <Upload size={16} /> Upload file
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportGithub} className="gap-2">
+              <Github size={16} /> Import from GitHub
+            </DropdownMenuItem>
 
-            <button
-              type="button"
-              onClick={() => onModeChange(mode === "plan" ? "agent" : "plan")}
-              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200 transition hover:bg-white/10"
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel>Builder</DropdownMenuLabel>
+
+            <DropdownMenuItem 
+              onClick={() => onShadcnChange(!shadcnEnabled)} 
+              className="flex justify-between"
             >
-              {mode === "plan" ? "Plan" : "Agent"}
-            </button>
-
-            <select
-              value={model}
-              onChange={(e) => onModelChange(e.target.value)}
-              className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/80 outline-none"
-            >
-              {models.map((m: any) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-
-            <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200">
-              <input
-                type="checkbox"
-                checked={shadcnEnabled}
-                onChange={(e) => onShadcnChange(e.target.checked)}
-                className="accent-white"
+              <span className="flex items-center gap-2"><Palette size={16} /> shadcn UI</span>
+              <input 
+                type="checkbox" 
+                checked={shadcnEnabled} 
+                onChange={() => {}} 
+                className="accent-white pointer-events-none" 
               />
-              shadcn
-            </label>
+            </DropdownMenuItem>
 
-            <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200">
-              <input
-                type="checkbox"
-                checked={reasoningEnabled}
-                onChange={(e) => onReasoningChange(e.target.checked)}
-                className="accent-white"
+            <DropdownMenuItem 
+              onClick={() => onWebSearchChange(!webSearchEnabled)} 
+              className="flex justify-between"
+            >
+              <span className="flex items-center gap-2"><SearchIcon size={16} /> Web search</span>
+              <input 
+                type="checkbox" 
+                checked={webSearchEnabled} 
+                onChange={() => {}} 
+                className="accent-white pointer-events-none" 
               />
-              reasoning
-            </label>
-          </div>
+            </DropdownMenuItem>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onAttach}
-              disabled={disabled}
-              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+            <DropdownMenuItem 
+              onClick={() => onDeepThinkingChange(!deepThinkingEnabled)} 
+              className="flex justify-between"
             >
-              +
-            </button>
+              <span className="flex items-center gap-2"><Brain size={16} /> Deep thinking</span>
+              <input 
+                type="checkbox" 
+                checked={deepThinkingEnabled} 
+                onChange={() => {}} 
+                className="accent-white pointer-events-none" 
+              />
+            </DropdownMenuItem>
 
-            <button
-              onClick={() => onSend(value)}
-              disabled={disabled || !hasValue}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow transition active:scale-[0.985] disabled:opacity-40"
+            <DropdownMenuItem 
+              onClick={() => onCanvasChange(!canvasEnabled)} 
+              className="flex justify-between"
             >
-              {isLoading ? <span className="text-[10px]">...</span> : <ArrowUp size={16} />}
-            </button>
-          </div>
+              <span className="flex items-center gap-2"><span>🖼️</span> Canvas</span>
+              <input 
+                type="checkbox" 
+                checked={canvasEnabled} 
+                onChange={() => {}} 
+                className="accent-white pointer-events-none" 
+              />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Main input area - styled to match image */}
+        <div className="flex-1 relative">
+          <textarea
+            value={value}
+            onChange={(event) => onValueChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (!disabled && hasValue) onSend(value);
+              }
+            }}
+            placeholder="Describe what to build"
+            aria-label="Describe what to build"
+            disabled={disabled}
+            rows={1}
+            className="w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-white outline-none placeholder:text-white/60 disabled:opacity-60 min-h-[48px] max-h-[120px]"
+          />
+        </div>
+
+        {/* Right side controls - mic, send, model */}
+        <div className="flex items-center gap-1 pr-1">
+          {/* Voice mic */}
+          <button
+            type="button"
+            onClick={() => {
+              // Voice input logic - integrate with existing if available
+              const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+              if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.onresult = (event: any) => {
+                  const transcript = event.results[0][0].transcript;
+                  onValueChange(value ? value + " " + transcript : transcript);
+                };
+                recognition.start();
+              } else {
+                alert("Voice input not supported in this browser");
+              }
+            }}
+            disabled={disabled}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition"
+          >
+            <Mic size={16} />
+          </button>
+
+          {/* Send button */}
+          <button
+            onClick={() => onSend(value)}
+            disabled={disabled || !hasValue}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black shadow transition active:scale-[0.985] disabled:opacity-40"
+          >
+            {isLoading ? <span className="text-[10px]">...</span> : <ArrowUp size={16} />}
+          </button>
+
+          {/* Model selector - matches GLM 5 style */}
+          <select
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="rounded-full border border-white/10 bg-black/40 px-2 py-1 text-xs text-white/90 outline-none min-w-[70px]"
+          >
+            {models.map((m: any) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
+
+      {/* Attachment ready indicator */}
+      {attachmentReady && (
+        <div className="mt-1 text-xs text-emerald-400">Attachment ready</div>
+      )}
     </div>
   );
 }
@@ -257,6 +337,9 @@ export default function HomePageClient() {
   const [model, setModel] = useState("claude-3-5-sonnet");
   const [shadcnEnabled, setShadcnEnabled] = useState(true);
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [deepThinkingEnabled, setDeepThinkingEnabled] = useState(false);
+  const [canvasEnabled, setCanvasEnabled] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -276,9 +359,18 @@ export default function HomePageClient() {
     const cleanPrompt = (value ?? prompt).trim();
     if (!cleanPrompt) return;
 
-    startTransition(async () => {
-      const finalPrompt = cleanPrompt + (screenshotUrl ? `\n\nAttachment: ${screenshotUrl}` : "");
+    let finalPrompt = cleanPrompt + (screenshotUrl ? `\n\nAttachment: ${screenshotUrl}` : "");
 
+    // Append dynamic features for backend
+    const features = [];
+    if (webSearchEnabled) features.push("web search enabled");
+    if (deepThinkingEnabled) features.push("deep thinking mode");
+    if (canvasEnabled) features.push("canvas mode");
+    if (features.length > 0) {
+      finalPrompt += `\n\n[Features: ${features.join(", ")}]`;
+    }
+
+    startTransition(async () => {
       const response = await fetch("/api/create-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -294,7 +386,7 @@ export default function HomePageClient() {
 
       const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data?.id) {
+      if (!response.ok || !data?.chatId || !data?.lastMessageId) {
         toast({
           title: "Could not start build",
           description: data?.error || "Please check auth/API configuration.",
@@ -303,7 +395,28 @@ export default function HomePageClient() {
         return;
       }
 
-      router.push(`/chats/${data.id}?preview=1`);
+      // Trigger the generation stream like in the new chat flow
+      const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: data.lastMessageId,
+          model,
+          reasoning: reasoningEnabled,
+          quality: "high",
+        }),
+      }).then(async (streamRes) => {
+        if (!streamRes.ok) {
+          throw new Error((await streamRes.text()) || "Failed to start generation");
+        }
+        if (!streamRes.body) throw new Error("No body on response");
+        return streamRes.body;
+      });
+
+      void streamPromise.catch(() => undefined);
+      context.setStreamPromise(streamPromise);
+
+      router.push(`/chats/${data.chatId}?preview=1`);
     });
   };
 
@@ -355,8 +468,20 @@ export default function HomePageClient() {
                       onShadcnChange={setShadcnEnabled}
                       reasoningEnabled={reasoningEnabled}
                       onReasoningChange={setReasoningEnabled}
+                      webSearchEnabled={webSearchEnabled}
+                      onWebSearchChange={setWebSearchEnabled}
+                      deepThinkingEnabled={deepThinkingEnabled}
+                      onDeepThinkingChange={setDeepThinkingEnabled}
+                      canvasEnabled={canvasEnabled}
+                      onCanvasChange={setCanvasEnabled}
                       onAttach={() => fileInputRef.current?.click()}
                       attachmentReady={Boolean(screenshotUrl)}
+                      onImportGithub={() => {
+                        const url = window.prompt("Enter GitHub repo URL:");
+                        if (url) {
+                          setPrompt((prev) => prev + (prev ? " " : "") + `[Import from GitHub: ${url}]`);
+                        }
+                      }}
                     />
 
                     {/* Preset quick prompts */}

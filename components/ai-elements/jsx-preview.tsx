@@ -123,6 +123,15 @@ const completeJsxTag = (code: string) => {
   );
 };
 
+// Strip <script> tags so React doesn't complain when previewing JSX that contains them.
+// Scripts in previews wouldn't execute anyway (React intentionally ignores them).
+const stripScripts = (code: string): string => {
+  // Remove both <script>...</script> and self-closing variants
+  return code
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*\/>/gi, "");
+};
+
 export type JSXPreviewProps = ComponentProps<"div"> & {
   jsx: string;
   isStreaming?: boolean;
@@ -153,7 +162,7 @@ export const JSXPreview = memo(
     }
 
     const processedJsx = useMemo(
-      () => (isStreaming ? completeJsxTag(jsx) : jsx),
+      () => stripScripts(isStreaming ? completeJsxTag(jsx) : jsx),
       [jsx, isStreaming]
     );
 
