@@ -2,7 +2,7 @@
 
 import { HomeShell } from "@/components/home/home-shell";
 import { useRouter } from "next/navigation";
-import { use, useRef, useState, useTransition, type ReactNode } from "react";
+import { use, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ArrowUp, Brain, Github, Loader2, Palette, Plus, Search as SearchIcon, Upload } from "lucide-react";
 import {
   DropdownMenu,
@@ -114,33 +114,13 @@ function PremiumPromptComposer({
   return (
     <div className="w-full">
       <div className="rounded-[28px] border border-white/10 bg-[#1f1f22] text-white shadow-[0_28px_80px_rgba(15,23,42,0.30)] backdrop-blur-2xl">
-        <textarea
-          value={value}
-          onChange={(event) => onValueChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              if (!disabled && hasValue) onSend(value);
-            }
-          }}
-          placeholder="Describe what to build"
-          aria-label="Describe what to build"
-          disabled={disabled}
-          rows={3}
-          className="min-h-[104px] w-full resize-none rounded-t-[28px] bg-transparent px-6 pb-4 pt-6 text-[17px] leading-relaxed text-white outline-none placeholder:text-zinc-400 disabled:opacity-60"
-        />
+        <textarea value={value} onChange={(event) => onValueChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!disabled && hasValue) onSend(value); } }} placeholder="Describe what to build" aria-label="Describe what to build" disabled={disabled} rows={3} className="min-h-[104px] w-full resize-none rounded-t-[28px] bg-transparent px-6 pb-4 pt-6 text-[17px] leading-relaxed text-white outline-none placeholder:text-zinc-400 disabled:opacity-60" />
 
-        {attachmentReady ? (
-          <div className="mx-5 mb-3 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">Attachment ready</div>
-        ) : null}
+        {attachmentReady ? <div className="mx-5 mb-3 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">Attachment ready</div> : null}
 
         <div className="flex min-h-[58px] items-center justify-between gap-3 border-t border-white/[0.06] px-3 py-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" disabled={disabled} className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50" aria-label="Open prompt actions">
-                <Plus className="size-5" />
-              </button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><button type="button" disabled={disabled} className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50" aria-label="Open prompt actions"><Plus className="size-5" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[min(86vw,340px)] rounded-[22px] border-white/10 bg-[#1f1f22] p-2 text-white shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
               <DropdownMenuLabel className="text-xs text-zinc-400">Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem>
@@ -160,9 +140,7 @@ function PremiumPromptComposer({
             <select id="home-model-select" value={model} onChange={(event) => onModelChange(event.target.value)} disabled={disabled} className="h-10 max-w-[58vw] rounded-full border border-white/10 bg-white/[0.055] px-4 text-sm text-white outline-none transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 md:min-w-[210px]">
               {models.map((m: any) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
-            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-40" aria-label="Start build">
-              {isLoading ? <span className="text-[10px]">...</span> : <ArrowUp className="size-5" />}
-            </button>
+            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-40" aria-label="Start build">{isLoading ? <span className="text-[10px]">...</span> : <ArrowUp className="size-5" />}</button>
           </div>
         </div>
       </div>
@@ -174,7 +152,7 @@ export default function HomePageClient() {
   const router = useRouter();
   const context = use(Context);
   const [prompt, setPrompt] = useState("");
-  const buildMode: Mode = "agent";
+  const [buildMode, setBuildMode] = useState<Mode>("agent");
   const [model, setModel] = useState("zai-org/GLM-5");
   const [shadcnEnabled, setShadcnEnabled] = useState(true);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -189,6 +167,30 @@ export default function HomePageClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const visibleModels = MODELS.filter((item) => !item.hidden);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBuilderSettings() {
+      try {
+        const response = await fetch("/api/user-settings", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json().catch(() => null);
+        const settings = data?.settings;
+        if (!settings || cancelled) return;
+        if (typeof settings.defaultModel === "string") setModel(settings.defaultModel);
+        if (["ask", "plan", "agent"].includes(settings.defaultMode)) setBuildMode(settings.defaultMode);
+        if (typeof settings.shadcnDefault === "boolean") setShadcnEnabled(settings.shadcnDefault);
+        if (typeof settings.webSearchDefault === "boolean") setWebSearchEnabled(settings.webSearchDefault);
+        if (typeof settings.deepThinkingDefault === "boolean") setDeepThinkingEnabled(settings.deepThinkingDefault);
+        if (typeof settings.canvasDefault === "boolean") setCanvasEnabled(settings.canvasDefault);
+        if (typeof settings.githubRepositoryUrl === "string") setGithubUrl(settings.githubRepositoryUrl);
+      } catch {
+        // Keep fast home startup even if settings are unavailable.
+      }
+    }
+    loadBuilderSettings();
+    return () => { cancelled = true; };
+  }, []);
+
   const handlePromptSend = (value?: string) => {
     const cleanPrompt = (value ?? prompt).trim();
     if (!cleanPrompt && attachments.length === 0) return;
@@ -201,27 +203,11 @@ export default function HomePageClient() {
         ].filter(Boolean);
         const finalPrompt = [cleanPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
         const screenshotUrl = attachments.find((item) => item.kind === "image" && item.url)?.url;
-        const response = await fetch("/api/create-chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalPrompt,
-            model,
-            quality: "high",
-            mode: buildMode,
-            shadcn: shadcnEnabled,
-            screenshotUrl,
-            attachments,
-          }),
-        });
+        const response = await fetch("/api/create-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: finalPrompt, model, quality: "high", mode: buildMode, shadcn: shadcnEnabled, screenshotUrl, attachments }) });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.chatId || !data?.lastMessageId) throw new Error(data?.error || "Please check auth/API configuration.");
 
-        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId: data.lastMessageId, model, reasoning: deepThinkingEnabled, quality: "high" }),
-        }).then(async (streamRes) => {
+        const streamPromise = fetch("/api/get-next-completion-stream-promise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: data.lastMessageId, model, reasoning: deepThinkingEnabled, quality: "high" }) }).then(async (streamRes) => {
           if (!streamRes.ok) throw new Error((await streamRes.text()) || "Failed to start generation");
           if (!streamRes.body) throw new Error("No body on response");
           return streamRes.body;
@@ -251,22 +237,12 @@ export default function HomePageClient() {
   const submitGithubImport = () => {
     const url = githubUrl.trim();
     setGithubError("");
-    if (!url) {
-      setGithubError("Enter a GitHub repository URL.");
-      return;
-    }
-    if (!/^https:\/\/github\.com\/[^/]+\/[^/]+/i.test(url)) {
-      setGithubError("Use a valid GitHub URL like https://github.com/owner/repo.");
-      return;
-    }
+    if (!url) { setGithubError("Enter a GitHub repository URL."); return; }
+    if (!/^https:\/\/github\.com\/[^/]+\/[^/]+/i.test(url)) { setGithubError("Use a valid GitHub URL like https://github.com/owner/repo."); return; }
     setIsGithubImporting(true);
     startTransition(async () => {
       try {
-        const response = await fetch("/api/import-github-repo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
+        const response = await fetch("/api/import-github-repo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.chatId) throw new Error(data?.error || "Could not import repository.");
         setGithubDialogOpen(false);
@@ -286,60 +262,15 @@ export default function HomePageClient() {
         <section id="hero" className="relative flex min-h-dvh overflow-hidden" style={{ background: HERO_GRADIENT }}>
           <div className="relative m-3 flex-1 overflow-hidden rounded-[28px] md:m-4">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,122,0,0.34),transparent_30%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_34%)]" />
-            <div className="relative flex min-h-dvh w-full flex-col">
-              <Header hideLogo />
-              <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
-                <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
-                  <h1 className="mb-10 text-center text-[52px] font-black leading-none tracking-[-0.07em] text-slate-950 md:text-[80px] lg:text-[92px]">
-                    Build. <span className="mx-3 md:mx-8">Preview.</span> <span className="bg-gradient-to-r from-lime-300 to-emerald-400 bg-clip-text text-transparent">Ship.</span>
-                  </h1>
-                  <div id="prompt-composer" className="relative w-full">
-                    <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} />
-                    <PresetChipsScroller onSelect={setPrompt} />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div className="relative flex min-h-dvh w-full flex-col"><Header hideLogo /><div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32"><div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6"><h1 className="mb-10 text-center text-[52px] font-black leading-none tracking-[-0.07em] text-slate-950 md:text-[80px] lg:text-[92px]">Build. <span className="mx-3 md:mx-8">Preview.</span> <span className="bg-gradient-to-r from-lime-300 to-emerald-400 bg-clip-text text-transparent">Ship.</span></h1><div id="prompt-composer" className="relative w-full"><PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} /><PresetChipsScroller onSelect={setPrompt} /></div></div></div></div>
           </div>
         </section>
 
-        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5">
-          <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
-            <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
-              <div><h2 className="text-lg font-semibold tracking-tight">Featured templates</h2><p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p></div>
-              <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link>
-            </div>
-            <div className="mt-4"><FeaturedAppsGrid apps={[]} limit={6} compact /></div>
-          </div>
-        </section>
+        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5"><div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5"><div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4"><div><h2 className="text-lg font-semibold tracking-tight">Featured templates</h2><p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p></div><Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link></div><div className="mt-4"><FeaturedAppsGrid apps={[]} limit={6} compact /></div></div></section>
       </div>
       <input ref={fileInputRef} className="hidden" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
       <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
-          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
-            <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
-            <DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}>
-            <div className="space-y-2">
-              <label htmlFor="github-url" className="text-sm font-medium">Repository URL</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" />
-                <Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">
-                  {isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {isGithubImporting ? "Importing" : "Import"}
-                </Button>
-              </div>
-              {githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
-              Supports public GitHub repositories. Private repository import should be connected through account integrations before use.
-            </div>
-          </form>
-          <DialogFooter className="border-t border-border/70 px-5 py-4">
-            <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
-          </DialogFooter>
-        </DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl"><DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left"><DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle><DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription></DialogHeader><form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}><div className="space-y-2"><label htmlFor="github-url" className="text-sm font-medium">Repository URL</label><div className="flex flex-col gap-2 sm:flex-row"><Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" /><Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">{isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}{isGithubImporting ? "Importing" : "Import"}</Button></div>{githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}</div><div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Supports public GitHub repositories. Private repository import should be connected through account integrations before use.</div></form><DialogFooter className="border-t border-border/70 px-5 py-4"><Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button></DialogFooter></DialogContent>
       </Dialog>
     </HomeShell>
   );
