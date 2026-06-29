@@ -2,9 +2,8 @@
 
 import type { SidebarChat } from "@/components/chats/nav-chats"
 import type { HomeSidebarUser } from "@/components/home/use-home-sidebar-data"
-import type { Sidebar } from "@/components/ui/sidebar"
 
-export function ChatsAppSidebar(_props: React.ComponentProps<typeof Sidebar> & {
+export function ChatsAppSidebar(_props: {
   currentChatId?: string
   chats?: SidebarChat[]
   user: HomeSidebarUser
