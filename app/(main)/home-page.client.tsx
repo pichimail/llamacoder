@@ -12,7 +12,6 @@ import {
   useMemo,
   useRef,
   useCallback,
-  type RefObject,
 } from "react";
 import { ArrowUp, Paperclip } from "lucide-react";
 import { Context } from "./providers";
@@ -52,7 +51,7 @@ const PROMPT_CHIP_GROUPS = [
     title: "SMM marketing",
     prompts: [
       "Build a social media campaign planner with calendar, post queue, channel filters, approval workflow, content cards, campaign KPIs, and a mobile-first dashboard.",
-      "Create an influencer outreach CRM with lead lists, campaign stages, contract status, message templates, performance cards, and admin-ready mock data services.",
+      "Create an influencer outreach CRM with lead lists, campaign stages, contract status, and admin-ready mock data services.",
       "Generate a brand content studio with asset library, caption generator UI, schedule board, campaign briefs, and responsive shadcn-style management screens.",
     ],
   },
