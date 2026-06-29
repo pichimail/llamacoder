@@ -19,23 +19,24 @@ model GeneratedApp {
 }
 
 model Chat {
-  id                String    @id @default(nanoid(16))
+  id                String        @id @default(nanoid(16))
   model             String
   quality           String
   prompt            String
   title             String
-  llamaCoderVersion String    @default("v2")
+  llamaCoderVersion String        @default("v2")
   shadcn            Boolean
   messages          Message[]
   projectId         String?
-  project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  isPinned          Boolean   @default(false)
-  isArchived        Boolean   @default(false)
+  project           Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  isPinned          Boolean       @default(false)
+  isArchived        Boolean       @default(false)
   historySummary    String?
   historySummaryKey String?
   historySummaryAt  DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  fileUploads       FileUpload[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   @@index([createdAt])
   @@index([projectId])
@@ -44,15 +45,16 @@ model Chat {
 }
 
 model Message {
-  id               String   @id @default(nanoid(16))
+  id               String        @id @default(nanoid(16))
   role             String
   content          String
   files            Json?
   previewImageUrl  String?
   chatId           String
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  position  Int
-  createdAt DateTime @default(now())
+  chat             Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  fileUploads      FileUpload[]
+  position         Int
+  createdAt        DateTime      @default(now())
 
   @@index([chatId])
   @@index([chatId, createdAt])
@@ -204,6 +206,7 @@ model User {
   sessions      Session[]
   projects      Project[]
   projectMembers ProjectMember[]
+  fileUploads   FileUpload[]
   createdAt     DateTime  @default(now())
 }
 
@@ -239,4 +242,41 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ===== File Upload Tracking =====
+model FileUpload {
+  id        String   @id @default(nanoid(12))
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blobUrl   String   @unique
+  filename  String
+  mimeType  String
+  size      Int
+  chatId    String?
+  chat      Chat?    @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([messageId])
+  @@index([createdAt])
+}
+
+// ===== Rate Limiting =====
+model RateLimit {
+  id        String   @id @default(nanoid(12))
+  userId    String
+  route     String
+  count     Int      @default(1)
+  windowStart DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, route, windowStart])
+  @@index([userId])
+  @@index([route])
+  @@index([createdAt])
 }
