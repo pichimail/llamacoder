@@ -1,34 +1,13 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
-import { TextColor } from "@/components/ui/text-color";
-import { OptionDropdown } from "@/components/option-dropdown";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  use,
-  useState,
-  useTransition,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
-import { ArrowUp, Paperclip } from "lucide-react";
-import { Context } from "./providers";
-
-import Header from "@/components/header";
-import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
-import { MODELS } from "@/lib/constants";
-import { useAvailableModels } from "@/lib/use-available-models";
-import type { FeaturedApp } from "@/lib/featured-apps";
-import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
-import { PlanModePanel } from "@/components/plan-mode-panel";
-import { VoiceInputButton } from "@/components/voice-input-button";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ArrowUp } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-type Mode = "ask" | "plan" | "agent";
-type VisibleModel = (typeof MODELS)[number] & { available?: boolean };
+const HERO_GRADIENT =
+  "linear-gradient(180deg, #0a0c1f 0%, #0e1f5a 20%, #2a237a 38%, #4f2a8f 52%, #7c2a7a 68%, #c23a6a 82%, #f05a7a 92%, #ff7a5a 100%)";
 
 const PROMPT_CHIP_GROUPS = [
   {
@@ -89,10 +68,6 @@ const PROMPT_CHIP_GROUPS = [
   },
 ];
 
-const HERO_GRADIENT =
-  "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
-const COMPOSER_MAX_WIDTH = "760px";
-
 function PresetChipsScroller({
   groups,
   activeTitles,
@@ -103,7 +78,7 @@ function PresetChipsScroller({
   onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number]) => void;
 }) {
   return (
-    <div className="mx-auto mt-3 w-full max-w-[760px] overflow-hidden px-0.5">
+    <div className="mx-auto mt-4 w-full max-w-[620px] overflow-hidden px-0.5">
       <div className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {groups.map((group) => {
           const isActive = typeof activeTitles[group.title] === "number";
@@ -112,10 +87,10 @@ function PresetChipsScroller({
               key={group.title}
               type="button"
               onClick={() => onSelect(group)}
-              className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 ${
+              className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60 ${
                 isActive
-                  ? "border-white/75 bg-white/82 text-slate-950 shadow-[0_12px_28px_rgba(15,23,42,0.12)]"
-                  : "border-white/42 bg-white/44 text-slate-800 hover:border-white/70 hover:bg-white/68 hover:text-slate-950"
+                  ? "border-white/60 bg-white/80 text-slate-950"
+                  : "border-white/25 bg-white/10 text-white hover:border-white/50 hover:bg-white/20"
               }`}
             >
               {group.title}
@@ -127,332 +102,160 @@ function PresetChipsScroller({
   );
 }
 
-function PremiumPromptComposer({
-  value,
-  onValueChange,
-  onSend,
-  isLoading,
-  disabled,
-  mode,
-  onModeChange,
-  model,
-  onModelChange,
-  models,
-  shadcnEnabled,
-  onShadcnChange,
-  reasoningEnabled,
-  onReasoningChange,
-  onAttach,
-  attachmentReady,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  onSend: (value: string) => void;
-  isLoading: boolean;
-  disabled: boolean;
-  mode: Mode;
-  onModeChange: (mode: Mode) => void;
-  model: string;
-  onModelChange: (model: string) => void;
-  models: VisibleModel[];
-  shadcnEnabled: boolean;
-  onShadcnChange: (value: boolean) => void;
-  reasoningEnabled: boolean;
-  onReasoningChange: (value: boolean) => void;
-  onAttach: () => void;
-  attachmentReady?: boolean;
-}) {
-  const hasValue = value.trim().length > 0 || attachmentReady;
-  const selectedModel = models.find((item) => item.value === model);
-
-  return (
-    <div className="w-full max-w-[760px]">
-      <div className="rounded-[28px] border border-white/10 bg-[#1F2023]/96 p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
-        <textarea
-          value={value}
-          onChange={(event) => onValueChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              if (!disabled && hasValue) onSend(value);
-            }
-          }}
-          placeholder="Describe what to build"
-          aria-label="Describe what to build"
-          disabled={disabled}
-          rows={3}
-          className="min-h-[76px] w-full resize-none rounded-[20px] bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-400 disabled:opacity-60"
-        />
-
-        {attachmentReady ? (
-          <div className="mb-2 ml-1 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] text-emerald-100">
-            Attachment ready
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onAttach}
-              disabled={disabled}
-              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
-              aria-label="Attach file"
-            >
-              <Paperclip className="size-3.5" aria-hidden="true" />
-            </button>
-            <OptionDropdown
-              value={mode}
-              onValueChange={(next) => onModeChange(next as Mode)}
-              aria-label="Select build mode"
-              triggerLabel={<span className="capitalize">{mode}</span>}
-              triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
-              contentClassName="rounded-2xl"
-              options={(["agent", "ask", "plan"] as const).map((item) => ({
-                value: item,
-                label: <span className="capitalize">{item}</span>,
-              }))}
-            />
-            <OptionDropdown
-              value={model}
-              onValueChange={onModelChange}
-              aria-label="Select model"
-              triggerLabel={<span className="block max-w-[104px] truncate sm:max-w-[150px]">{selectedModel?.label ?? model}</span>}
-              triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
-              contentClassName="max-h-[320px] overflow-y-auto rounded-2xl"
-              options={models.map((item) => ({
-                value: item.value,
-                label: item.available === false ? `${item.label} (needs key)` : item.label,
-                disabled: item.available === false,
-              }))}
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {value.trim() ? (
-              <PromptRewriteButton
-                prompt={value}
-                mode={mode}
-                model={model}
-                onRewrite={onValueChange}
-                disabled={disabled}
-                iconOnly
-              />
-            ) : null}
-            <button
-              type="button"
-              onClick={() => onReasoningChange(!reasoningEnabled)}
-              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
-                reasoningEnabled
-                  ? "border-violet-300/40 bg-violet-300/15 text-violet-100"
-                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              }`}
-              aria-pressed={reasoningEnabled}
-            >
-              Think
-            </button>
-            <button
-              type="button"
-              onClick={() => onShadcnChange(!shadcnEnabled)}
-              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
-                shadcnEnabled
-                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-100"
-                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              }`}
-              aria-pressed={shadcnEnabled}
-            >
-              shadcn
-            </button>
-            <VoiceInputButton
-              onTranscript={(text) => onValueChange(`${value}${value.trim() ? " " : ""}${text}`)}
-              disabled={disabled}
-              className="size-8 rounded-full border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              label="Dictate prompt"
-            />
-            <button
-              type="button"
-              onClick={() => onSend(value)}
-              disabled={disabled || !hasValue}
-              className="inline-flex size-8 items-center justify-center rounded-full bg-white text-[#1F2023] shadow-sm transition hover:-translate-y-px hover:bg-white/85 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-zinc-500"
-              aria-label={isLoading ? "Generating" : "Send prompt"}
-            >
-              <ArrowUp className="size-4" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }) {
+export default function HomePageClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const context = use(Context);
-  const [prompt, setPrompt] = useState(searchParams.get("prompt") || "");
-  const [model, setModel] = useState(MODELS.find((item) => !item.hidden)?.value || "zai-org/GLM-5");
-  const [mode, setMode] = useState<Mode>("agent");
-  const [reasoningEnabled, setReasoningEnabled] = useState(false);
-  const [shadcnEnabled, setShadcnEnabled] = useState(true);
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>();
-  const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [isSubmitting, startTransition] = useTransition();
+
+  const [prompt, setPrompt] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
-  const availableModels = useAvailableModels();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const visibleModels = useMemo<VisibleModel[]>(
-    () => (availableModels ?? MODELS.filter((item) => !item.hidden)) as VisibleModel[],
-    [availableModels],
-  );
-
-  useEffect(() => {
-    const fromUrl = searchParams.get("prompt");
-    if (fromUrl) setPrompt(fromUrl);
-  }, [searchParams]);
-
-  const handlePromptChipClick = useCallback((group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
-    setPromptChipIndexes((current) => {
-      const nextIndex = ((current[group.title] ?? -1) + 1) % group.prompts.length;
-      setPrompt(group.prompts[nextIndex]);
-      return { ...current, [group.title]: nextIndex };
-    });
-  }, []);
-
-  const handleAttachmentUpload = async (file: File) => {
-    setScreenshotLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/blob-upload", { method: "POST", body: formData });
-      if (!response.ok) throw new Error("Attachment upload failed");
-      const payload = (await response.json()) as { url?: string };
-      if (!payload.url) throw new Error("No attachment URL returned");
-      setScreenshotUrl(payload.url);
-      if (!prompt.trim()) setPrompt("Build from this attachment");
-      toast({ title: "Attachment ready" });
-    } catch (error) {
-      setScreenshotUrl(undefined);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Could not upload attachment.",
-        variant: "destructive",
-      });
-    } finally {
-      setScreenshotLoading(false);
-    }
+  const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
+    const currentIndex = promptChipIndexes[group.title] ?? -1;
+    const nextIndex = (currentIndex + 1) % group.prompts.length;
+    setPromptChipIndexes((prev) => ({ ...prev, [group.title]: nextIndex }));
+    setPrompt(group.prompts[nextIndex]);
   };
 
-  const handlePromptSend = (value: string) => {
-    const cleanPrompt = value.trim();
-    if (!cleanPrompt && !screenshotUrl) return;
+  const handlePromptSend = () => {
+    const clean = prompt.trim();
+    if (!clean) return;
 
-    startTransition(async () => {
-      let finalPrompt = cleanPrompt || "Build from the attached file.";
-      if (screenshotUrl) finalPrompt += `\n\nAttachment: ${screenshotUrl}`;
+    setIsSubmitting(true);
 
-      const response = await fetch("/api/create-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          model,
-          quality: "high",
-          mode,
-          shadcn: shadcnEnabled,
-          reasoning: reasoningEnabled,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.id) {
-        toast({
-          title: "Could not start build",
-          description: data?.error || "Please check auth/API configuration.",
-          variant: "destructive",
-        });
-        return;
-      }
-      context.setStreamPromise(data.streamPromise);
-      router.push(`/chats/${data.id}?preview=1`);
-    });
+    fetch("/api/create-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: clean,
+        model: "claude-3-5-sonnet",
+        quality: "high",
+        mode: "agent",
+        shadcn: true,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.id) {
+          router.push(`/chats/${data.id}?preview=1`);
+        } else {
+          toast({ title: "Failed to start build" });
+        }
+      })
+      .catch(() => toast({ title: "Error", description: "Could not create chat" }))
+      .finally(() => setIsSubmitting(false));
   };
 
   return (
     <HomeShell>
-      <div className="flex min-h-dvh flex-col text-foreground">
-        <section
-          id="hero"
-          className="relative flex min-h-dvh overflow-hidden rounded-none lg:rounded-[28px]"
-          style={{ background: HERO_GRADIENT }}
-        >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,122,0,0.34),transparent_30%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_34%)]" />
-          <div className="relative flex min-h-dvh w-full flex-col">
-            <Header hideLogo />
+      <div className="flex min-h-dvh bg-[#0a0a0a] text-white">
+        {/* Sidebar styled exactly like the reference */}
+        <div className="hidden w-64 flex-shrink-0 flex-col border-r border-white/10 bg-[#0a0a0a] text-sm lg:flex">
+          <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-3.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded bg-[#ff4d8d] text-[11px] font-bold">P</div>
+            <span className="font-medium">pichi's Llamacoder</span>
+            <span className="ml-0.5 text-white/50">⌄</span>
+          </div>
 
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-0 md:pb-32">
-              <div className="flex w-full max-w-[760px] -translate-y-4 flex-col items-center md:-translate-y-8">
-                <TextColor className="mb-4 min-h-[4.25rem] md:min-h-[5.25rem]" />
+          <div className="flex-1 overflow-auto px-2 py-3 space-y-px text-[13px]">
+            <div className="flex items-center gap-2 rounded bg-white/10 px-3 py-1.5 font-medium">📊 Dashboard</div>
+            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">🔍 Search <span className="ml-auto text-[10px] opacity-50">⌘K</span></div>
+            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">📚 Resources</div>
+            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">🔌 Connectors</div>
 
-                <div id="prompt-composer" className="relative w-full" style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}>
-                  {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-                  <PremiumPromptComposer
+            <div className="pt-3 pb-1 px-3 text-[10px] tracking-[1px] text-white/40">PROJECTS</div>
+            <div className="pl-1 space-y-px">
+              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">All projects</div>
+              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Starred</div>
+              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Created by me</div>
+              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Shared with me</div>
+            </div>
+
+            <div className="pt-3 pb-1 px-3 text-[10px] tracking-[1px] text-white/40">RECENTS</div>
+            <div className="pl-1 text-white/60 space-y-px">
+              <div className="px-3 py-1 hover:bg-white/5 rounded cursor-pointer truncate">Dashboard builder</div>
+              <div className="px-3 py-1 hover:bg-white/5 rounded cursor-pointer truncate">SaaS landing</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main area with subtle space + soft rounded gradient */}
+        <div className="flex-1 p-3 md:p-4">
+          <div
+            className="relative flex h-full flex-col items-center justify-center overflow-hidden rounded-[28px] p-8 md:p-12"
+            style={{ background: HERO_GRADIENT }}
+          >
+            {/* soft overlays */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_45%_25%,rgba(255,255,255,0.06),transparent)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_55%_80%,rgba(0,0,0,0.28),transparent)]" />
+
+            {/* Toggle view icon */}
+            <div className="absolute right-5 top-5 z-20">
+              <button className="rounded-lg border border-white/15 bg-black/30 p-1.5 hover:bg-white/10 transition" title="Toggle view">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="relative z-10 w-full max-w-[620px] px-6 text-center">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-0.5 text-xs backdrop-blur">
+                <span className="flex -space-x-0.5">
+                  <span className="block h-2.5 w-2.5 rounded-full bg-blue-400 ring-1 ring-black/60" />
+                  <span className="block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-1 ring-black/60" />
+                  <span className="block h-2.5 w-2.5 rounded-full bg-violet-400 ring-1 ring-black/60" />
+                </span>
+                <span>Connect all your tools</span>
+              </div>
+
+              <h1 className="text-4xl font-semibold tracking-tighter md:text-[42px] mb-8">
+                Let's build something, pichi
+              </h1>
+
+              {/* Dark grey prompt input with soft curved corners */}
+              <div className="mx-auto w-full">
+                <div className="flex items-center gap-3 rounded-3xl bg-[#1f1f22] border border-white/10 pl-5 pr-2 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                  <button className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-lg leading-none hover:bg-white/15 transition">
+                    +
+                  </button>
+
+                  <input
+                    type="text"
                     value={prompt}
-                    onValueChange={setPrompt}
-                    onSend={handlePromptSend}
-                    isLoading={isSubmitting || screenshotLoading}
-                    disabled={isSubmitting || screenshotLoading}
-                    mode={mode}
-                    onModeChange={setMode}
-                    model={model}
-                    onModelChange={setModel}
-                    models={visibleModels}
-                    shadcnEnabled={shadcnEnabled}
-                    onShadcnChange={setShadcnEnabled}
-                    reasoningEnabled={reasoningEnabled}
-                    onReasoningChange={setReasoningEnabled}
-                    onAttach={() => fileInputRef.current?.click()}
-                    attachmentReady={Boolean(screenshotUrl)}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handlePromptSend(); }}
+                    placeholder="Ask Llamacoder to create a dashboard"
+                    className="flex-1 bg-transparent outline-none placeholder:text-white/50 text-white"
                   />
 
-                  <PresetChipsScroller groups={PROMPT_CHIP_GROUPS} activeTitles={promptChipIndexes} onSelect={handlePromptChipClick} />
-
-                  {mode === "ask" ? (
-                    <p className="mt-2 text-center text-xs text-slate-900/80">
-                      Ask mode — best for questions, refinements, and targeted changes.
-                    </p>
-                  ) : null}
+                  <div className="flex items-center gap-1 text-white/60">
+                    <div className="flex cursor-pointer items-center rounded-full bg-white/5 px-3 py-1 text-xs hover:bg-white/10">
+                      Build <span className="ml-0.5 text-[9px]">⌄</span>
+                    </div>
+                    <button
+                      onClick={handlePromptSend}
+                      disabled={isSubmitting || !prompt.trim()}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-50 transition active:scale-[0.96]"
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
 
-        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5">
-          <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
-            <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p>
-              </div>
-              <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link>
-            </div>
-            <div className="mt-4">
-              <FeaturedAppsGrid apps={featuredApps} limit={6} compact />
+              {/* Preset quick prompts - kept as requested */}
+              <PresetChipsScroller
+                groups={PROMPT_CHIP_GROUPS}
+                activeTitles={promptChipIndexes}
+                onSelect={handlePromptChipClick}
+              />
             </div>
           </div>
-        </section>
+        </div>
       </div>
-      <input
-        ref={fileInputRef}
-        className="hidden"
-        type="file"
-        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void handleAttachmentUpload(file);
-          if (event.currentTarget) event.currentTarget.value = "";
-        }}
-      />
     </HomeShell>
   );
 }
