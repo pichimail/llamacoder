@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import {
-  getMainCodingPrompt,
-} from "@/lib/prompts";
+import { getMainCodingPrompt } from "@/lib/prompts";
 import { z } from "zod";
 import { resolveModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
@@ -11,6 +9,7 @@ import { anyProviderConfigured } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { buildPhaseOneSpec } from "@/lib/build-engine";
 import { seedBuildArtifacts } from "@/lib/build-workspace";
+import { getCurrentUser, isAuthRequired } from "@/lib/access-control";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -59,6 +58,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request body" }, { status: 400 });
     }
 
+    const user = await getCurrentUser();
+    if ((await isAuthRequired()) && !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn } = parsed.data;
     const resolvedModel = resolveModel(model);
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
@@ -72,14 +76,32 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await rateLimitOrThrow(`create-chat:${request.headers.get("x-forwarded-for") || "local"}`, { limit: 18, windowSeconds: 60 });
+      const rateKey = user?.id || request.headers.get("x-forwarded-for") || "local";
+      await rateLimitOrThrow(`create-chat:${rateKey}`, { limit: 18, windowSeconds: 60 });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
     }
 
     const prisma = getPrisma();
+    const project = user
+      ? await prisma.project.create({
+          data: {
+            name: buildSpec.title || "Untitled App",
+            description: promptWithAttachments || null,
+            userId: user.id,
+          },
+        })
+      : null;
+
     const chat = await prisma.chat.create({
-      data: { model: resolvedModel, quality, prompt, title: buildSpec.title, shadcn },
+      data: {
+        model: resolvedModel,
+        quality,
+        prompt,
+        title: buildSpec.title,
+        shadcn,
+        projectId: project?.id,
+      },
     });
 
     const userMessage = screenshotUrl
@@ -131,12 +153,13 @@ export async function POST(request: NextRequest) {
     logGeneration({
       chatId: chat.id,
       model: resolvedModel,
-      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode },
+      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode, userId: user?.id || null },
       output: userMessage,
       metadata: { type: "initial_generation", title: buildSpec.title, template: buildSpec.templateId },
     });
 
     return NextResponse.json({
+      id: chat.id,
       chatId: chat.id,
       lastMessageId: lastMessage.id,
       buildSpec,
