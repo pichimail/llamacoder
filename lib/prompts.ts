@@ -97,6 +97,38 @@ When the user asks for a dashboard, admin panel, SaaS app, workspace, CRM, analy
 - Individual page.tsx files should focus on their specific screen content.
 - Use nested layouts (app/admin/layout.tsx) for section-specific chrome when useful.
 
+## SAAS DASHBOARD + USER/ADMIN SEPARATION (STRICT)
+
+For SaaS dashboard requests (user dashboard + admin):
+
+- Create:
+  - app/layout.tsx : main user layout with user sidebar (Dashboard, Projects, Settings, etc.)
+  - app/page.tsx or app/dashboard/page.tsx : the main user dashboard view.
+  - app/admin/layout.tsx : SEPARATE admin-only layout with admin sidebar.
+  - app/admin/page.tsx : admin dashboard home.
+  - Additional admin pages under /admin/* as needed (e.g. /admin/users).
+- User-facing main layout/sidebar MUST NOT show admin links.
+- Admin access: ONLY show a "Admin Dashboard" button/link in the user profile dropdown (or avatar menu) and ONLY if the current user role is "admin". Use a simple role state (local state or mock context) for preview.
+- Clicking the admin link from profile must navigate to /admin using real routing.
+- Admin layout/sidebar must be completely separate from user sidebar.
+- For the admin dashboard: use STRICT shadcn/ui style ONLY. Use ONLY real required shadcn blocks/components/elements for a functional admin dashboard: 
+  - Layout/Sidebar (shadcn sidebar patterns or simple resizable), Header with user info
+  - shadcn Button (all variants), Card, Table (with proper shadcn table primitives), Badge, Dialog, Select, Input, Label
+  - Typography using shadcn text styles / headings
+  - Strict minimal: Overview cards, recent activity table, user list table, settings forms.
+  Absolutely no custom components outside shadcn/ui, no extra libraries beyond what's needed, no bloat. Use only what's strictly required.
+- User main page/sidebar: clean user-facing dashboard (metrics, quick actions). Show Admin link ONLY inside the profile/avatar dropdown and only for admin role.
+- Use a simple mock role (e.g. useState or context "admin" | "user") so clicking the admin entry in profile dropdown routes to /admin using real navigation.
+- Real separate sidebars: user sidebar in main layout, completely different admin sidebar in admin layout.
+- Real sidebar navigation in both that switches pages via real routes.
+
+Concrete structure example for SaaS user + admin (follow structure exactly):
+- app/layout.tsx: user shell + UserSidebar (Dashboard, Projects, Settings...) + Header + ProfileDropdown
+- app/dashboard/page.tsx or app/page.tsx : main user view
+- ProfileDropdown component: if (role === 'admin') show "Admin Dashboard" item → router.push('/admin')
+- app/admin/layout.tsx : dedicated AdminLayout + AdminSidebar (Overview, Users, Reports...)
+- app/admin/page.tsx and other admin pages: STRICT shadcn only using Card, Table, Button variants, Badge, Input etc for real admin features. No extra fluff.
+
 ## DEFAULT VISUAL DIRECTION
 - Build advanced, premium UI by default, but the design must match the requested product category.
 - Default style: calm premium product, sharp hierarchy, generous spacing, strong contrast, thin separators, purposeful typography, accessible controls, subtle motion, and fully responsive mobile/web behavior.
@@ -132,6 +164,7 @@ Use this only for product surfaces that the user actually requested: dashboards,
 Product-app quality bar:
 - Build the app's real daily-use workflow using **real multi-page routing**, not a marketing page.
 - MANDATORY file-system routing: create app/layout.tsx + separate page files for each major screen (e.g. app/dashboard/page.tsx, app/reports/page.tsx, app/admin/page.tsx, app/settings/page.tsx).
+- Follow the SAAS DASHBOARD + USER/ADMIN SEPARATION rules above for any app with user + admin surfaces.
 - The persistent sidebar / top navigation lives in app/layout.tsx and uses real <Link href="/..."> or useRouter to switch between real routes.
 - Include domain-specific data, forms, filters, detail states, editing states, confirmations, and empty/loading/error states on the correct pages.
 - For dashboards/admin: real navigation between Overview, Analytics, Users, Projects, Settings, Billing, etc.

@@ -256,17 +256,22 @@ export function getSandpackConfig(
   }
 
   // Also allow root layout so multi-page apps can use it if the model generates one
-  const rootLayout = files.find(f => 
+  const rootLayoutFile = files.find(f => 
     normalizePreviewPath(f.path) === "app/layout.tsx" || normalizePreviewPath(f.path) === "app/layout.ts"
   );
-  if (rootLayout) {
-    const layoutContent = sanitizePreviewContent(rootLayout.content || "");
+  let hasLayout = false;
+  if (rootLayoutFile) {
+    const layoutContent = sanitizePreviewContent(rootLayoutFile.content || "");
     sandpackFiles["/app/layout.tsx"] = layoutContent;
+    hasLayout = true;
   }
 
   if (designInspector) {
     sandpackFiles[DESIGN_INSPECTOR_RUNTIME_PATH] = DESIGN_INSPECTOR_RUNTIME_SOURCE;
   }
+
+  // Inject virtual current route for robust switching (helps iframe + layout composition)
+  sandpackFiles["/lib/__preview-route.ts"] = `export const currentRoute = "${currentRoute || '/'}";`;
 
   if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
     const mainFile =
@@ -326,6 +331,12 @@ export function getSandpackConfig(
         .map(p => `import ${p.importName} from '${p.importPath}';`)
         .join("\n");
 
+      // Support layout wrapping for persistent sidebars/nav when model provides app/layout.tsx
+      const layoutImport = hasLayout ? `import Layout from './app/layout';` : '';
+      const wrapWithLayout = hasLayout 
+        ? (child: string) => `<Layout>{${child}}</Layout>` 
+        : (child: string) => child;
+
       const routeObjectBody = uniquePages
         .map(p => `  "${p.route}": ${p.importName}`)
         .join(",\n");
@@ -336,6 +347,7 @@ ${cssImports}
 import { ensureTwind } from '@/lib/twind';
 ${inspectorImport}
 ${importStatements}
+${layoutImport}
 
 // Multi-page routing support - works with the preview navigation chrome
 const routeComponents: Record<string, React.ComponentType<any>> = {
@@ -353,10 +365,16 @@ function getPageForRoute(pathname: string): React.ComponentType<any> {
 ensureTwind();
 
 export default function App() {
+  // Prefer virtual injected route for reliable preview switching across remounts/iframes
+  let initialRoute = "${currentRoute}";
+  try {
+    // @ts-ignore - injected at build time for preview
+    initialRoute = require('./lib/__preview-route').currentRoute || initialRoute;
+  } catch {}
   const [currentPath, setCurrentPath] = React.useState(
     typeof window !== "undefined" 
-      ? (window.location.pathname || "${currentRoute}") 
-      : "${currentRoute}"
+      ? (window.location.pathname || initialRoute) 
+      : initialRoute
   );
 
   React.useEffect(() => {
@@ -394,7 +412,7 @@ export default function App() {
 
   return (
     <div className="${themeClass} min-h-dvh bg-background text-foreground">
-      ${inspectorWrap("<PageComponent />")}
+      ${inspectorWrap(wrapWithLayout("<PageComponent />"))}
     </div>
   );
 }`;

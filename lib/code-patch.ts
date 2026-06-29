@@ -30,4 +30,4 @@ export function mergeArtifactFiles(
 }
 
 export const patchModeSystemHint =
-  "PATCH MODE: The user is iterating on an existing app. Return ONLY files that must change. Do not regenerate unchanged files. Use exact ```lang{path=...} fences. Keep app/page.tsx renderable.";
+  "PATCH MODE: The user is iterating on an existing app. Return ONLY files that must change. Do not regenerate unchanged files. Use exact ```lang{path=...} fences. For multi-screen apps, keep the main routes and app/layout.tsx renderable. Do not cram everything into a single page file.";
