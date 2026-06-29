@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
+import { GlobalAppShell } from "@/components/global-app-shell";
 import "./globals.css";
 
 let title = "Chinna-Coder";
@@ -44,10 +45,10 @@ export default function RootLayout({
         <PlausibleProvider domain="llamacoder.io" />
       </head>
       <body
-        className="flex min-h-full flex-col bg-background font-sans text-foreground antialiased"
+        className="min-h-full bg-background font-sans text-foreground antialiased"
         suppressHydrationWarning
       >
-        {children}
+        <GlobalAppShell>{children}</GlobalAppShell>
       </body>
     </html>
   );
