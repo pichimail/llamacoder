@@ -264,3 +264,19 @@ model FileUpload {
   @@index([messageId])
   @@index([createdAt])
 }
+
+// ===== Rate Limiting =====
+model RateLimit {
+  id        String   @id @default(nanoid(12))
+  userId    String
+  route     String
+  count     Int      @default(1)
+  windowStart DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, route, windowStart])
+  @@index([userId])
+  @@index([route])
+  @@index([createdAt])
+}
