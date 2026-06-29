@@ -9,6 +9,7 @@ import {
 } from "@/lib/github-repo-import";
 import { extractPreviewDependencies } from "@/lib/package-deps";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
+import { getCurrentUserOrNull, AuthError, authErrorResponse } from "@/lib/authz";
 
 const schema = z.object({
   url: z.string().url(),
@@ -17,6 +18,12 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await getCurrentUserOrNull();
+    if (!user) {
+      throw new AuthError("Unauthorized", 401);
+    }
+
     const json = await request.json().catch(() => null);
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
@@ -41,7 +48,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
 
-    await rateLimitOrThrow(`github-repo-import:${request.headers.get("x-forwarded-for") || "local"}`, {
+    await rateLimitOrThrow(`github-repo-import:${user.id}`, {
       limit: 10,
       windowSeconds: 60,
     });
@@ -71,6 +78,16 @@ export async function POST(request: NextRequest) {
     const markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
 
     const prisma = getPrisma();
+
+    // Create a project for the authenticated user
+    const project = await prisma.project.create({
+      data: {
+        name: title,
+        description: userPrompt,
+        userId: user.id,
+      },
+    });
+
     const chat = await prisma.chat.create({
       data: {
         model: "openrouter/auto",
@@ -78,6 +95,7 @@ export async function POST(request: NextRequest) {
         prompt: userPrompt,
         title,
         shadcn: true,
+        projectId: project.id,
         messages: {
           create: [
             {
@@ -117,6 +135,10 @@ export async function POST(request: NextRequest) {
       hasReadme: Boolean(imported.readme),
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
+    console.error("GitHub import error:", error);
     return NextResponse.json(
       {
         error:

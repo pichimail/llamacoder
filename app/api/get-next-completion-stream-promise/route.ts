@@ -12,6 +12,7 @@ import {
 } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { patchModeSystemHint } from "@/lib/code-patch";
+import { getCurrentUserOrNull, requireChatAccess, AuthError } from "@/lib/authz";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -133,29 +134,46 @@ function improveAutofixPrompt(messages: ChatMessage[]) {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.DATABASE_URL) {
-    return new Response("Server misconfiguration: missing database URL", { status: 500 });
-  }
-  if (!anyProviderConfigured()) {
-    return new Response("Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY", { status: 500 });
-  }
-
-  const parsed = requestSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return new Response("Invalid request", { status: 400 });
-  const { messageId, model, reasoning, quality } = parsed.data;
-
   try {
-    await rateLimitOrThrow(`generation:${messageId}`, { limit: 20, windowSeconds: 60 });
-  } catch (error) {
-    return new Response(error instanceof Error ? error.message : "Rate limited", { status: 429 });
-  }
+    if (!process.env.DATABASE_URL) {
+      return new Response("Server misconfiguration: missing database URL", { status: 500 });
+    }
+    if (!anyProviderConfigured()) {
+      return new Response("Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY", { status: 500 });
+    }
 
-  const neon = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaNeon(neon);
-  const prisma = new PrismaClient({ adapter });
+    const parsed = requestSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) return new Response("Invalid request", { status: 400 });
+    const { messageId, model, reasoning, quality } = parsed.data;
 
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) return new Response(null, { status: 404 });
+    try {
+      await rateLimitOrThrow(`generation:${messageId}`, { limit: 20, windowSeconds: 60 });
+    } catch (error) {
+      return new Response(error instanceof Error ? error.message : "Rate limited", { status: 429 });
+    }
+
+    const neon = new Pool({ connectionString: process.env.DATABASE_URL });
+    const adapter = new PrismaNeon(neon);
+    const prisma = new PrismaClient({ adapter });
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: { chat: { select: { id: true } } },
+    });
+    if (!message) return new Response(null, { status: 404 });
+
+    // Check chat access
+    const user = await getCurrentUserOrNull();
+    if (user) {
+      try {
+        await requireChatAccess(message.chat.id, user.id, "read");
+      } catch (error) {
+        if (error instanceof AuthError) {
+          return new Response(error.message, { status: error.status });
+        }
+        throw error;
+      }
+    }
 
   const messagesRes = await prisma.message.findMany({
     where: { chatId: message.chatId, position: { lte: message.position } },
@@ -273,10 +291,17 @@ export async function POST(req: Request) {
         "x-hyperspeed-provider": result.provider,
       },
     });
+    } catch (error) {
+      console.error("Error starting completion stream:", error);
+      const msg = error instanceof Error ? `Failed to start generation: ${error.message}` : "Failed to start generation";
+      return new Response(msg, { status: 500 });
+    }
   } catch (error) {
-    console.error("Error starting completion stream:", error);
-    const msg = error instanceof Error ? `Failed to start generation: ${error.message}` : "Failed to start generation";
-    return new Response(msg, { status: 500 });
+    console.error("Completion API error:", error);
+    if (error instanceof AuthError) {
+      return new Response(error.message, { status: error.status });
+    }
+    return new Response("Internal server error", { status: 500 });
   }
 }
 
