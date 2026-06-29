@@ -19,7 +19,7 @@ import { Context } from "./providers";
 
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
-import { getVisibleModels, MODELS } from "@/lib/constants";
+import { MODELS } from "@/lib/constants";
 import { useAvailableModels } from "@/lib/use-available-models";
 import type { FeaturedApp } from "@/lib/featured-apps";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
@@ -154,7 +154,7 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
   const searchParams = useSearchParams();
   const context = use(Context);
   const [prompt, setPrompt] = useState(searchParams.get("prompt") || "");
-  const [model, setModel] = useState(MODELS[0]?.value || "glm-5");
+  const [model, setModel] = useState(MODELS.find((item) => !item.hidden)?.value || "zai-org/GLM-5");
   const [mode, setMode] = useState<Mode>("agent");
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
   const [shadcnEnabled, setShadcnEnabled] = useState(true);
@@ -165,7 +165,7 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
   const availableModels = useAvailableModels();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const visibleModels = useMemo(() => availableModels ?? getVisibleModels(), [availableModels]);
+  const visibleModels = useMemo(() => availableModels ?? MODELS.filter((item) => !item.hidden), [availableModels]);
 
   useEffect(() => {
     const fromUrl = searchParams.get("prompt");
