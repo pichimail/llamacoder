@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import {
   Brain,
   ChevronDown,
@@ -33,7 +33,7 @@ function SidebarLink({
   onClick,
 }: {
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   active?: boolean;
   onClick?: () => void;
