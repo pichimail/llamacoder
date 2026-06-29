@@ -2,12 +2,16 @@
 
 import { HomeShell } from "@/components/home/home-shell";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { use, useState, useRef, useTransition } from "react";
 import { ArrowUp, Paperclip } from "lucide-react";
 import Link from "next/link";
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
+import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
+import { Context } from "./providers";
+
+type Mode = "ask" | "plan" | "agent";
 
 const HERO_GRADIENT =
   "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
@@ -105,15 +109,161 @@ function PresetChipsScroller({
   );
 }
 
+function PremiumPromptComposer({
+  value,
+  onValueChange,
+  onSend,
+  isLoading,
+  disabled,
+  mode,
+  onModeChange,
+  model,
+  onModelChange,
+  models,
+  shadcnEnabled,
+  onShadcnChange,
+  reasoningEnabled,
+  onReasoningChange,
+  onAttach,
+  attachmentReady,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  onSend: (value: string) => void;
+  isLoading: boolean;
+  disabled: boolean;
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
+  model: string;
+  onModelChange: (model: string) => void;
+  models: any[];
+  shadcnEnabled: boolean;
+  onShadcnChange: (value: boolean) => void;
+  reasoningEnabled: boolean;
+  onReasoningChange: (value: boolean) => void;
+  onAttach: () => void;
+  attachmentReady?: boolean;
+}) {
+  const hasValue = value.trim().length > 0 || attachmentReady;
+  const selectedModel = models.find((item: any) => item.value === model);
+
+  return (
+    <div className="w-full">
+      <div className="rounded-[28px] border border-white/10 bg-[#1F2023]/96 p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
+        <textarea
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (!disabled && hasValue) onSend(value);
+            }
+          }}
+          placeholder="Describe what to build"
+          aria-label="Describe what to build"
+          disabled={disabled}
+          rows={3}
+          className="min-h-[76px] w-full resize-none rounded-[20px] bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+        />
+
+        {attachmentReady ? (
+          <div className="mb-2 ml-1 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] text-emerald-100">
+            Attachment ready
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onAttach}
+              disabled={disabled}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+            >
+              <Paperclip size={16} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onModeChange(mode === "plan" ? "agent" : "plan")}
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200 transition hover:bg-white/10"
+            >
+              {mode === "plan" ? "Plan" : "Agent"}
+            </button>
+
+            <select
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/80 outline-none"
+            >
+              {models.map((m: any) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200">
+              <input
+                type="checkbox"
+                checked={shadcnEnabled}
+                onChange={(e) => onShadcnChange(e.target.checked)}
+                className="accent-white"
+              />
+              shadcn
+            </label>
+
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200">
+              <input
+                type="checkbox"
+                checked={reasoningEnabled}
+                onChange={(e) => onReasoningChange(e.target.checked)}
+                className="accent-white"
+              />
+              reasoning
+            </label>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onAttach}
+              disabled={disabled}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+            >
+              +
+            </button>
+
+            <button
+              onClick={() => onSend(value)}
+              disabled={disabled || !hasValue}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow transition active:scale-[0.985] disabled:opacity-40"
+            >
+              {isLoading ? <span className="text-[10px]">...</span> : <ArrowUp size={16} />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePageClient() {
   const router = useRouter();
+  const context = use(Context); // kept for compatibility if needed
 
   const [prompt, setPrompt] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<Mode>("agent");
+  const [model, setModel] = useState("claude-3-5-sonnet");
+  const [shadcnEnabled, setShadcnEnabled] = useState(true);
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const [isSubmitting, startTransition] = useTransition();
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
+
+  const visibleModels = MODELS.filter((item) => !item.hidden);
 
   const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
     const currentIndex = promptChipIndexes[group.title] ?? -1;
@@ -122,40 +272,48 @@ export default function HomePageClient() {
     setPrompt(group.prompts[nextIndex]);
   };
 
-  const handlePromptSend = () => {
-    const clean = prompt.trim();
-    if (!clean) return;
+  const handlePromptSend = (value?: string) => {
+    const cleanPrompt = (value ?? prompt).trim();
+    if (!cleanPrompt) return;
 
-    setIsSubmitting(true);
+    startTransition(async () => {
+      const finalPrompt = cleanPrompt + (screenshotUrl ? `\n\nAttachment: ${screenshotUrl}` : "");
 
-    fetch("/api/create-chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: clean,
-        model: "claude-3-5-sonnet",
-        quality: "high",
-        mode: "agent",
-        shadcn: true,
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.id) {
-          router.push(`/chats/${data.id}?preview=1`);
-        } else {
-          toast({ title: "Failed to start build" });
-        }
-      })
-      .catch(() => toast({ title: "Error", description: "Could not create chat" }))
-      .finally(() => setIsSubmitting(false));
+      const response = await fetch("/api/create-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          model,
+          quality: "high",
+          mode,
+          shadcn: shadcnEnabled,
+          reasoning: reasoningEnabled,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.id) {
+        toast({
+          title: "Could not start build",
+          description: data?.error || "Please check auth/API configuration.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      router.push(`/chats/${data.id}?preview=1`);
+    });
   };
 
   const handleAttachmentUpload = async (file: File) => {
-    // simple stub - in real it would upload
+    // Basic client-side preview for now (original had upload logic)
     const url = URL.createObjectURL(file);
     setScreenshotUrl(url);
-    setPrompt((p) => p || "Build from the attached file.");
+    if (!prompt.trim()) {
+      setPrompt("Build from the attached image/screenshot.");
+    }
   };
 
   return (
@@ -181,43 +339,25 @@ export default function HomePageClient() {
                     </h1>
                   </div>
 
-                  <div id="prompt-composer" className="relative w-full max-w-[620px]">
-                    {/* Dark grey prompt input with soft curved corners */}
-                    <div className="flex items-center gap-3 rounded-3xl bg-[#1f1f22] border border-white/10 pl-5 pr-2 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                      <button 
-                        onClick={() => { /* attach logic if needed */ }}
-                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-lg leading-none hover:bg-white/15 transition"
-                      >
-                        +
-                      </button>
-
-                      <input
-                        type="text"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handlePromptSend();
-                          }
-                        }}
-                        placeholder="Ask Llamacoder to create a dashboard"
-                        className="flex-1 bg-transparent outline-none placeholder:text-white/50 text-white"
-                      />
-
-                      <div className="flex items-center gap-1 text-white/60">
-                        <div className="flex cursor-pointer items-center rounded-full bg-white/5 px-3 py-1 text-xs hover:bg-white/10">
-                          Build <span className="ml-0.5 text-[9px]">⌄</span>
-                        </div>
-                        <button
-                          onClick={handlePromptSend}
-                          disabled={isSubmitting || !prompt.trim()}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-50 transition active:scale-[0.96]"
-                        >
-                          <ArrowUp size={15} />
-                        </button>
-                      </div>
-                    </div>
+                  <div id="prompt-composer" className="relative w-full">
+                    <PremiumPromptComposer
+                      value={prompt}
+                      onValueChange={setPrompt}
+                      onSend={handlePromptSend}
+                      isLoading={isSubmitting}
+                      disabled={isSubmitting}
+                      mode={mode}
+                      onModeChange={setMode}
+                      model={model}
+                      onModelChange={setModel}
+                      models={visibleModels}
+                      shadcnEnabled={shadcnEnabled}
+                      onShadcnChange={setShadcnEnabled}
+                      reasoningEnabled={reasoningEnabled}
+                      onReasoningChange={setReasoningEnabled}
+                      onAttach={() => fileInputRef.current?.click()}
+                      attachmentReady={Boolean(screenshotUrl)}
+                    />
 
                     {/* Preset quick prompts */}
                     <PresetChipsScroller
