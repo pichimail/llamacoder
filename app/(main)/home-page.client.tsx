@@ -1,7 +1,6 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
-import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { TextColor } from "@/components/ui/text-color";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,8 +12,9 @@ import {
   useMemo,
   useRef,
   useCallback,
+  type RefObject,
 } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUp, Paperclip } from "lucide-react";
 import { Context } from "./providers";
 
 import Header from "@/components/header";
@@ -29,12 +29,7 @@ import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
 type Mode = "ask" | "plan" | "agent";
-type ComposerAttachment = {
-  kind: "image" | "file";
-  filename: string;
-  url?: string;
-  size?: number;
-};
+type VisibleModel = (typeof MODELS)[number] & { available?: boolean };
 
 const PROMPT_CHIP_GROUPS = [
   {
@@ -96,8 +91,8 @@ const PROMPT_CHIP_GROUPS = [
 ];
 
 const HERO_GRADIENT =
-  "radial-gradient(circle at 50% 100%, rgba(255,122,0,0.96) 0%, rgba(255,122,0,0.78) 14%, rgba(255,151,203,0.72) 42%, rgba(198,165,214,0.72) 66%, rgba(174,193,231,0.82) 100%)";
-const COMPOSER_MAX_WIDTH = "46rem";
+  "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
+const COMPOSER_MAX_WIDTH = "760px";
 
 function PresetChipsScroller({
   groups,
@@ -106,45 +101,187 @@ function PresetChipsScroller({
 }: {
   groups: typeof PROMPT_CHIP_GROUPS;
   activeTitles: Record<string, number>;
-  onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number], direction?: "next" | "previous") => void;
+  onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number]) => void;
 }) {
   return (
-    <div className="flex w-full max-w-[720px] items-center gap-2 overflow-hidden">
-      <button
-        type="button"
-        aria-label="Previous prompt group"
-        onClick={() => {
-          const first = groups[0];
-          if (first) onSelect(first, "previous");
-        }}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/35 text-slate-700 shadow-sm transition hover:bg-white/55"
-      >
-        <ChevronLeft className="size-3.5" />
-      </button>
-      <div className="flex min-w-0 flex-1 snap-x gap-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/30">
-        {groups.map((group) => (
-          <button
-            key={group.title}
-            type="button"
-            onClick={() => onSelect(group, "next")}
-            className="snap-start whitespace-nowrap rounded-full border border-white/35 bg-white/45 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-            title={group.prompts[activeTitles[group.title] ?? 0]}
-          >
-            {group.title}
-          </button>
-        ))}
+    <div className="mx-auto mt-3 w-full max-w-[760px] overflow-hidden px-0.5">
+      <div className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {groups.map((group) => {
+          const isActive = typeof activeTitles[group.title] === "number";
+          return (
+            <button
+              key={group.title}
+              type="button"
+              onClick={() => onSelect(group)}
+              className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 ${
+                isActive
+                  ? "border-white/75 bg-white/82 text-slate-950 shadow-[0_12px_28px_rgba(15,23,42,0.12)]"
+                  : "border-white/42 bg-white/44 text-slate-800 hover:border-white/70 hover:bg-white/68 hover:text-slate-950"
+              }`}
+            >
+              {group.title}
+            </button>
+          );
+        })}
       </div>
-      <button
-        type="button"
-        aria-label="Next prompt group"
-        onClick={() => {
-          const last = groups[groups.length - 1];
-          if (last) onSelect(last, "next");
-        }}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/35 text-slate-700 shadow-sm transition hover:bg-white/55"
-      >
-        <ChevronRight className="size-3.5" />
-      </button>
+    </div>
+  );
+}
+
+function PremiumPromptComposer({
+  value,
+  onValueChange,
+  onSend,
+  isLoading,
+  disabled,
+  mode,
+  onModeChange,
+  model,
+  onModelChange,
+  models,
+  shadcnEnabled,
+  onShadcnChange,
+  reasoningEnabled,
+  onReasoningChange,
+  onAttach,
+  attachmentReady,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  onSend: (value: string) => void;
+  isLoading: boolean;
+  disabled: boolean;
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
+  model: string;
+  onModelChange: (model: string) => void;
+  models: VisibleModel[];
+  shadcnEnabled: boolean;
+  onShadcnChange: (value: boolean) => void;
+  reasoningEnabled: boolean;
+  onReasoningChange: (value: boolean) => void;
+  onAttach: () => void;
+  attachmentReady?: boolean;
+}) {
+  const hasValue = value.trim().length > 0 || attachmentReady;
+  const selectedModel = models.find((item) => item.value === model);
+
+  return (
+    <div className="w-full max-w-[760px]">
+      <div className="rounded-[28px] border border-white/10 bg-[#1F2023]/96 p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
+        <textarea
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (!disabled && hasValue) onSend(value);
+            }
+          }}
+          placeholder="Describe what to build"
+          aria-label="Describe what to build"
+          disabled={disabled}
+          rows={3}
+          className="min-h-[76px] w-full resize-none rounded-[20px] bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+        />
+
+        {attachmentReady ? (
+          <div className="mb-2 ml-1 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] text-emerald-100">
+            Attachment ready
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onAttach}
+              disabled={disabled}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+              aria-label="Attach file"
+            >
+              <Paperclip className="size-3.5" aria-hidden="true" />
+            </button>
+            <OptionDropdown
+              value={mode}
+              onValueChange={(next) => onModeChange(next as Mode)}
+              aria-label="Select build mode"
+              triggerLabel={<span className="capitalize">{mode}</span>}
+              triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
+              contentClassName="rounded-2xl"
+              options={(["agent", "ask", "plan"] as const).map((item) => ({
+                value: item,
+                label: <span className="capitalize">{item}</span>,
+              }))}
+            />
+            <OptionDropdown
+              value={model}
+              onValueChange={onModelChange}
+              aria-label="Select model"
+              triggerLabel={<span className="block max-w-[104px] truncate sm:max-w-[150px]">{selectedModel?.label ?? model}</span>}
+              triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
+              contentClassName="max-h-[320px] overflow-y-auto rounded-2xl"
+              options={models.map((item) => ({
+                value: item.value,
+                label: item.available === false ? `${item.label} (needs key)` : item.label,
+                disabled: item.available === false,
+              }))}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {value.trim() ? (
+              <PromptRewriteButton
+                prompt={value}
+                mode={mode}
+                model={model}
+                onRewrite={onValueChange}
+                disabled={disabled}
+                iconOnly
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onReasoningChange(!reasoningEnabled)}
+              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
+                reasoningEnabled
+                  ? "border-violet-300/40 bg-violet-300/15 text-violet-100"
+                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
+              }`}
+              aria-pressed={reasoningEnabled}
+            >
+              Think
+            </button>
+            <button
+              type="button"
+              onClick={() => onShadcnChange(!shadcnEnabled)}
+              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
+                shadcnEnabled
+                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-100"
+                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
+              }`}
+              aria-pressed={shadcnEnabled}
+            >
+              shadcn
+            </button>
+            <VoiceInputButton
+              onTranscript={(text) => onValueChange(`${value}${value.trim() ? " " : ""}${text}`)}
+              disabled={disabled}
+              className="size-8 rounded-full border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
+              label="Dictate prompt"
+            />
+            <button
+              type="button"
+              onClick={() => onSend(value)}
+              disabled={disabled || !hasValue}
+              className="inline-flex size-8 items-center justify-center rounded-full bg-white text-[#1F2023] shadow-sm transition hover:-translate-y-px hover:bg-white/85 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-zinc-500"
+              aria-label={isLoading ? "Generating" : "Send prompt"}
+            >
+              <ArrowUp className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -165,19 +302,19 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
   const availableModels = useAvailableModels();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const visibleModels = useMemo(() => availableModels ?? MODELS.filter((item) => !item.hidden), [availableModels]);
+  const visibleModels = useMemo<VisibleModel[]>(
+    () => (availableModels ?? MODELS.filter((item) => !item.hidden)) as VisibleModel[],
+    [availableModels],
+  );
 
   useEffect(() => {
     const fromUrl = searchParams.get("prompt");
     if (fromUrl) setPrompt(fromUrl);
   }, [searchParams]);
 
-  const handlePromptChipClick = useCallback((group: (typeof PROMPT_CHIP_GROUPS)[number], direction: "next" | "previous" = "next") => {
+  const handlePromptChipClick = useCallback((group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
     setPromptChipIndexes((current) => {
-      const currentIndex = current[group.title] ?? 0;
-      const nextIndex = direction === "next"
-        ? (currentIndex + 1) % group.prompts.length
-        : (currentIndex - 1 + group.prompts.length) % group.prompts.length;
+      const nextIndex = ((current[group.title] ?? -1) + 1) % group.prompts.length;
       setPrompt(group.prompts[nextIndex]);
       return { ...current, [group.title]: nextIndex };
     });
@@ -213,9 +350,8 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
 
     startTransition(async () => {
       let finalPrompt = cleanPrompt || "Build from the attached file.";
-      if (screenshotUrl) {
-        finalPrompt += `\n\nAttachment: ${screenshotUrl}`;
-      }
+      if (screenshotUrl) finalPrompt += `\n\nAttachment: ${screenshotUrl}`;
+
       const response = await fetch("/api/create-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -242,105 +378,47 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
     });
   };
 
-  const composerFooter = (
-    <div className="flex w-full items-center justify-between gap-2">
-      <OptionDropdown
-        value={mode}
-        onValueChange={(value) => setMode(value as Mode)}
-        aria-label="Select build mode"
-        triggerLabel={<span className="capitalize">{mode}</span>}
-        options={(["ask", "plan", "agent"] as const).map((item) => ({
-          value: item,
-          label: <span className="capitalize">{item}</span>,
-        }))}
-      />
-      <OptionDropdown
-        value={model}
-        onValueChange={setModel}
-        aria-label="Select model"
-        triggerLabel={visibleModels.find((item) => item.value === model)?.label ?? model}
-        options={visibleModels.map((item) => ({
-          value: item.value,
-          label: item.label,
-          disabled: "available" in item ? !item.available : false,
-        }))}
-      />
-    </div>
-  );
-
-  const showEnhance = prompt.trim().length > 0;
-
-  const composerVoiceButton = (
-    <VoiceInputButton
-      onTranscript={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
-      disabled={isSubmitting || screenshotLoading}
-      className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
-      label="Dictate prompt"
-    />
-  );
-
   return (
     <HomeShell>
       <div className="flex min-h-dvh flex-col text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-dvh flex-col"
+          className="relative flex min-h-dvh overflow-hidden rounded-none lg:rounded-[28px]"
           style={{ background: HERO_GRADIENT }}
         >
-          <div className="relative flex flex-1 flex-col">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,122,0,0.34),transparent_30%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_34%)]" />
+          <div className="relative flex min-h-dvh w-full flex-col">
             <Header hideLogo />
 
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-28 pt-0 md:pb-36">
-              <div className="flex w-full max-w-[760px] -translate-y-8 flex-col items-center md:-translate-y-12">
-                <TextColor className="mb-2 min-h-[4.25rem] md:min-h-[5.25rem]" />
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-0 md:pb-32">
+              <div className="flex w-full max-w-[760px] -translate-y-4 flex-col items-center md:-translate-y-8">
+                <TextColor className="mb-4 min-h-[4.25rem] md:min-h-[5.25rem]" />
 
-                <div
-                  id="prompt-composer"
-                  className="relative mt-6 w-full"
-                  style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}
-                >
+                <div id="prompt-composer" className="relative w-full" style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}>
                   {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-                <PromptInputBox
-                  value={prompt}
-                  onValueChange={setPrompt}
-                  onSend={handlePromptSend}
-                  onRepoImported={(chatId) => router.push(`/chats/${chatId}?preview=1`)}
-                    isLoading={isSubmitting}
+                  <PremiumPromptComposer
+                    value={prompt}
+                    onValueChange={setPrompt}
+                    onSend={handlePromptSend}
+                    isLoading={isSubmitting || screenshotLoading}
                     disabled={isSubmitting || screenshotLoading}
-                    placeholder="Describe what to build"
-                    thinkEnabled={reasoningEnabled}
-                    onThinkChange={setReasoningEnabled}
-                    accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-                    toolbarEnd={
-                      <div className="flex items-center gap-1.5">
-                        {showEnhance ? (
-                          <PromptRewriteButton
-                            prompt={prompt}
-                            mode={mode}
-                            model={model}
-                            onRewrite={setPrompt}
-                            disabled={isSubmitting || screenshotLoading}
-                            iconOnly
-                          />
-                        ) : null}
-                        {composerVoiceButton}
-                      </div>
-                    }
-                    footer={composerFooter}
+                    mode={mode}
+                    onModeChange={setMode}
+                    model={model}
+                    onModelChange={setModel}
+                    models={visibleModels}
                     shadcnEnabled={shadcnEnabled}
                     onShadcnChange={setShadcnEnabled}
+                    reasoningEnabled={reasoningEnabled}
+                    onReasoningChange={setReasoningEnabled}
+                    onAttach={() => fileInputRef.current?.click()}
+                    attachmentReady={Boolean(screenshotUrl)}
                   />
 
-                  <div className="mt-4">
-                    <PresetChipsScroller
-                      groups={PROMPT_CHIP_GROUPS}
-                      activeTitles={promptChipIndexes}
-                      onSelect={handlePromptChipClick}
-                    />
-                  </div>
+                  <PresetChipsScroller groups={PROMPT_CHIP_GROUPS} activeTitles={promptChipIndexes} onSelect={handlePromptChipClick} />
 
                   {mode === "ask" ? (
-                    <p className="mt-2 text-center text-xs text-slate-800/75">
+                    <p className="mt-2 text-center text-xs text-slate-900/80">
                       Ask mode — best for questions, refinements, and targeted changes.
                     </p>
                   ) : null}
@@ -350,26 +428,14 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
           </div>
         </section>
 
-        <section
-          id="featured-templates"
-          className="relative z-10 mx-auto w-full max-w-5xl -mt-2 px-4 pb-8 pt-4 md:-mt-4"
-        >
+        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5">
           <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
             <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Featured templates
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Open a responsive preview, then remix in the builder.
-                </p>
+                <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p>
               </div>
-              <Link
-                href="/gallery"
-                className="text-xs text-muted-foreground transition hover:text-foreground"
-              >
-                View gallery
-              </Link>
+              <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link>
             </div>
             <div className="mt-4">
               <FeaturedAppsGrid apps={featuredApps} limit={6} compact />
@@ -385,6 +451,7 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) void handleAttachmentUpload(file);
+          if (event.currentTarget) event.currentTarget.value = "";
         }}
       />
     </HomeShell>
