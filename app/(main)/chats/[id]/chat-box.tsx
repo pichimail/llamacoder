@@ -1,6 +1,6 @@
 "use client";
 
-import { InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/input-bar";
+import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { Brain, Code2, Database, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -406,7 +406,7 @@ export default function ChatBox({
               tip="Mode"
               triggerLabel={<span className="capitalize">{mode}</span>}
               triggerClassName={ghostTrigger}
-              options={( ["ask", "plan", "agent"] as const).map((value) => ({
+              options={(["ask", "plan", "agent"] as const).map((value) => ({
                 value,
                 label: <span className="capitalize">{value}</span>,
               }))}
