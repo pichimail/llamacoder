@@ -48,100 +48,56 @@ const PROMPT_CHIP_GROUPS = [
   {
     title: "GSAP / Three.js",
     prompts: [
-      "Create a highly interactive landing page with real GSAP section transitions, a Three.js particle field, hover-reactive cards, scroll progress, responsive animation fallbacks, and a clean shadcn/ui component system.",
-      "Build a futuristic product microsite with a Three.js orbital scene, animejs staggered panels, kinetic typography, sticky feature navigation, and performant responsive behavior across mobile, tablet, and desktop.",
-      "Generate an immersive launch page with ReactBits-style background effects, GSAP reveal-on-scroll modules, animated comparison cards, a pricing carousel, and production-safe animation fallbacks when motion is reduced.",
+      "Build an immersive 3D product showcase with a Three.js hero object, GSAP scroll sections, animated spec cards, responsive mobile fallbacks, and premium lighting controls.",
+      "Create a cinematic portfolio site with Three.js particles, GSAP reveal timelines, magnetic hover cards, image galleries, contact CTA, and accessibility-safe reduced motion handling.",
+      "Build a luxury launch page using GSAP pinned storytelling, Three.js ambient background, smooth section transitions, and a shadcn-style signup form.",
     ],
   },
   {
     title: "SMM marketing",
     prompts: [
-      "Build a social media marketing agency site with campaign packages, content calendar preview, creator workflow cards, lead-generation form, animated case-study carousel, shadcn/ui dialogs, and responsive dark editorial styling.",
-      "Create an SMM dashboard landing page for brands with post scheduling, analytics previews, team approval flows, inbox automation, pricing, testimonials, and backend-ready contact capture.",
-      "Generate a marketing campaign builder app with brand kit setup, AI caption generator UI, asset upload modal, campaign calendar, approval statuses, analytics cards, and admin-ready full-stack structure.",
+      "Build a social media campaign planner with calendar, post queue, channel filters, approval workflow, content cards, campaign KPIs, and a mobile-first dashboard.",
+      "Create an influencer outreach CRM with lead lists, campaign stages, contract status, message templates, performance cards, and admin-ready mock data services.",
+      "Generate a brand content studio with asset library, caption generator UI, schedule board, campaign briefs, and responsive shadcn-style management screens.",
     ],
   },
   {
     title: "Home automation",
     prompts: [
-      "Build a full-stack smart home automation dashboard with room controls, device cards, scene builder, energy usage charts, user auth screens, admin settings, and responsive touch-friendly controls.",
-      "Create an IoT home control app with lighting, thermostat, security cameras, schedules, automations, live status indicators, protected routes, and a polished shadcn/ui dashboard layout.",
-      "Generate a home automation SaaS portal for installers with customer sites, device provisioning, alerts, service tickets, billing status, team roles, and a super-admin overview.",
+      "Build a smart home control app with rooms, device toggles, scene automation, energy usage charts, alerts, family permissions, and mobile-first controls.",
+      "Create an IoT home dashboard with real-time-looking device states, automation rules, security cameras grid, climate controls, and responsive tablet layout.",
+      "Generate a premium smart lighting app with room scenes, scheduling, color controls, automation history, and accessible switch/toggle states.",
     ],
   },
   {
     title: "Electric cars",
     prompts: [
-      "Build an electric vehicle brand landing page with a cinematic hero, range and charging feature sections, model comparison carousel, reservation form, dealer locator UI, and responsive Three.js-inspired visuals.",
-      "Create an EV ownership dashboard with vehicle status, charging history, trip analytics, service reminders, subscription billing, authentication, and admin tools for fleet managers.",
-      "Generate an electric car e-commerce configurator with model selection, color and wheel options, financing calculator, checkout flow, inventory dashboard, and mobile-first interaction design.",
+      "Build an EV companion app with vehicle status, range planner, charging map, trip history, battery health, climate controls, and responsive mobile UI.",
+      "Create a premium electric car configurator with model selection, color/wheel options, financing summary, comparison table, and animated preview panels.",
+      "Generate an EV fleet dashboard with charger availability, vehicle assignments, energy cost charts, service alerts, and admin management views.",
     ],
   },
   {
     title: "E-commerce",
     prompts: [
-      "Build a full-stack online shopping app with product grid, filters, product detail pages, cart, checkout flow, order history, user authentication, admin inventory dashboard, and shadcn/ui components.",
-      "Create a premium marketplace dashboard with seller onboarding, product upload modal, order management, analytics cards, customer messaging, refunds, and super-admin moderation tools.",
-      "Generate a modern e-commerce storefront with animated product carousel, wishlist, search, variant picker, responsive checkout, promotional landing sections, and backend-ready Prisma data models.",
+      "Build a premium mobile-first fashion e-commerce app with collection browsing, product details, cart, checkout steps, wishlist, order tracking, and admin inventory screens.",
+      "Create a D2C storefront with product filters, variant selector, reviews, cart drawer, account orders, promo codes, and responsive checkout UI.",
+      "Generate a marketplace admin portal with sellers, product moderation, payouts, orders, analytics, support tickets, and role-based workflows.",
     ],
   },
   {
-    title: "Full-stack apps",
+    title: "Full-stack SaaS",
     prompts: [
-      "Build a production-style full-stack application with authentication, Prisma schema, protected routes, CRUD workflows, file upload modal, activity feed, admin dashboard, and polished loading and empty states.",
-      "Create a collaborative workspace app with projects, tasks, comments, members, role permissions, search, notifications, settings pages, and responsive dashboard navigation.",
-      "Generate a multi-tenant SaaS app with workspace switching, billing placeholders, team invitations, audit logs, admin and super-admin dashboards, and clean shadcn/ui data tables.",
-    ],
-  },
-  {
-    title: "Dashboards",
-    prompts: [
-      "Build a responsive analytics dashboard with KPI cards, charts, date range filters, data table, command palette, export buttons, settings drawer, and polished loading skeletons.",
-      "Create an operations dashboard with live status panels, incident timeline, team workload, searchable resources, alerts, sidebar navigation, and admin controls.",
-      "Generate a finance dashboard with revenue charts, expense categories, transaction table, account cards, budget goals, export modal, and responsive mobile summary cards.",
-    ],
-  },
-  {
-    title: "Auth screens",
-    prompts: [
-      "Build a complete authentication flow with sign in, sign up, forgot password, reset password, 2FA verification, profile setup, protected dashboard, validation states, and responsive shadcn/ui forms.",
-      "Create premium onboarding and authentication screens for a SaaS app with role selection, workspace creation, invite acceptance, email verification UI, and animated success states.",
-      "Generate an enterprise auth portal with SSO buttons, passwordless login, admin approval state, audit-friendly session list, account security settings, and mobile-safe layouts.",
-    ],
-  },
-  {
-    title: "Admin panels",
-    prompts: [
-      "Build an admin dashboard with users, roles, permissions, audit logs, system health, content moderation, settings, search, filters, bulk actions, and two-way links back to the app.",
-      "Create a super-admin console for a multi-tenant SaaS with tenant management, impersonation UI, billing status, feature flags, usage analytics, incident controls, and responsive data tables.",
-      "Generate a back-office CRM admin panel with contacts, deals, pipelines, tasks, team permissions, reports, import modal, and polished empty/error/loading states.",
-    ],
-  },
-  {
-    title: "AI apps",
-    prompts: [
-      "Build an AI application with prompt input, model selector, file attachment modal, generation history, result cards, saved outputs, settings, billing placeholders, and a full-stack backend-ready architecture.",
-      "Create an AI content studio with document upload, prompt templates, brand voice settings, generation queue, preview editor, export actions, admin dashboard, and responsive controls.",
-      "Generate an AI research assistant app with source upload, chat panel, citation cards, saved threads, project folders, search, user auth, and polished shadcn/ui layout.",
-    ],
-  },
-  {
-    title: "AI chat UI",
-    prompts: [
-      "Build an AI agent chat dashboard inspired by Claude, Perplexity, OpenAI, and Mistral patterns with a hero prompt input, attachment controls, model selection, tools menu, chat history, and responsive split-pane workspace.",
-      "Create a full-stack AI agent workspace with prompt composer, file attachments, tool calling activity panel, sources sidebar, conversation folders, settings, admin controls, and polished streaming states.",
-      "Generate an AI assistant landing-to-app flow with public hero prompt box, advanced controls, dashboard chat threads, agent presets, knowledge upload modal, and production-style auth screens.",
+      "Build a production-ready SaaS dashboard scaffold with auth screens, project CRUD, team roles, billing plans, API key management, audit logs, and responsive shadcn UI.",
+      "Create a multi-tenant workspace app with organizations, members, invitations, feature flags, settings, usage limits, and server-ready route structure.",
+      "Generate a B2B SaaS admin console with users, plans, subscriptions, content management, logs, integrations, and production-safe empty/loading/error states.",
     ],
   },
 ];
 
-const PRESET_PROMPTS = new Set(
-  PROMPT_CHIP_GROUPS.flatMap((group) => group.prompts),
-);
-
 const HERO_GRADIENT =
-  "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
-const COMPOSER_MAX_WIDTH = "760px";
+  "radial-gradient(circle at 50% 100%, rgba(255,122,0,0.96) 0%, rgba(255,122,0,0.78) 14%, rgba(255,151,203,0.72) 42%, rgba(198,165,214,0.72) 66%, rgba(174,193,231,0.82) 100%)";
+const COMPOSER_MAX_WIDTH = "46rem";
 
 function PresetChipsScroller({
   groups,
@@ -150,325 +106,169 @@ function PresetChipsScroller({
 }: {
   groups: typeof PROMPT_CHIP_GROUPS;
   activeTitles: Record<string, number>;
-  onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number]) => void;
+  onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number], direction?: "next" | "previous") => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  }, []);
-
-  useEffect(() => {
-    updateScrollState();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", updateScrollState, { passive: true });
-    const observer = new ResizeObserver(updateScrollState);
-    observer.observe(el);
-    return () => {
-      el.removeEventListener("scroll", updateScrollState);
-      observer.disconnect();
-    };
-  }, [updateScrollState, groups.length]);
-
-  const scrollBy = (direction: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: direction * 168, behavior: "smooth" });
-  };
-
   return (
-    <div className="relative mx-auto w-full max-w-[760px]">
-      {canScrollLeft ? (
-        <button
-          type="button"
-          onClick={() => scrollBy(-1)}
-          aria-label="Scroll presets left"
-          className="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/70 text-slate-700/70 shadow-sm backdrop-blur-sm transition hover:text-slate-900"
-        >
-          <ChevronLeft className="size-3.5" />
-        </button>
-      ) : null}
-      <div
-        ref={scrollRef}
-        className="flex gap-2 overflow-x-auto px-7 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ maxWidth: "100%" }}
+    <div className="flex w-full max-w-[720px] items-center gap-2 overflow-hidden">
+      <button
+        type="button"
+        aria-label="Previous prompt group"
+        onClick={() => {
+          const first = groups[0];
+          if (first) onSelect(first, "previous");
+        }}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/35 text-slate-700 shadow-sm transition hover:bg-white/55"
       >
-        {groups.map((group) => {
-          const isActive = typeof activeTitles[group.title] === "number";
-          return (
-            <button
-              key={group.title}
-              type="button"
-              onClick={() => onSelect(group)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
-                isActive
-                  ? "border-slate-900/20 bg-white/90 text-slate-900 shadow-sm"
-                  : "border-white/50 bg-white/55 text-slate-800/80 hover:border-white/70 hover:bg-white/75 hover:text-slate-900"
-              }`}
-            >
-              {group.title}
-            </button>
-          );
-        })}
+        <ChevronLeft className="size-3.5" />
+      </button>
+      <div className="flex min-w-0 flex-1 snap-x gap-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/30">
+        {groups.map((group) => (
+          <button
+            key={group.title}
+            type="button"
+            onClick={() => onSelect(group, "next")}
+            className="snap-start whitespace-nowrap rounded-full border border-white/35 bg-white/45 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            title={group.prompts[activeTitles[group.title] ?? 0]}
+          >
+            {group.title}
+          </button>
+        ))}
       </div>
-      {canScrollRight ? (
-        <button
-          type="button"
-          onClick={() => scrollBy(1)}
-          aria-label="Scroll presets right"
-          className="absolute right-0 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/70 text-slate-700/70 shadow-sm backdrop-blur-sm transition hover:text-slate-900"
-        >
-          <ChevronRight className="size-3.5" />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        aria-label="Next prompt group"
+        onClick={() => {
+          const last = groups[groups.length - 1];
+          if (last) onSelect(last, "next");
+        }}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/35 text-slate-700 shadow-sm transition hover:bg-white/55"
+      >
+        <ChevronRight className="size-3.5" />
+      </button>
     </div>
   );
 }
 
-export default function HomePageClient() {
+export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }) {
   const router = useRouter();
-  const context = use(Context);
   const searchParams = useSearchParams();
-  useEffect(() => {
-    const t = searchParams.get("prompt");
-    if (t) setPrompt(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [prompt, setPrompt] = useState("");
-  const visibleModels = getVisibleModels();
-  const availableModels = useAvailableModels();
-  const [model, setModel] = useState(
-    visibleModels.find((m) => !m.hidden)?.value || visibleModels[0]?.value || MODELS[0].value,
-  );
-  const [featuredApps, setFeaturedApps] = useState<FeaturedApp[] | null>(null);
-  const [shadcnEnabled, setShadcnEnabled] = useState(true);
-  const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const context = use(Context);
+  const [prompt, setPrompt] = useState(searchParams.get("prompt") || "");
+  const [model, setModel] = useState(MODELS[0]?.value || "glm-5");
   const [mode, setMode] = useState<Mode>("agent");
-  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
-    undefined,
-  );
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const [shadcnEnabled, setShadcnEnabled] = useState(true);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>();
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [blobUploadConfigured, setBlobUploadConfigured] = useState<
-    boolean | null
-  >(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isSubmitting, startTransition] = useTransition();
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
+  const availableModels = useAvailableModels();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [, startTransition] = useTransition();
+  const visibleModels = useMemo(() => availableModels ?? getVisibleModels(), [availableModels]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/blob-upload/config", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setBlobUploadConfigured(!!data.configured);
-        }
-      } catch { if (!cancelled) setBlobUploadConfigured(false); }
-    })();
-    return () => { cancelled = true; };
+    const fromUrl = searchParams.get("prompt");
+    if (fromUrl) setPrompt(fromUrl);
+  }, [searchParams]);
+
+  const handlePromptChipClick = useCallback((group: (typeof PROMPT_CHIP_GROUPS)[number], direction: "next" | "previous" = "next") => {
+    setPromptChipIndexes((current) => {
+      const currentIndex = current[group.title] ?? 0;
+      const nextIndex = direction === "next"
+        ? (currentIndex + 1) % group.prompts.length
+        : (currentIndex - 1 + group.prompts.length) % group.prompts.length;
+      setPrompt(group.prompts[nextIndex]);
+      return { ...current, [group.title]: nextIndex };
+    });
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/featured", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setFeaturedApps(data.apps ?? []);
-        }
-      } catch {
-        if (!cancelled) setFeaturedApps([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const isUploadAvailable = blobUploadConfigured === true;
-
-  const showEnhance = useMemo(
-    () => prompt.trim().length > 0 && !PRESET_PROMPTS.has(prompt),
-    [prompt],
-  );
-
-  const getModelLabel = (val: string) =>
-    availableModels?.find((x) => x.value === val)?.label ||
-    MODELS.find((x) => x.value === val)?.label ||
-    val;
-
-  useEffect(() => {
-    if (!availableModels?.length) return;
-    const current = availableModels.find((entry) => entry.value === model);
-    if (current?.available) return;
-    const fallback = availableModels.find((entry) => entry.available);
-    if (fallback) setModel(fallback.value);
-  }, [availableModels, model]);
-
-  const modes = [
-    { value: "ask" as const, label: "Ask", icon: "?" },
-    { value: "plan" as const, label: "Plan", icon: "≡" },
-    { value: "agent" as const, label: "Agent  ", icon: "◇" },
-  ];
-  const currentMode = modes.find(m => m.value === mode)!;
-  const composerFooter = (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
-      <OptionDropdown
-        value={mode}
-        onValueChange={(value) => setMode(value as Mode)}
-        aria-label="Select mode"
-        triggerLabel={
-          <span>
-            {currentMode.icon} {currentMode.label}
-          </span>
-        }
-        triggerClassName="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/20 hover:bg-white/10 hover:text-white"
-        options={modes.map((item) => ({
-          value: item.value,
-          label: (
-            <span>
-              {item.icon} {item.label}
-            </span>
-          ),
-        }))}
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <OptionDropdown
-          value={model}
-          onValueChange={setModel}
-          aria-label="Select AI model"
-          triggerLabel={getModelLabel(model)}
-          triggerClassName="h-8 min-w-[180px] rounded-full border border-white/10 bg-white/5 px-3 text-sm text-slate-100 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/20 hover:bg-white/10 hover:text-white"
-          contentClassName="max-h-[320px]"
-          options={(availableModels ?? getVisibleModels()).map((item) => ({
-            value: item.value,
-            label:
-              "available" in item && item.available === false
-                ? `${item.label} (needs API key)`
-                : item.label,
-            disabled: "available" in item ? !item.available : false,
-          }))}
-        />
-      </div>
-    </div>
-  );
-
-  const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
-    const currentIndex = promptChipIndexes[group.title] ?? -1;
-    const nextIndex = (currentIndex + 1) % group.prompts.length;
-    setPromptChipIndexes((current) => ({ ...current, [group.title]: nextIndex }));
-    setPrompt(group.prompts[nextIndex]);
-  };
-
-  const uploadAttachment = async (file: File) => {
-    if (!isUploadAvailable) {
-      toast({ title: "Upload unavailable", description: "Blob storage is not configured.", variant: "destructive" });
-      return undefined;
-    }
+  const handleAttachmentUpload = async (file: File) => {
     setScreenshotLoading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/blob-upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      return {
-        url: data.url as string,
-        kind: file.type.startsWith("image/") ? ("image" as const) : ("file" as const),
-        filename: file.name || "attachment",
-        size: file.size,
-      };
-    } catch {
-      toast({ title: "Upload failed", variant: "destructive" });
-      return undefined;
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/blob-upload", { method: "POST", body: formData });
+      if (!response.ok) throw new Error("Attachment upload failed");
+      const payload = (await response.json()) as { url?: string };
+      if (!payload.url) throw new Error("No attachment URL returned");
+      setScreenshotUrl(payload.url);
+      if (!prompt.trim()) setPrompt("Build from this attachment");
+      toast({ title: "Attachment ready" });
+    } catch (error) {
+      setScreenshotUrl(undefined);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Could not upload attachment.",
+        variant: "destructive",
+      });
     } finally {
       setScreenshotLoading(false);
     }
   };
 
-  const handlePromptSend = async (content: string, files?: File[]) => {
-    if (!content.trim() && !files?.length) return;
-    setIsSubmitting(true);
+  const handlePromptSend = (value: string) => {
+    const cleanPrompt = value.trim();
+    if (!cleanPrompt && !screenshotUrl) return;
+
     startTransition(async () => {
-      try {
-        let nextScreenshotUrl = screenshotUrl;
-        const attachments: ComposerAttachment[] = [];
-
-        if (files?.[0]) {
-          const uploaded = await uploadAttachment(files[0]);
-          if (!uploaded) {
-            setIsSubmitting(false);
-            return;
-          }
-          nextScreenshotUrl = uploaded.url;
-          attachments.push({
-            kind: uploaded.kind,
-            filename: uploaded.filename,
-            url: uploaded.url,
-            size: uploaded.size,
-          });
-        }
-
-        const promptText =
-          content.trim() || (files?.length ? "Build this from the attached file" : "");
-        const initialQuality = mode === "agent" ? "high" : "low";
-
-        const res = await fetch("/api/create-chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: promptText,
-            model,
-            quality: initialQuality,
-            mode,
-            screenshotUrl: nextScreenshotUrl,
-            attachments,
-            shadcn: shadcnEnabled,
-          }),
-        });
-        if (!res.ok) {
-          let description = "Failed to create chat";
-          try {
-            const data = await res.json();
-            if (data?.error) description = data.error;
-          } catch {}
-          toast({ title: "Error", description, variant: "destructive" });
-          setIsSubmitting(false);
-          return;
-        }
-        const { chatId, lastMessageId } = await res.json();
-
-        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
-          method: "POST",
-          body: JSON.stringify({
-            messageId: lastMessageId,
-            model,
-            reasoning: reasoningEnabled,
-            quality: initialQuality,
-          }),
-        }).then(async (r) => {
-          if (!r.ok) throw new Error((await r.text()) || "Failed to start generation");
-          if (!r.body) throw new Error("No body on response");
-          return r.body;
-        });
-        void streamPromise.catch(() => undefined);
-
-        setPrompt("");
-        setScreenshotUrl(undefined);
-        router.push(`/chats/${chatId}`);
-        context.setStreamPromise(streamPromise);
-      } finally {
-        setIsSubmitting(false);
+      let finalPrompt = cleanPrompt || "Build from the attached file.";
+      if (screenshotUrl) {
+        finalPrompt += `\n\nAttachment: ${screenshotUrl}`;
       }
+      const response = await fetch("/api/create-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          model,
+          quality: "high",
+          mode,
+          shadcn: shadcnEnabled,
+          reasoning: reasoningEnabled,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.id) {
+        toast({
+          title: "Could not start build",
+          description: data?.error || "Please check auth/API configuration.",
+          variant: "destructive",
+        });
+        return;
+      }
+      context.setStreamPromise(data.streamPromise);
+      router.push(`/chats/${data.id}?preview=1`);
     });
   };
+
+  const composerFooter = (
+    <div className="flex w-full items-center justify-between gap-2">
+      <OptionDropdown
+        value={mode}
+        onValueChange={(value) => setMode(value as Mode)}
+        aria-label="Select build mode"
+        triggerLabel={<span className="capitalize">{mode}</span>}
+        options={(["ask", "plan", "agent"] as const).map((item) => ({
+          value: item,
+          label: <span className="capitalize">{item}</span>,
+        }))}
+      />
+      <OptionDropdown
+        value={model}
+        onValueChange={setModel}
+        aria-label="Select model"
+        triggerLabel={visibleModels.find((item) => item.value === model)?.label ?? model}
+        options={visibleModels.map((item) => ({
+          value: item.value,
+          label: item.label,
+          disabled: "available" in item ? !item.available : false,
+        }))}
+      />
+    </div>
+  );
+
+  const showEnhance = prompt.trim().length > 0;
 
   const composerVoiceButton = (
     <VoiceInputButton
@@ -484,14 +284,14 @@ export default function HomePageClient() {
       <div className="flex min-h-dvh flex-col text-foreground">
         <section
           id="hero"
-          className="relative flex min-h-[112dvh] flex-col"
+          className="relative flex min-h-dvh flex-col"
           style={{ background: HERO_GRADIENT }}
         >
           <div className="relative flex flex-1 flex-col">
-            <Header hideLogo showSidebarTrigger />
+            <Header hideLogo />
 
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-6">
-              <div className="flex w-full max-w-[760px] flex-col items-center">
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-28 pt-0 md:pb-36">
+              <div className="flex w-full max-w-[760px] -translate-y-8 flex-col items-center md:-translate-y-12">
                 <TextColor className="mb-2 min-h-[4.25rem] md:min-h-[5.25rem]" />
 
                 <div
@@ -572,23 +372,21 @@ export default function HomePageClient() {
               </Link>
             </div>
             <div className="mt-4">
-              <FeaturedAppsGrid
-                apps={featuredApps ?? undefined}
-                limit={3}
-                compact
-                liveThumbs={false}
-              />
+              <FeaturedAppsGrid apps={featuredApps} limit={6} compact />
             </div>
           </div>
         </section>
-
-        <footer
-          id="examples"
-          className="flex w-full justify-center border-t border-border/40 bg-background px-4 py-8 text-xs text-muted-foreground"
-        >
-          Chinna-Coder — Build production apps from a prompt
-        </footer>
       </div>
+      <input
+        ref={fileInputRef}
+        className="hidden"
+        type="file"
+        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleAttachmentUpload(file);
+        }}
+      />
     </HomeShell>
   );
 }
