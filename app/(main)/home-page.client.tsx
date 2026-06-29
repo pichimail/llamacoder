@@ -164,6 +164,7 @@ export default function HomePageClient() {
   const router = useRouter();
   const context = use(Context);
   const [prompt, setPrompt] = useState("");
+  const buildMode: Mode = "agent";
   const [model, setModel] = useState("zai-org/GLM-5");
   const [shadcnEnabled, setShadcnEnabled] = useState(true);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -193,7 +194,7 @@ export default function HomePageClient() {
             prompt: finalPrompt,
             model,
             quality: "high",
-            mode: "agent",
+            mode: buildMode,
             shadcn: shadcnEnabled,
             screenshotUrl,
             attachments,
