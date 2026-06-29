@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-
-import { HomePageClient } from "./home-page.client";
+import HomePageClient from "./home-page.client";
 
 function HomeFallback() {
   return (
@@ -13,7 +12,7 @@ function HomeFallback() {
 export default function HomePageWrapper() {
   return (
     <Suspense fallback={<HomeFallback />}>
-      <HomePageClient featuredApps={[]} />
+      <HomePageClient />
     </Suspense>
   );
 }

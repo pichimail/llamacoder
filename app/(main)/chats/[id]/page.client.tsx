@@ -321,15 +321,18 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const requestFix = useCallback(async ({ error, auto, attempt, fallback, files }: { error: string; auto: boolean; attempt: number; fallback: boolean; files?: RawGeneratedFile[] }) => {
     const sourceFiles = files && files.length > 0 ? files : artifactFiles;
     const normalizedFiles = sourceFiles.map(normalizeFile);
+    const hasLayout = normalizedFiles.some(f => f.path === "app/layout.tsx" || f.path === "app/layout.ts");
+    const hasMultipleRoutes = normalizedFiles.filter(f => /^app\/.*\/page\.(tsx|ts|jsx|js)$/.test(f.path)).length > 1;
     const singleFileArtifact = normalizedFiles.length <= 1 || (normalizedFiles.length === 1 && normalizedFiles[0]?.path === "app/page.tsx");
-    const shouldRebuild = fallback || singleFileArtifact || attempt > 1;
+    const isCrammedSinglePage = !hasLayout && !hasMultipleRoutes && normalizedFiles.length < 5;
+    const shouldRebuild = fallback || singleFileArtifact || isCrammedSinglePage || attempt > 1;
     const prefix = auto
       ? shouldRebuild
-        ? "Rebuild the generated app cleanly. Return a complete corrected multi-file project, splitting large app/page.tsx code into focused components, data/helpers, and preview-safe backend-shaped files where useful."
-        : "Apply the smallest working fix for this preview error. Return only changed files and any newly required support files."
+        ? "Rebuild the generated app cleanly as a proper multi-page project. Use app/layout.tsx for persistent UI (sidebars, nav) and dedicated route files (app/dashboard/page.tsx etc). Split large code into focused components, data, and pages."
+        : "Apply the smallest working fix for this preview error. Return only changed files and any newly required support files or routes."
       : shouldRebuild
-        ? "The code is not working. Rebuild it as a complete corrected multi-file project."
-        : "The code is not working. Fix it with the smallest working patch.";
+        ? "The code is not working. Rebuild it as a complete corrected multi-page project with proper routing and layout."
+        : "The code is not working. Fix it with the smallest working patch across the relevant route files.";
     const fileManifest = normalizedFiles.map((file) => `- ${file.path}`).join("\n");
     const sourceContext = formatFixFileContext(normalizedFiles);
     const text = `${prefix}
@@ -347,10 +350,10 @@ ${sourceContext || "- no source parsed"}
 
 Fix requirements:
 - Output only fenced code blocks using \`\`\`tsx{path=...} format.
-- Keep app/page.tsx renderable, but do not pack the whole application into app/page.tsx.
-- If the current artifact has only app/page.tsx, return a complete multi-file structure with components and lib files.
+- For multi-screen apps use app/layout.tsx + separate pages for routes. Do not pack the whole application into app/page.tsx or use state to fake pages.
+- If the current artifact is crammed into few files or only app/page.tsx, return a complete multi-file multi-route structure with layout and dedicated pages.
 - Create every local component or helper file that is imported.
-- Preserve working existing files unless they must change for the fix.`;
+- Preserve working existing files and routes unless they must change for the fix.`;
     const message = await createMessage(chat.id, text, "user");
     const controller = new AbortController();
     abortControllerRef.current = controller;
