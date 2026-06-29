@@ -2,8 +2,8 @@
 
 import { HomeShell } from "@/components/home/home-shell";
 import { useRouter } from "next/navigation";
-import { use, useRef, useState, useTransition } from "react";
-import { ArrowUp, Brain, Github, Palette, Plus, Search as SearchIcon, Upload } from "lucide-react";
+import { use, useRef, useState, useTransition, type ReactNode } from "react";
+import { ArrowUp, Brain, Github, Loader2, Palette, Plus, Search as SearchIcon, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
@@ -33,7 +43,7 @@ const PROMPT_CHIP_GROUPS = [
   { title: "AI chat UI", prompt: "Build a mobile-first chat interface with thread history, attachments, streaming state, message actions, and a clean artifact preview flow." },
 ] as const;
 
-function ToggleItem({ label, icon, checked, onChange }: { label: string; icon: React.ReactNode; checked: boolean; onChange: (value: boolean) => void }) {
+function ToggleItem({ label, icon, checked, onChange }: { label: string; icon: ReactNode; checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <DropdownMenuItem onClick={() => onChange(!checked)} className="flex justify-between gap-3">
       <span className="flex items-center gap-2">{icon}{label}</span>
@@ -172,6 +182,10 @@ export default function HomePageClient() {
   const [canvasEnabled, setCanvasEnabled] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubError, setGithubError] = useState("");
+  const [isGithubImporting, setIsGithubImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const visibleModels = MODELS.filter((item) => !item.hidden);
 
@@ -234,21 +248,35 @@ export default function HomePageClient() {
     if (!prompt.trim()) setPrompt("Build from the uploaded file or screenshot.");
   };
 
-  const handleImportGithub = () => {
-    const url = window.prompt("Paste a public GitHub repository URL");
-    if (!url?.trim()) return;
+  const submitGithubImport = () => {
+    const url = githubUrl.trim();
+    setGithubError("");
+    if (!url) {
+      setGithubError("Enter a GitHub repository URL.");
+      return;
+    }
+    if (!/^https:\/\/github\.com\/[^/]+\/[^/]+/i.test(url)) {
+      setGithubError("Use a valid GitHub URL like https://github.com/owner/repo.");
+      return;
+    }
+    setIsGithubImporting(true);
     startTransition(async () => {
-      const response = await fetch("/api/import-github-repo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.chatId) {
-        toast({ title: "Import failed", description: data?.error || "Could not import repository.", variant: "destructive" });
-        return;
+      try {
+        const response = await fetch("/api/import-github-repo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.chatId) throw new Error(data?.error || "Could not import repository.");
+        setGithubDialogOpen(false);
+        setGithubUrl("");
+        router.push(`/chats/${data.chatId}?preview=1`);
+      } catch (error) {
+        setGithubError(error instanceof Error ? error.message : "Could not import repository.");
+      } finally {
+        setIsGithubImporting(false);
       }
-      router.push(`/chats/${data.chatId}?preview=1`);
     });
   };
 
@@ -266,7 +294,7 @@ export default function HomePageClient() {
                     Build. <span className="mx-3 md:mx-8">Preview.</span> <span className="bg-gradient-to-r from-lime-300 to-emerald-400 bg-clip-text text-transparent">Ship.</span>
                   </h1>
                   <div id="prompt-composer" className="relative w-full">
-                    <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting} model={model} onModelChange={setModel} models={visibleModels} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={handleImportGithub} />
+                    <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} />
                     <PresetChipsScroller onSelect={setPrompt} />
                   </div>
                 </div>
@@ -286,6 +314,33 @@ export default function HomePageClient() {
         </section>
       </div>
       <input ref={fileInputRef} className="hidden" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
+      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
+          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
+            <DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}>
+            <div className="space-y-2">
+              <label htmlFor="github-url" className="text-sm font-medium">Repository URL</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" />
+                <Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">
+                  {isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {isGithubImporting ? "Importing" : "Import"}
+                </Button>
+              </div>
+              {githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+              Supports public GitHub repositories. Private repository import should be connected through account integrations before use.
+            </div>
+          </form>
+          <DialogFooter className="border-t border-border/70 px-5 py-4">
+            <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </HomeShell>
   );
 }
