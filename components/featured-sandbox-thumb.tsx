@@ -50,7 +50,7 @@ export function FeaturedSandboxThumb({
 
   const config = useMemo(() => {
     if (!files?.length) return null;
-    return getSandpackConfig(files);
+    return getSandpackConfig(files, {}, {} as any, "/");
   }, [files]);
 
   if (!live || failed || motionOnly || !files?.length || !config) {

@@ -135,14 +135,16 @@ function isPreviewRuntimeFile(path: string, content: string) {
 
   if (
     filename === "package.json" ||
-    filename === "layout.tsx" ||
-    filename === "layout.ts" ||
     filename === "middleware.ts" ||
     filename === "route.ts" ||
     filename === "route.tsx"
   ) {
     return false;
   }
+
+  // Allow layouts (root and section layouts) so real multi-page apps with
+  // app/layout.tsx + persistent sidebar + multiple routes can render properly.
+  // We still sanitize heavy server-only things inside sanitizePreviewContent.
 
   return /\.(tsx|ts|jsx|js|css)$/.test(normalizedPath);
 }
@@ -181,6 +183,7 @@ export function getSandpackConfig(
   inputFiles: Array<{ path: string; content?: string; code?: string }>,
   extraDependencies: Record<string, string> = {},
   options: SandpackBuildOptions = {},
+  currentRoute = "/",
 ) {
   const includeShadcn = options.includeShadcn !== false;
   const theme = options.theme ?? "light";
@@ -252,6 +255,15 @@ export function getSandpackConfig(
     previewUserFiles.push({ path: normalizedPath, content: previewContent });
   }
 
+  // Also allow root layout so multi-page apps can use it if the model generates one
+  const rootLayout = files.find(f => 
+    normalizePreviewPath(f.path) === "app/layout.tsx" || normalizePreviewPath(f.path) === "app/layout.ts"
+  );
+  if (rootLayout) {
+    const layoutContent = sanitizePreviewContent(rootLayout.content || "");
+    sandpackFiles["/app/layout.tsx"] = layoutContent;
+  }
+
   if (designInspector) {
     sandpackFiles[DESIGN_INSPECTOR_RUNTIME_PATH] = DESIGN_INSPECTOR_RUNTIME_SOURCE;
   }
@@ -263,6 +275,11 @@ export function getSandpackConfig(
       previewUserFiles.find((f) => f.path.endsWith("/App.tsx")) ||
       previewUserFiles.find((f) => f.path === "App.tsx") ||
       previewUserFiles.find((f) => isLikelyRenderableReactFile(f.path, f.content));
+
+    // Collect other page files for multi-page routing support
+    const pageFiles = previewUserFiles.filter(f =>
+      /^app\/.*\/page\.(tsx|jsx|ts|js)$/.test(f.path) || f.path === "app/page.tsx"
+    );
 
     if (mainFile) {
       const cssImports = previewUserFiles
@@ -278,18 +295,106 @@ export function getSandpackConfig(
         ? (child: string) => `<InspectorProvider>${child}</InspectorProvider>`
         : (child: string) => child;
 
+      // Build proper imports + registry for multi-page routing
+      // This allows the preview URL bar / prev/next buttons + sidebar links to actually switch pages
+      type PageEntry = { route: string; importName: string; importPath: string; isHome: boolean };
+
+      const pageEntries: PageEntry[] = pageFiles.map((f, index) => {
+        let route = f.path
+          .replace(/^app\//, "/")
+          .replace(/\/page\.(tsx|jsx|ts|js)$/, "")
+          .replace(/\(.*?\)\/?/g, "") || "/";
+        if (route === "/page" || route === "") route = "/";
+
+        const baseName = f.path.replace(/[^a-zA-Z0-9]/g, "_");
+        const importName = route === "/" ? "HomePage" : `Page_${baseName}`;
+
+        return {
+          route,
+          importName,
+          importPath: toImportPath(f.path),
+          isHome: route === "/"
+        };
+      });
+
+      // Dedupe by route, prefer home as main
+      const uniquePages = Array.from(
+        new Map(pageEntries.map(p => [p.route, p])).values()
+      );
+
+      const importStatements = uniquePages
+        .map(p => `import ${p.importName} from '${p.importPath}';`)
+        .join("\n");
+
+      const routeObjectBody = uniquePages
+        .map(p => `  "${p.route}": ${p.importName}`)
+        .join(",\n");
+
       sandpackFiles["App.tsx"] = `import React from 'react';
 import './app/globals.css';
 ${cssImports}
 import { ensureTwind } from '@/lib/twind';
-${inspectorImport}import MainComponent from '${toImportPath(mainFile.path)}';
+${inspectorImport}
+${importStatements}
+
+// Multi-page routing support - works with the preview navigation chrome
+const routeComponents: Record<string, React.ComponentType<any>> = {
+${routeObjectBody}
+};
+
+function getPageForRoute(pathname: string): React.ComponentType<any> {
+  const clean = (pathname || "/").replace(/\\/$/, "") || "/";
+  if (routeComponents[clean]) return routeComponents[clean];
+  if (routeComponents["/"]) return routeComponents["/"];
+  // Safe fallback to first available page
+  return Object.values(routeComponents)[0] || (() => <div>No pages</div>);
+}
 
 ensureTwind();
 
 export default function App() {
+  const [currentPath, setCurrentPath] = React.useState(
+    typeof window !== "undefined" 
+      ? (window.location.pathname || "${currentRoute}") 
+      : "${currentRoute}"
+  );
+
+  React.useEffect(() => {
+    const updatePath = () => {
+      setCurrentPath(window.location.pathname || "/");
+    };
+
+    window.addEventListener("popstate", updatePath);
+
+    const handleRouteChange = (e: any) => {
+      if (e.detail?.path) {
+        const newPath = e.detail.path;
+        if (window.location.pathname !== newPath) {
+          window.history.replaceState({}, "", newPath);
+        }
+        setCurrentPath(newPath);
+      }
+    };
+    window.addEventListener("preview-route-change", handleRouteChange);
+
+    const origPush = window.history.pushState;
+    window.history.pushState = function (...args: any[]) {
+      origPush.apply(this, args);
+      updatePath();
+    };
+
+    return () => {
+      window.removeEventListener("popstate", updatePath);
+      window.removeEventListener("preview-route-change", handleRouteChange as any);
+      window.history.pushState = origPush;
+    };
+  }, []);
+
+  const PageComponent = getPageForRoute(currentPath) || (() => <div>Page not found</div>);
+
   return (
     <div className="${themeClass} min-h-dvh bg-background text-foreground">
-      ${inspectorWrap("<MainComponent />")}
+      ${inspectorWrap("<PageComponent />")}
     </div>
   );
 }`;
@@ -476,26 +581,33 @@ const shadcnFiles = {
   export function useRouter() {
     return {
       push: (url: string) => {
-        if (typeof window !== "undefined") window.history.pushState({}, "", url)
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", url);
+          // Notify our multi-page App wrapper so it actually switches pages
+          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
+        }
       },
       replace: (url: string) => {
-        if (typeof window !== "undefined") window.history.replaceState({}, "", url)
+        if (typeof window !== "undefined") {
+          window.history.replaceState({}, "", url);
+          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
+        }
       },
       back: () => {
-        if (typeof window !== "undefined") window.history.back()
+        if (typeof window !== "undefined") window.history.back();
       },
       refresh: () => {}
     }
   }
 
   export function usePathname() {
-    return typeof window === "undefined" ? "/" : window.location.pathname
+    return typeof window === "undefined" ? "/" : window.location.pathname;
   }
 
   export function useSearchParams() {
     return new URLSearchParams(
       typeof window === "undefined" ? "" : window.location.search
-    )
+    );
   }
   `,
   "/lib/next-link.tsx": `

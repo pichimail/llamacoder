@@ -217,7 +217,15 @@ export default function ReactCodeRunner({
       const index = routes.indexOf(normalized);
       if (index >= 0) {
         setRouteIndex(index);
-        setPreviewUrl(routeToPreviewUrl(normalized));
+      }
+      const targetUrl = routeToPreviewUrl(normalized);
+      setPreviewUrl(targetUrl);
+
+      // Force the iframe / sandpack preview to update location for our multi-page root
+      if (typeof window !== "undefined") {
+        // This will trigger our improved App wrapper + next-navigation shim
+        window.history.pushState({}, "", targetUrl);
+        window.dispatchEvent(new CustomEvent("preview-route-change", { detail: { path: normalized } }));
       }
     },
     [routes],
@@ -247,7 +255,7 @@ export default function ReactCodeRunner({
       data-preview-mode={activePreviewMode}
       style={{ "--preview-viewport-width": activeModeConfig.viewportWidth } as CSSProperties}
       className={`relative h-full w-full [&_.sp-preview-container]:flex [&_.sp-preview-container]:h-full [&_.sp-preview-container]:w-full [&_.sp-preview-container]:grow [&_.sp-preview-container]:flex-col [&_.sp-preview-container]:items-center [&_.sp-preview-container]:justify-center [&_.sp-preview-container]:overflow-auto [&_.sp-preview-iframe]:!w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:!max-w-[var(--preview-viewport-width)] [&_.sp-preview-iframe]:grow [&_.sp-preview-iframe]:!rounded-xl [&_.sp-preview-iframe]:!border [&_.sp-preview-iframe]:!border-border [&_.sp-preview-iframe]:!bg-background ${hiddenValidation ? "pointer-events-none opacity-0" : ""}`}
-      {...getSandpackConfig(files, extraDependencies, sandpackOptions)}
+      {...getSandpackConfig(files, extraDependencies, sandpackOptions, activeRoute)}
     >
       {!hiddenValidation && !showWebPreviewChrome && routes.length > 1 ? (
         <ArtifactRouteControls
