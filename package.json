@@ -9,6 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "tsc --noEmit --noUnusedLocals",
+    "test:e2e": "playwright test",
     "export:training": "npx tsx scripts/export-training-data.ts",
     "run:finetune": "npx tsx scripts/run-finetune.ts",
     "capture:og": "npx tsx scripts/capture-preview-og.ts"
