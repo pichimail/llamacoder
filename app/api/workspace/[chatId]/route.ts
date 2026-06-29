@@ -6,6 +6,11 @@ import {
   formatGeneratedCodeIssues,
   validateGeneratedCodeFiles,
 } from "@/lib/generated-code-validation";
+import {
+  accessErrorResponse,
+  requireChatAccess,
+  type AccessLevel,
+} from "@/lib/access-control";
 
 type ArtifactFileInput = {
   path: string;
@@ -41,6 +46,12 @@ function cleanFiles(files: ArtifactFileInput[] = []) {
       return { path, content };
     })
     .filter((file) => file.path && !file.path.endsWith(".gitkeep"));
+}
+
+function accessLevelForAction(action: string): AccessLevel {
+  if (action === "validate") return "viewer";
+  if (action === "save-env" || action === "connect-github" || action === "create-pr") return "owner";
+  return "editor";
 }
 
 function inferModeFromMessages(
@@ -173,6 +184,12 @@ async function syncFiles(chatId: string, files: ArtifactFileInput[]) {
 
 export async function GET(_: Request, context: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await context.params;
+  try {
+    await requireChatAccess(chatId, "viewer");
+  } catch (error) {
+    return accessErrorResponse(error);
+  }
+
   const workspace = await serializeWorkspace(chatId);
   if (!workspace) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
   return NextResponse.json(workspace);
@@ -182,6 +199,12 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   const { chatId } = await context.params;
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "");
+
+  try {
+    await requireChatAccess(chatId, accessLevelForAction(action));
+  } catch (error) {
+    return accessErrorResponse(error);
+  }
 
   if (action === "sync") {
     const result = await syncFiles(chatId, body.files || []);
