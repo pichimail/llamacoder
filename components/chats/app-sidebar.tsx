@@ -6,6 +6,7 @@ import { GalleryVerticalEnd, Home, Images, MessageSquare, Plus, Shield } from "l
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { NavChats, type SidebarChat } from "@/components/chats/nav-chats"
+import ThemeToggle from "@/components/theme-toggle"
 import type { HomeSidebarUser } from "@/components/home/use-home-sidebar-data"
 import {
   Sidebar,
@@ -16,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 
 function getNavMain(isAdmin?: boolean) {
@@ -108,6 +110,10 @@ export function ChatsAppSidebar({
         <NavChats chats={chats} currentChatId={currentChatId} />
       </SidebarContent>
       <SidebarFooter className="border-t border-white/8 bg-[#1F2023]/95">
+        <div className="px-2">
+          <ThemeToggle showLabel className="w-full justify-start rounded-xl border border-white/8 bg-white/5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white" />
+        </div>
+        <SidebarSeparator />
         {authEnabled && !isAuthenticated ? (
           <SidebarMenu>
             <SidebarMenuItem>
