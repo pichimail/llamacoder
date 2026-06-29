@@ -11,6 +11,7 @@ import { anyProviderConfigured } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { buildPhaseOneSpec } from "@/lib/build-engine";
 import { seedBuildArtifacts } from "@/lib/build-workspace";
+import { getCurrentUserOrNull, AuthError, authErrorResponse } from "@/lib/authz";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -53,6 +54,17 @@ function attachmentContext(attachments: {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get current user (required or use local dev user)
+    const user = await getCurrentUserOrNull();
+    
+    // Rate limit by user ID or IP
+    const rateLimitKey = user ? `create-chat:user:${user.id}` : `create-chat:ip:${request.headers.get("x-forwarded-for") || "unknown"}`;
+    try {
+      await rateLimitOrThrow(rateLimitKey, { limit: 18, windowSeconds: 60 });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
+    }
+
     const json = await request.json().catch(() => null);
     const parsed = createChatSchema.safeParse(json);
     if (!parsed.success) {
@@ -71,15 +83,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" }, { status: 500 });
     }
 
-    try {
-      await rateLimitOrThrow(`create-chat:${request.headers.get("x-forwarded-for") || "local"}`, { limit: 18, windowSeconds: 60 });
-    } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
-    }
-
     const prisma = getPrisma();
+    
+    // Create a project for authenticated users
+    let projectId: string | null = null;
+    if (user) {
+      const project = await prisma.project.create({
+        data: {
+          name: buildSpec.title || "Untitled App",
+          description: prompt.substring(0, 200) || null,
+          userId: user.id,
+        },
+      });
+      projectId = project.id;
+    }
+    
     const chat = await prisma.chat.create({
-      data: { model: resolvedModel, quality, prompt, title: buildSpec.title, shadcn },
+      data: { model: resolvedModel, quality, prompt, title: buildSpec.title, shadcn, projectId },
     });
 
     const userMessage = screenshotUrl

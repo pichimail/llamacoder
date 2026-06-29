@@ -1,7 +1,7 @@
 import "server-only";
 
-import { auth } from "@/lib/auth";
 import { ADMIN_EMAIL, isAdminEmail } from "@/lib/admin-config";
+import { requireAdmin, AuthError } from "@/lib/authz";
 
 export { ADMIN_EMAIL, isAdminEmail };
 
@@ -9,12 +9,21 @@ export { ADMIN_EMAIL, isAdminEmail };
 export const ADMIN_COOKIE = "cc_admin";
 
 export async function getAdminSession() {
-  const session = await auth();
-  return isAdminEmail(session?.user?.email) ? session : null;
+  try {
+    const user = await requireAdmin();
+    return { user };
+  } catch {
+    return null;
+  }
 }
 
 export async function isAdminRequest() {
-  return Boolean(await getAdminSession());
+  try {
+    await requireAdmin();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Password admin login is intentionally disabled. Admin access is Google OAuth only.

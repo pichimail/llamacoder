@@ -6,6 +6,7 @@ import {
   formatGeneratedCodeIssues,
   validateGeneratedCodeFiles,
 } from "@/lib/generated-code-validation";
+import { getCurrentUserOrNull, AuthError, authErrorResponse, requireChatAccess } from "@/lib/authz";
 
 type ArtifactFileInput = {
   path: string;
@@ -172,18 +173,40 @@ async function syncFiles(chatId: string, files: ArtifactFileInput[]) {
 }
 
 export async function GET(_: Request, context: { params: Promise<{ chatId: string }> }) {
-  const { chatId } = await context.params;
-  const workspace = await serializeWorkspace(chatId);
-  if (!workspace) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
-  return NextResponse.json(workspace);
+  try {
+    const { chatId } = await context.params;
+    const user = await getCurrentUserOrNull();
+    
+    // Verify user can access this chat
+    if (user) {
+      await requireChatAccess(chatId, user.id, "read");
+    }
+    
+    const workspace = await serializeWorkspace(chatId);
+    if (!workspace) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    return NextResponse.json(workspace);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
+    return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  }
 }
 
 export async function POST(request: Request, context: { params: Promise<{ chatId: string }> }) {
-  const { chatId } = await context.params;
-  const body = await request.json().catch(() => ({}));
-  const action = String(body.action || "");
+  try {
+    const { chatId } = await context.params;
+    const user = await getCurrentUserOrNull();
+    
+    // Verify user can access this chat
+    if (user) {
+      await requireChatAccess(chatId, user.id, "write");
+    }
+    
+    const body = await request.json().catch(() => ({}));
+    const action = String(body.action || "");
 
-  if (action === "sync") {
+    if (action === "sync") {
     const result = await syncFiles(chatId, body.files || []);
     if (!result) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     return NextResponse.json({
@@ -324,7 +347,14 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     return NextResponse.json({ ok: true, prUrl: pr.url, branch: pr.branch, fileCount: result?.count || 0, workspace: await serializeWorkspace(chatId) });
   }
 
-  return NextResponse.json({ error: "Unknown workspace action" }, { status: 400 });
+    return NextResponse.json({ error: "Unknown workspace action" }, { status: 400 });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
+    console.error("Workspace API error:", error);
+    return NextResponse.json({ error: "Workspace action failed" }, { status: 500 });
+  }
 }
 
 export const runtime = "nodejs";
