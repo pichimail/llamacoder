@@ -149,7 +149,7 @@ function PremiumPromptComposer({
 
   return (
     <div className="w-full">
-      <div className="rounded-[28px] border border-white/10 bg-[#1F2023]/96 p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
+      <div className="rounded-[28px] border border-white/10 bg-[#1f1f22] p-2.5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
         <textarea
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
@@ -163,7 +163,7 @@ function PremiumPromptComposer({
           aria-label="Describe what to build"
           disabled={disabled}
           rows={3}
-          className="min-h-[76px] w-full resize-none rounded-[20px] bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+          className="min-h-[76px] w-full resize-none rounded-[20px] bg-[#1f1f22] px-2.5 py-2 text-[15px] leading-relaxed text-white outline-none placeholder:text-zinc-400 disabled:opacity-60"
         />
 
         {attachmentReady ? (

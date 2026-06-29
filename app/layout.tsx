@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
 import { GlobalAppShell } from "@/components/global-app-shell";
 import "./globals.css";
+import { Public_Sans } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
 
 let title = "Chinna-Coder";
 let description = "Turn ideas into apps with Chinna-Coder.";
@@ -40,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-background text-foreground" suppressHydrationWarning>
+    <html lang="en" className={cn("h-full bg-background text-foreground", "font-sans", publicSans.variable)} suppressHydrationWarning>
       <head>
         <PlausibleProvider domain="llamacoder.io" />
       </head>

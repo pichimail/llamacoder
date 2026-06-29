@@ -164,6 +164,13 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
 export function GlobalAppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  const pathname = usePathname();
+  const isAdminRoute = pathname.startsWith("/admin");
+
+  if (isAdminRoute) {
+    // For admin routes, render children directly (admin layout provides its own sidebar)
+    return <>{children}</>;
+  }
 
   return (
     <div className={cn("min-h-dvh bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out lg:grid", collapsed ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[320px_minmax(0,1fr)]")}>
