@@ -35,12 +35,12 @@ function SidebarLink({ href, icon: Icon, label, active, collapsed, onClick }: { 
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "group flex h-11 items-center rounded-xl text-[15px] text-zinc-200 transition hover:bg-zinc-800/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-400",
-        collapsed ? "justify-center px-0" : "gap-3 px-4",
+        "group flex h-9 items-center rounded-xl text-sm text-zinc-200 transition hover:bg-zinc-800/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-400",
+        collapsed ? "justify-center px-0" : "gap-2.5 px-3",
         active && "bg-zinc-800 text-white",
       )}
     >
-      <Icon className="size-5 shrink-0 stroke-[1.9]" aria-hidden="true" />
+      <Icon className="size-4 shrink-0 stroke-[1.9]" aria-hidden="true" />
       {!collapsed ? <span className="truncate">{label}</span> : null}
     </Link>
   );
@@ -52,7 +52,7 @@ function ChatListLink({ href, label, active, onClick }: { href: string; label: s
       href={href}
       onClick={onClick}
       className={cn(
-        "block truncate rounded-xl px-4 py-2.5 text-[15px] text-zinc-200 transition hover:bg-zinc-800/90",
+        "block truncate rounded-xl px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-800/90",
         active && "bg-zinc-800 text-white",
       )}
     >

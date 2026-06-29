@@ -2,12 +2,15 @@
 
 import { HomeShell } from "@/components/home/home-shell";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ArrowUp } from "lucide-react";
+import { useState, useRef } from "react";
+import { ArrowUp, Paperclip } from "lucide-react";
+import Link from "next/link";
+import Header from "@/components/header";
+import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { toast } from "@/hooks/use-toast";
 
 const HERO_GRADIENT =
-  "linear-gradient(180deg, #0a0c1f 0%, #0e1f5a 20%, #2a237a 38%, #4f2a8f 52%, #7c2a7a 68%, #c23a6a 82%, #f05a7a 92%, #ff7a5a 100%)";
+  "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
 
 const PROMPT_CHIP_GROUPS = [
   {
@@ -107,6 +110,8 @@ export default function HomePageClient() {
 
   const [prompt, setPrompt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
 
@@ -146,116 +151,114 @@ export default function HomePageClient() {
       .finally(() => setIsSubmitting(false));
   };
 
+  const handleAttachmentUpload = async (file: File) => {
+    // simple stub - in real it would upload
+    const url = URL.createObjectURL(file);
+    setScreenshotUrl(url);
+    setPrompt((p) => p || "Build from the attached file.");
+  };
+
   return (
     <HomeShell>
-      <div className="flex min-h-dvh bg-[#0a0a0a] text-white">
-        {/* Sidebar styled exactly like the reference */}
-        <div className="hidden w-64 flex-shrink-0 flex-col border-r border-white/10 bg-[#0a0a0a] text-sm lg:flex">
-          <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-3.5">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-[#ff4d8d] text-[11px] font-bold">P</div>
-            <span className="font-medium">pichi's Llamacoder</span>
-            <span className="ml-0.5 text-white/50">⌄</span>
-          </div>
+      <div className="flex min-h-dvh flex-col text-foreground">
+        <section
+          id="hero"
+          className="relative flex min-h-dvh overflow-hidden"
+          style={{ background: HERO_GRADIENT }}
+        >
+          {/* subtle space and curved corners for the gradient background */}
+          <div className="relative m-3 md:m-4 flex-1 overflow-hidden rounded-[28px]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,122,0,0.34),transparent_30%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_34%)]" />
 
-          <div className="flex-1 overflow-auto px-2 py-3 space-y-px text-[13px]">
-            <div className="flex items-center gap-2 rounded bg-white/10 px-3 py-1.5 font-medium">📊 Dashboard</div>
-            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">🔍 Search <span className="ml-auto text-[10px] opacity-50">⌘K</span></div>
-            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">📚 Resources</div>
-            <div className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:bg-white/5 rounded cursor-pointer">🔌 Connectors</div>
+            <div className="relative flex min-h-dvh w-full flex-col">
+              <Header hideLogo />
 
-            <div className="pt-3 pb-1 px-3 text-[10px] tracking-[1px] text-white/40">PROJECTS</div>
-            <div className="pl-1 space-y-px">
-              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">All projects</div>
-              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Starred</div>
-              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Created by me</div>
-              <div className="px-3 py-1 text-white/70 hover:bg-white/5 rounded cursor-pointer">Shared with me</div>
-            </div>
+              <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-0 md:pb-32">
+                <div className="flex w-full max-w-[760px] -translate-y-4 flex-col items-center md:-translate-y-8">
+                  <div className="mb-4 min-h-[4.25rem] md:min-h-[5.25rem] flex items-center justify-center">
+                    <h1 className="text-4xl font-semibold tracking-tighter md:text-[42px] text-center">
+                      Let's build something, pichi
+                    </h1>
+                  </div>
 
-            <div className="pt-3 pb-1 px-3 text-[10px] tracking-[1px] text-white/40">RECENTS</div>
-            <div className="pl-1 text-white/60 space-y-px">
-              <div className="px-3 py-1 hover:bg-white/5 rounded cursor-pointer truncate">Dashboard builder</div>
-              <div className="px-3 py-1 hover:bg-white/5 rounded cursor-pointer truncate">SaaS landing</div>
-            </div>
-          </div>
-        </div>
+                  <div id="prompt-composer" className="relative w-full max-w-[620px]">
+                    {/* Dark grey prompt input with soft curved corners */}
+                    <div className="flex items-center gap-3 rounded-3xl bg-[#1f1f22] border border-white/10 pl-5 pr-2 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                      <button 
+                        onClick={() => { /* attach logic if needed */ }}
+                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-lg leading-none hover:bg-white/15 transition"
+                      >
+                        +
+                      </button>
 
-        {/* Main area with subtle space + soft rounded gradient */}
-        <div className="flex-1 p-3 md:p-4">
-          <div
-            className="relative flex h-full flex-col items-center justify-center overflow-hidden rounded-[28px] p-8 md:p-12"
-            style={{ background: HERO_GRADIENT }}
-          >
-            {/* soft overlays */}
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_45%_25%,rgba(255,255,255,0.06),transparent)]" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_55%_80%,rgba(0,0,0,0.28),transparent)]" />
+                      <input
+                        type="text"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handlePromptSend();
+                          }
+                        }}
+                        placeholder="Ask Llamacoder to create a dashboard"
+                        className="flex-1 bg-transparent outline-none placeholder:text-white/50 text-white"
+                      />
 
-            {/* Toggle view icon */}
-            <div className="absolute right-5 top-5 z-20">
-              <button className="rounded-lg border border-white/15 bg-black/30 p-1.5 hover:bg-white/10 transition" title="Toggle view">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="relative z-10 w-full max-w-[620px] px-6 text-center">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-0.5 text-xs backdrop-blur">
-                <span className="flex -space-x-0.5">
-                  <span className="block h-2.5 w-2.5 rounded-full bg-blue-400 ring-1 ring-black/60" />
-                  <span className="block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-1 ring-black/60" />
-                  <span className="block h-2.5 w-2.5 rounded-full bg-violet-400 ring-1 ring-black/60" />
-                </span>
-                <span>Connect all your tools</span>
-              </div>
-
-              <h1 className="text-4xl font-semibold tracking-tighter md:text-[42px] mb-8">
-                Let's build something, pichi
-              </h1>
-
-              {/* Dark grey prompt input with soft curved corners */}
-              <div className="mx-auto w-full">
-                <div className="flex items-center gap-3 rounded-3xl bg-[#1f1f22] border border-white/10 pl-5 pr-2 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                  <button className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-lg leading-none hover:bg-white/15 transition">
-                    +
-                  </button>
-
-                  <input
-                    type="text"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handlePromptSend(); }}
-                    placeholder="Ask Llamacoder to create a dashboard"
-                    className="flex-1 bg-transparent outline-none placeholder:text-white/50 text-white"
-                  />
-
-                  <div className="flex items-center gap-1 text-white/60">
-                    <div className="flex cursor-pointer items-center rounded-full bg-white/5 px-3 py-1 text-xs hover:bg-white/10">
-                      Build <span className="ml-0.5 text-[9px]">⌄</span>
+                      <div className="flex items-center gap-1 text-white/60">
+                        <div className="flex cursor-pointer items-center rounded-full bg-white/5 px-3 py-1 text-xs hover:bg-white/10">
+                          Build <span className="ml-0.5 text-[9px]">⌄</span>
+                        </div>
+                        <button
+                          onClick={handlePromptSend}
+                          disabled={isSubmitting || !prompt.trim()}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-50 transition active:scale-[0.96]"
+                        >
+                          <ArrowUp size={15} />
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={handlePromptSend}
-                      disabled={isSubmitting || !prompt.trim()}
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-50 transition active:scale-[0.96]"
-                    >
-                      <ArrowUp size={15} />
-                    </button>
+
+                    {/* Preset quick prompts */}
+                    <PresetChipsScroller
+                      groups={PROMPT_CHIP_GROUPS}
+                      activeTitles={promptChipIndexes}
+                      onSelect={handlePromptChipClick}
+                    />
                   </div>
                 </div>
               </div>
-
-              {/* Preset quick prompts - kept as requested */}
-              <PresetChipsScroller
-                groups={PROMPT_CHIP_GROUPS}
-                activeTitles={promptChipIndexes}
-                onSelect={handlePromptChipClick}
-              />
             </div>
           </div>
-        </div>
+        </section>
+
+        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5">
+          <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
+            <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p>
+              </div>
+              <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link>
+            </div>
+            <div className="mt-4">
+              <FeaturedAppsGrid apps={[]} limit={6} compact />
+            </div>
+          </div>
+        </section>
       </div>
+
+      <input
+        ref={fileInputRef}
+        className="hidden"
+        type="file"
+        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleAttachmentUpload(file);
+          if (event.currentTarget) event.currentTarget.value = "";
+        }}
+      />
     </HomeShell>
   );
 }
