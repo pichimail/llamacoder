@@ -3,23 +3,13 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { TextColor } from "@/components/ui/text-color";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  use,
-  useState,
-  useTransition,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
+import { useRouter } from "next/navigation";
+import { use, useRef, useState, useTransition } from "react";
 import { ArrowUp, Paperclip } from "lucide-react";
 import { Context } from "./providers";
-
 import Header from "@/components/header";
 import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { MODELS } from "@/lib/constants";
-import { useAvailableModels } from "@/lib/use-available-models";
 import type { FeaturedApp } from "@/lib/featured-apps";
 import { PromptRewriteButton } from "@/components/prompt-rewrite-button";
 import { PlanModePanel } from "@/components/plan-mode-panel";
@@ -28,7 +18,6 @@ import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
 type Mode = "ask" | "plan" | "agent";
-type VisibleModel = (typeof MODELS)[number] & { available?: boolean };
 
 const PROMPT_CHIP_GROUPS = [
   {
@@ -91,31 +80,28 @@ const PROMPT_CHIP_GROUPS = [
 
 const HERO_GRADIENT =
   "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
-const COMPOSER_MAX_WIDTH = "760px";
 
 function PresetChipsScroller({
-  groups,
   activeTitles,
   onSelect,
 }: {
-  groups: typeof PROMPT_CHIP_GROUPS;
   activeTitles: Record<string, number>;
   onSelect: (group: (typeof PROMPT_CHIP_GROUPS)[number]) => void;
 }) {
   return (
     <div className="mx-auto mt-3 w-full max-w-[760px] overflow-hidden px-0.5">
       <div className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {groups.map((group) => {
+        {PROMPT_CHIP_GROUPS.map((group) => {
           const isActive = typeof activeTitles[group.title] === "number";
           return (
             <button
               key={group.title}
               type="button"
               onClick={() => onSelect(group)}
-              className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 ${
+              className={`shrink-0 snap-start whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 ${
                 isActive
-                  ? "border-white/75 bg-white/82 text-slate-950 shadow-[0_12px_28px_rgba(15,23,42,0.12)]"
-                  : "border-white/42 bg-white/44 text-slate-800 hover:border-white/70 hover:bg-white/68 hover:text-slate-950"
+                  ? "border-white/75 bg-white/80 text-slate-950 shadow-[0_12px_28px_rgba(15,23,42,0.12)]"
+                  : "border-white/40 bg-white/45 text-slate-800 hover:border-white/70 hover:bg-white/70 hover:text-slate-950"
               }`}
             >
               {group.title}
@@ -137,7 +123,6 @@ function PremiumPromptComposer({
   onModeChange,
   model,
   onModelChange,
-  models,
   shadcnEnabled,
   onShadcnChange,
   reasoningEnabled,
@@ -154,7 +139,6 @@ function PremiumPromptComposer({
   onModeChange: (mode: Mode) => void;
   model: string;
   onModelChange: (model: string) => void;
-  models: VisibleModel[];
   shadcnEnabled: boolean;
   onShadcnChange: (value: boolean) => void;
   reasoningEnabled: boolean;
@@ -163,7 +147,8 @@ function PremiumPromptComposer({
   attachmentReady?: boolean;
 }) {
   const hasValue = value.trim().length > 0 || attachmentReady;
-  const selectedModel = models.find((item) => item.value === model);
+  const visibleModels = MODELS.filter((item) => !item.hidden);
+  const selectedModel = visibleModels.find((item) => item.value === model);
 
   return (
     <div className="w-full max-w-[760px]">
@@ -192,13 +177,7 @@ function PremiumPromptComposer({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onAttach}
-              disabled={disabled}
-              className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
-              aria-label="Attach file"
-            >
+            <button type="button" onClick={onAttach} disabled={disabled} className="inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40" aria-label="Attach file">
               <Paperclip className="size-3.5" aria-hidden="true" />
             </button>
             <OptionDropdown
@@ -208,10 +187,7 @@ function PremiumPromptComposer({
               triggerLabel={<span className="capitalize">{mode}</span>}
               triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
               contentClassName="rounded-2xl"
-              options={(["agent", "ask", "plan"] as const).map((item) => ({
-                value: item,
-                label: <span className="capitalize">{item}</span>,
-              }))}
+              options={(["agent", "ask", "plan"] as const).map((item) => ({ value: item, label: <span className="capitalize">{item}</span> }))}
             />
             <OptionDropdown
               value={model}
@@ -220,62 +196,16 @@ function PremiumPromptComposer({
               triggerLabel={<span className="block max-w-[104px] truncate sm:max-w-[150px]">{selectedModel?.label ?? model}</span>}
               triggerClassName="h-8 rounded-full border border-white/10 bg-white/[0.055] px-3 text-xs text-zinc-200 hover:bg-white/10"
               contentClassName="max-h-[320px] overflow-y-auto rounded-2xl"
-              options={models.map((item) => ({
-                value: item.value,
-                label: item.available === false ? `${item.label} (needs key)` : item.label,
-                disabled: item.available === false,
-              }))}
+              options={visibleModels.map((item) => ({ value: item.value, label: item.label }))}
             />
           </div>
 
           <div className="flex items-center gap-1.5">
-            {value.trim() ? (
-              <PromptRewriteButton
-                prompt={value}
-                mode={mode}
-                model={model}
-                onRewrite={onValueChange}
-                disabled={disabled}
-                iconOnly
-              />
-            ) : null}
-            <button
-              type="button"
-              onClick={() => onReasoningChange(!reasoningEnabled)}
-              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
-                reasoningEnabled
-                  ? "border-violet-300/40 bg-violet-300/15 text-violet-100"
-                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              }`}
-              aria-pressed={reasoningEnabled}
-            >
-              Think
-            </button>
-            <button
-              type="button"
-              onClick={() => onShadcnChange(!shadcnEnabled)}
-              className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${
-                shadcnEnabled
-                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-100"
-                  : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              }`}
-              aria-pressed={shadcnEnabled}
-            >
-              shadcn
-            </button>
-            <VoiceInputButton
-              onTranscript={(text) => onValueChange(`${value}${value.trim() ? " " : ""}${text}`)}
-              disabled={disabled}
-              className="size-8 rounded-full border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"
-              label="Dictate prompt"
-            />
-            <button
-              type="button"
-              onClick={() => onSend(value)}
-              disabled={disabled || !hasValue}
-              className="inline-flex size-8 items-center justify-center rounded-full bg-white text-[#1F2023] shadow-sm transition hover:-translate-y-px hover:bg-white/85 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-zinc-500"
-              aria-label={isLoading ? "Generating" : "Send prompt"}
-            >
+            {value.trim() ? <PromptRewriteButton prompt={value} mode={mode} model={model} onRewrite={onValueChange} disabled={disabled} iconOnly /> : null}
+            <button type="button" onClick={() => onReasoningChange(!reasoningEnabled)} className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${reasoningEnabled ? "border-violet-300/40 bg-violet-300/15 text-violet-100" : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"}`} aria-pressed={reasoningEnabled}>Think</button>
+            <button type="button" onClick={() => onShadcnChange(!shadcnEnabled)} className={`hidden h-8 rounded-full border px-3 text-xs transition sm:inline-flex ${shadcnEnabled ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-100" : "border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white"}`} aria-pressed={shadcnEnabled}>shadcn</button>
+            <VoiceInputButton onTranscript={(text) => onValueChange(`${value}${value.trim() ? " " : ""}${text}`)} disabled={disabled} className="size-8 rounded-full border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white" label="Dictate prompt" />
+            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-8 items-center justify-center rounded-full bg-white text-[#1F2023] shadow-sm transition hover:-translate-y-px hover:bg-white/85 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-zinc-500" aria-label={isLoading ? "Generating" : "Send prompt"}>
               <ArrowUp className="size-4" aria-hidden="true" />
             </button>
           </div>
@@ -287,9 +217,8 @@ function PremiumPromptComposer({
 
 export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const context = use(Context);
-  const [prompt, setPrompt] = useState(searchParams.get("prompt") || "");
+  const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(MODELS.find((item) => !item.hidden)?.value || "zai-org/GLM-5");
   const [mode, setMode] = useState<Mode>("agent");
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
@@ -298,26 +227,15 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [promptChipIndexes, setPromptChipIndexes] = useState<Record<string, number>>({});
-  const availableModels = useAvailableModels();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const visibleModels = useMemo<VisibleModel[]>(
-    () => (availableModels ?? MODELS.filter((item) => !item.hidden)) as VisibleModel[],
-    [availableModels],
-  );
-
-  useEffect(() => {
-    const fromUrl = searchParams.get("prompt");
-    if (fromUrl) setPrompt(fromUrl);
-  }, [searchParams]);
-
-  const handlePromptChipClick = useCallback((group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
+  const handlePromptChipClick = (group: (typeof PROMPT_CHIP_GROUPS)[number]) => {
     setPromptChipIndexes((current) => {
       const nextIndex = ((current[group.title] ?? -1) + 1) % group.prompts.length;
       setPrompt(group.prompts[nextIndex]);
       return { ...current, [group.title]: nextIndex };
     });
-  }, []);
+  };
 
   const handleAttachmentUpload = async (file: File) => {
     setScreenshotLoading(true);
@@ -333,11 +251,7 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
       toast({ title: "Attachment ready" });
     } catch (error) {
       setScreenshotUrl(undefined);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Could not upload attachment.",
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Could not upload attachment.", variant: "destructive" });
     } finally {
       setScreenshotLoading(false);
     }
@@ -350,26 +264,14 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
     startTransition(async () => {
       let finalPrompt = cleanPrompt || "Build from the attached file.";
       if (screenshotUrl) finalPrompt += `\n\nAttachment: ${screenshotUrl}`;
-
       const response = await fetch("/api/create-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          model,
-          quality: "high",
-          mode,
-          shadcn: shadcnEnabled,
-          reasoning: reasoningEnabled,
-        }),
+        body: JSON.stringify({ prompt: finalPrompt, model, quality: "high", mode, shadcn: shadcnEnabled, reasoning: reasoningEnabled }),
       });
       const data = await response.json();
       if (!response.ok || !data?.id) {
-        toast({
-          title: "Could not start build",
-          description: data?.error || "Please check auth/API configuration.",
-          variant: "destructive",
-        });
+        toast({ title: "Could not start build", description: data?.error || "Please check auth/API configuration.", variant: "destructive" });
         return;
       }
       context.setStreamPromise(data.streamPromise);
@@ -380,47 +282,18 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
   return (
     <HomeShell>
       <div className="flex min-h-dvh flex-col text-foreground">
-        <section
-          id="hero"
-          className="relative flex min-h-dvh overflow-hidden rounded-none lg:rounded-[28px]"
-          style={{ background: HERO_GRADIENT }}
-        >
+        <section id="hero" className="relative flex min-h-dvh overflow-hidden" style={{ background: HERO_GRADIENT }}>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,122,0,0.34),transparent_30%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_34%)]" />
           <div className="relative flex min-h-dvh w-full flex-col">
             <Header hideLogo />
-
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-0 md:pb-32">
               <div className="flex w-full max-w-[760px] -translate-y-4 flex-col items-center md:-translate-y-8">
                 <TextColor className="mb-4 min-h-[4.25rem] md:min-h-[5.25rem]" />
-
-                <div id="prompt-composer" className="relative w-full" style={{ ["--an-max-width" as any]: COMPOSER_MAX_WIDTH }}>
+                <div id="prompt-composer" className="relative w-full">
                   {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
-                  <PremiumPromptComposer
-                    value={prompt}
-                    onValueChange={setPrompt}
-                    onSend={handlePromptSend}
-                    isLoading={isSubmitting || screenshotLoading}
-                    disabled={isSubmitting || screenshotLoading}
-                    mode={mode}
-                    onModeChange={setMode}
-                    model={model}
-                    onModelChange={setModel}
-                    models={visibleModels}
-                    shadcnEnabled={shadcnEnabled}
-                    onShadcnChange={setShadcnEnabled}
-                    reasoningEnabled={reasoningEnabled}
-                    onReasoningChange={setReasoningEnabled}
-                    onAttach={() => fileInputRef.current?.click()}
-                    attachmentReady={Boolean(screenshotUrl)}
-                  />
-
-                  <PresetChipsScroller groups={PROMPT_CHIP_GROUPS} activeTitles={promptChipIndexes} onSelect={handlePromptChipClick} />
-
-                  {mode === "ask" ? (
-                    <p className="mt-2 text-center text-xs text-slate-900/80">
-                      Ask mode — best for questions, refinements, and targeted changes.
-                    </p>
-                  ) : null}
+                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting || screenshotLoading} disabled={isSubmitting || screenshotLoading} mode={mode} onModeChange={setMode} model={model} onModelChange={setModel} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} reasoningEnabled={reasoningEnabled} onReasoningChange={setReasoningEnabled} onAttach={() => fileInputRef.current?.click()} attachmentReady={Boolean(screenshotUrl)} />
+                  <PresetChipsScroller activeTitles={promptChipIndexes} onSelect={handlePromptChipClick} />
+                  {mode === "ask" ? <p className="mt-2 text-center text-xs text-slate-900/80">Ask mode — best for questions, refinements, and targeted changes.</p> : null}
                 </div>
               </div>
             </div>
@@ -430,29 +303,14 @@ export function HomePageClient({ featuredApps }: { featuredApps: FeaturedApp[] }
         <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-8 pt-5">
           <div className="rounded-[36px] border border-border/70 bg-background/95 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.18)] backdrop-blur-md md:px-5 md:py-5">
             <div className="flex items-end justify-between gap-4 border-b border-border/60 pb-4">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">Featured templates</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p>
-              </div>
+              <div><h2 className="text-lg font-semibold tracking-tight">Featured templates</h2><p className="mt-1 text-sm text-muted-foreground">Open a responsive preview, then remix in the builder.</p></div>
               <Link href="/gallery" className="text-xs text-muted-foreground transition hover:text-foreground">View gallery</Link>
             </div>
-            <div className="mt-4">
-              <FeaturedAppsGrid apps={featuredApps} limit={6} compact />
-            </div>
+            <div className="mt-4"><FeaturedAppsGrid apps={featuredApps} limit={6} compact /></div>
           </div>
         </section>
       </div>
-      <input
-        ref={fileInputRef}
-        className="hidden"
-        type="file"
-        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void handleAttachmentUpload(file);
-          if (event.currentTarget) event.currentTarget.value = "";
-        }}
-      />
+      <input ref={fileInputRef} className="hidden" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
     </HomeShell>
   );
 }
