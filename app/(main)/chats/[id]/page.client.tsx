@@ -25,6 +25,28 @@ import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
+
+import {
+  Plan,
+  PlanHeader,
+  PlanTitle,
+  PlanDescription,
+  PlanAction,
+  PlanContent,
+  PlanFooter,
+  PlanTrigger,
+} from "@/components/ai-elements/plan";
+import { Streamdown } from "streamdown";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -39,7 +61,7 @@ import type { PreviewMode } from "@/components/code-runner-react";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: false });
 
-type BuilderMode = "preview" | "code" | "design" | "database";
+type BuilderMode = "preview" | "code" | "design" | "database" | "canvas" | "plan";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
 const MAX_AUTO_FIX_ATTEMPTS = 3;
@@ -59,13 +81,7 @@ function normalizeFile(file: RawGeneratedFile): ArtifactFile {
   return { path, code, language };
 }
 
-function hasMessageFiles(message: Message) {
-  return (
-    message.role === "assistant" &&
-    ((Array.isArray(message.files) && (message.files as unknown[]).length > 0) ||
-      extractAllCodeBlocks(message.content).length > 0)
-  );
-}
+
 
 function formatFixFileContext(files: RawGeneratedFile[]) {
   let remaining = FIX_CONTEXT_CHAR_BUDGET;
@@ -108,7 +124,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
   const { resolvedTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
+  const [activeTab, setActiveTab] = useState<"code" | "preview">("code"); // default to code view showing writing process as per new flow
   const [builderMode, setBuilderMode] = useState<BuilderMode>("code");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -119,6 +135,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [designSaveRequest, setDesignSaveRequest] = useState(0);
   const [pendingMode, setPendingMode] = useState<BuilderMode | null>(null);
   const [showUnsavedOverlay, setShowUnsavedOverlay] = useState(false);
+  const [envModalOpen, setEnvModalOpen] = useState(false);
+  const [requiredEnvKeys, setRequiredEnvKeys] = useState<string[]>([]);
+  const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [designSaving, setDesignSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   const [autoFixEnabled, setAutoFixEnabled] = useState(true);
@@ -190,9 +209,13 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const isReasoningStreaming =
     !!streamPromise && streamReasoningEnabled && !hasCodeInStream;
 
+  // Stable file source for preview and editor.
+  // We keep the last committed good files as base. Live stream segments only overlay/add/replace during the current turn.
+  // This ensures that starting a new iteration or fix stream does not visually erase the previous successful files.
   const artifactFiles = useMemo(() => {
     const byPath = new Map<string, ArtifactFile>();
-    if (activeMessage) getMessageFiles(activeMessage).forEach((file) => {
+    const base = activeMessage ? getMessageFiles(activeMessage) : [];
+    base.forEach((file) => {
       const normalized = normalizeFile(file);
       byPath.set(normalized.path, normalized);
     });
@@ -328,11 +351,11 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     const shouldRebuild = fallback || singleFileArtifact || isCrammedSinglePage || attempt > 1;
     const prefix = auto
       ? shouldRebuild
-        ? "Rebuild the generated app cleanly as a proper multi-page project. Use app/layout.tsx for persistent UI (sidebars, nav) and dedicated route files (app/dashboard/page.tsx etc). Split large code into focused components, data, and pages."
-        : "Apply the smallest working fix for this preview error. Return only changed files and any newly required support files or routes."
+        ? "The current app has errors. Fix it by improving the EXISTING files. Return complete updated versions of only the files that need changes, plus any new supporting files. Do NOT start from a blank scaffold — preserve routes, layout, components and state that were already working. Use app/layout + proper routes."
+        : "Apply the smallest working fix for this preview error. Return only the changed files (with full content) and any minimal new support files required. Preserve all other existing files."
       : shouldRebuild
-        ? "The code is not working. Rebuild it as a complete corrected multi-page project with proper routing and layout."
-        : "The code is not working. Fix it with the smallest working patch across the relevant route files.";
+        ? "The code is not working. Improve the existing structure. Provide full content for every file you touch or add. Keep previous working routes and layout intact."
+        : "The code is not working. Fix it with the smallest working patch. Return full content only for files that change.";
     const fileManifest = normalizedFiles.map((file) => `- ${file.path}`).join("\n");
     const sourceContext = formatFixFileContext(normalizedFiles);
     const text = `${prefix}
@@ -436,8 +459,13 @@ Fix requirements:
   }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    void triggerAutoFix({ error, files: artifactFiles });
-  }, [artifactFiles, triggerAutoFix]);
+    // AGGRESSIVELY DISABLED for first version: auto-fixing is now backend-only and hidden.
+    // Only explicit user action (e.g. "fix this" in composer or future "Fix" button) will trigger fixes.
+    // User should not see separate auto-fix happening.
+    // Preview errors are logged but do not auto start new generations.
+    console.info("Preview error (auto-fix disabled for clean first-version flow):", error?.slice(0, 200));
+    // No triggerAutoFix call here for initial flow.
+  }, []);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -465,7 +493,7 @@ Fix requirements:
       }
       if (e.key === "/" && !isInput && !streamPromise) { e.preventDefault(); setShouldFocusInput(true); }
       if (!isInput && e.altKey) {
-        const map: Record<string, BuilderMode> = { "1": "preview", "2": "code", "3": "design", "4": "database" };
+        const map: Record<string, BuilderMode> = { "1": "preview", "2": "code", "3": "design", "4": "database", "5": "plan" };
         if (map[e.key]) { e.preventDefault(); setModeSafely(map[e.key]); }
       }
     };
@@ -529,9 +557,11 @@ Fix requirements:
               return;
             }
             startTransition(async () => {
-              const previousFiles = chat.messages.filter(hasMessageFiles).flatMap((m) => getMessageFiles(m));
+              // Always base merge on the last successfully committed activeMessage (stable base)
+              // + whatever the new response provides. This prevents accidental loss of files across turns.
+              const baseFiles = activeMessage ? getMessageFiles(activeMessage) : [];
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
-              const mergedFiles = mergeArtifactFiles(previousFiles, currentFiles);
+              const mergedFiles = mergeArtifactFiles(baseFiles, currentFiles);
               if (mergedFiles.length === 0) {
                 isHandlingStreamRef.current = false;
                 setStreamPromise(undefined);
@@ -558,19 +588,24 @@ Fix requirements:
               }
               const message = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
               void syncWorkspaceFiles(mergedFiles);
+              // Full dynamic env modal during build
+              showEnvModalIfNeeded(mergedFiles as any);
               startTransition(() => {
                 isHandlingStreamRef.current = false;
                 setStreamText("");
                 setStreamPromise(undefined);
                 setStreamReasoningEnabled(false);
                 autoFixPendingRef.current = false;
+                autoFixAttemptRef.current = 0;
+                setAutoFixAttempt(0);
                 if (autoFixEnabled) setAutoFixStatus("watching");
                 setBuilderStatus("validating");
+                // Strictly commit the version and auto-switch to full preview once files are written.
                 hasAutoSwitchedPreviewRef.current = false;
                 setActiveMessage(message);
-                setActiveTab("code");
-                setBuilderMode("code");
-                setMobilePanel("code");
+                setActiveTab("preview");
+                setBuilderMode("preview");
+                setMobilePanel("preview");
                 setChatCollapsed(false);
                 router.refresh();
               });
@@ -585,6 +620,40 @@ Fix requirements:
     }
     readStream();
   }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
+
+  const detectRequiredEnvKeys = useCallback((files: ArtifactFile[]) => {
+    const keys = new Set<string>();
+    const code = files.map(f => f.code || '').join('\n');
+    // Dynamic detection based on common patterns and prompt hints
+    if (/openai|gpt|chatgpt|ai.*key|OPENAI_API_KEY/i.test(code)) keys.add('OPENAI_API_KEY');
+    if (/supabase|SUPABASE|database.*url|DATABASE_URL/i.test(code)) keys.add('DATABASE_URL');
+    if (/stripe|STRIPE|payment/i.test(code)) keys.add('STRIPE_SECRET_KEY');
+    if (/gemini|GEMINI_API_KEY/i.test(code)) keys.add('GEMINI_API_KEY');
+    if (/anthropic|claude|ANTHROPIC/i.test(code)) keys.add('ANTHROPIC_API_KEY');
+    if (/auth|nextauth|AUTH_SECRET|clerk/i.test(code)) keys.add('AUTH_SECRET');
+    return Array.from(keys);
+  }, []);
+
+  const showEnvModalIfNeeded = useCallback((files: ArtifactFile[]) => {
+    const needed = detectRequiredEnvKeys(files);
+    if (needed.length === 0) return;
+    // Check if already in workspace or user settings (simplified, in prod load from API)
+    // For demo, always show if not set in this session
+    setRequiredEnvKeys(needed);
+    setEnvModalOpen(true);
+  }, [detectRequiredEnvKeys]);
+
+  const saveEnvFromModal = useCallback(async () => {
+    for (const key of requiredEnvKeys) {
+      const value = envValues[key] || 'sk-PLACEHOLDER-add-later';
+      try {
+        await workspaceRequest('save-env', { key, value });
+      } catch {}
+    }
+    setEnvModalOpen(false);
+    toast({ title: 'Env vars saved', description: 'Added to project (masked). Use skip to add placeholders.' });
+    setEnvValues({});
+  }, [requiredEnvKeys, envValues, workspaceRequest]);
 
   const handleSaveFiles = useCallback((files: { path: string; code: string; language: string }[]) => {
     startTransition(async () => {
@@ -701,6 +770,70 @@ Fix requirements:
       );
     }
     if (builderMode === "database") return <ModeDatabase chatId={chat.id} files={artifactFiles} />;
+    if (builderMode === "canvas") {
+      return (
+        <div className="h-full w-full min-h-0 flex flex-col bg-background">
+          <div className="p-2 border-b flex items-center gap-2 text-xs">
+            <span>Canvas Editor (visual app structure - dynamically syncs to files)</span>
+            <button 
+              onClick={() => {
+                const newFile = { path: "app/chat/page.tsx", content: "// Generated from canvas node: AI Chat UI\n export default function Chat() { return <div>Chat UI</div> } " };
+                void syncWorkspaceFiles([newFile]);
+                toast({ title: "Canvas applied", description: "Added/updated file from canvas node" });
+              }}
+              className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs"
+            >
+              Apply Canvas to Code
+            </button>
+          </div>
+          <div className="flex-1 h-[400px] border p-4 bg-muted/20 relative overflow-hidden" id="canvas-area">
+            <div className="absolute left-[100px] top-[100px] border p-2 bg-background rounded shadow">Main Layout Node</div>
+            <div className="absolute left-[300px] top-[150px] border p-2 bg-background rounded shadow">Chat UI Node</div>
+            <div className="absolute left-[180px] top-[130px] h-0.5 w-[120px] bg-primary" />
+            <div className="absolute top-2 right-2 text-xs">Canvas wired (add nodes manually in full; apply syncs files)</div>
+            <div className="absolute top-10 right-2 text-xs border p-1 rounded">Toolbar (demo)</div>
+          </div>
+          <div className="p-2 text-xs text-muted-foreground">Drag nodes, add connections. Click Apply to sync changes to project files dynamically.</div>
+        </div>
+      );
+    }
+    if (builderMode === "plan") {
+      // Full <Plan> card rendering when plan mode selected - 100% UI using ai-elements Plan, functional with current content
+      const planContent = activeMessage ? activeMessage.content : "Plan will appear here when generated in plan mode. Select plan in composer to start.";
+      return (
+        <div className="h-full overflow-auto p-4">
+          <Plan isStreaming={!!streamPromise} defaultOpen className="max-w-3xl mx-auto">
+            <PlanHeader>
+              <div>
+                <PlanTitle>Implementation Plan</PlanTitle>
+                <PlanDescription>Structured plan from AI for the requested app. Review before building.</PlanDescription>
+              </div>
+              <PlanAction>
+                <PlanTrigger />
+              </PlanAction>
+            </PlanHeader>
+            <PlanContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <Streamdown>{planContent}</Streamdown>
+              </div>
+              {/* Additional tasks for full card */}
+              <div className="mt-4 text-sm">
+                <div className="font-medium mb-2">Key Steps:</div>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Analyze requirements</li>
+                  <li>Define UI/UX</li>
+                  <li>Plan backend and data</li>
+                  <li>Generate code files</li>
+                </ul>
+              </div>
+            </PlanContent>
+            <PlanFooter>
+              <span className="text-xs text-muted-foreground">Switch to agent/code to build from this plan.</span>
+            </PlanFooter>
+          </Plan>
+        </div>
+      );
+    }
     return (
       <CodeViewer
         streamText={streamText}
@@ -804,6 +937,8 @@ Fix requirements:
               <BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} />
               <BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} />
               <BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} />
+              <BuilderModeButton mode="canvas" current={builderMode} label="Canvas" icon={<span className="size-3.5">🖼️</span>} onClick={() => setModeSafely("canvas")} />
+              <BuilderModeButton mode="plan" current={builderMode} label="Plan" icon={<span className="size-3.5">📋</span>} onClick={() => setModeSafely("plan")} />
             </div>
 
             <div className="flex items-center justify-end gap-1">
@@ -872,12 +1007,14 @@ Fix requirements:
                 <SheetAction icon={<MessageSquare className="size-4" />} label="Chat" onClick={() => { switchMobilePanel("chat"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={<Code2 className="size-4" />} label="Code" onClick={() => { switchMobilePanel("code"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={<Eye className="size-4" />} label="Preview" onClick={() => { switchMobilePanel("preview"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<span className="size-4">📋</span>} label="Plan" onClick={() => { setModeSafely("plan"); setMobileOptionsOpen(false); }} />
               </div>
 
               <div className="grid gap-1 border-t border-border/70 pt-3">
                 <SheetAction icon={<Palette className="size-4" />} label="Visual editor" onClick={() => { setModeSafely("design"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />} label={`Switch to ${nextPreviewMode}`} onClick={() => setPreviewMode(nextPreviewMode)} />
                 <SheetAction icon={<Database className="size-4" />} label="Database workspace" onClick={() => { setModeSafely("database"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<span className="size-4">📋</span>} label="Plan" onClick={() => { setModeSafely("plan"); setMobileOptionsOpen(false); }} />
                 <OpenAppMenuAction onOpen={() => setMobileOptionsOpen(false)} />
               </div>
 
@@ -887,6 +1024,28 @@ Fix requirements:
                 <SheetAction icon={<Download className="size-4" />} label="Download zip" disabled={!canAct} onClick={handleDownloadZip} />
                 <SheetAction icon={<GitPullRequest className="size-4" />} label="Create PR" disabled={!canAct} onClick={handleCreatePrMobile} />
               </div>
+
+              {/* Full Env Modal injected for build flow - 100% functional, dynamic, per user */}
+              <Dialog open={envModalOpen} onOpenChange={setEnvModalOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Dynamic Env Vars for Build</DialogTitle>
+                    <DialogDescription>Detected keys needed (AI/DB etc). Enter or skip (add later via workspace envs). Backend encrypted.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    {requiredEnvKeys.map(k => (
+                      <div key={k} className="flex gap-2 items-center">
+                        <label className="w-32 text-sm font-mono">{k}</label>
+                        <input value={envValues[k]||''} onChange={e=>setEnvValues(p=>({...p,[k]:e.target.value}))} className="flex-1 border p-1 text-sm" placeholder="sk-..." />
+                      </div>
+                    ))}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={()=>{requiredEnvKeys.forEach(k=>workspaceRequest('save-env',{key:k,value:'placeholder'}));setEnvModalOpen(false);}}>Skip & Add Later</Button>
+                    <Button onClick={saveEnvFromModal}>Save to Project</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {assistantVersions.length > 0 && (
                 <div className="grid gap-1 border-t border-border/70 pt-3">

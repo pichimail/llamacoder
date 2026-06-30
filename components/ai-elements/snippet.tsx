@@ -135,7 +135,7 @@ export const SnippetCopyButton = ({
       aria-label="Copy"
       className={className}
       onClick={copyToClipboard}
-      size="icon-sm"
+      size="sm"
       title="Copy"
       {...props}
     >

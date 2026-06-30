@@ -159,25 +159,29 @@ export async function saveWorkspaceFiles(chatId: string, files: Array<{ path: st
   const normalized = normalizeSeedFiles(files);
   const incomingPaths = normalized.map((file) => file.path);
 
-  await prisma.$transaction([
-    prisma.projectFile.deleteMany({
-      where: {
-        projectId,
-        path: { notIn: incomingPaths.length > 0 ? incomingPaths : [""] },
-      },
-    }),
-    ...normalized.map((file) =>
-      prisma.projectFile.upsert({
-        where: { projectId_path: { projectId, path: file.path } },
-        update: { content: file.content },
-        create: {
+  // Never wipe the entire workspace if caller accidentally passes empty list.
+  // Only perform destructive replace when we have a concrete non-empty set to commit.
+  if (normalized.length > 0) {
+    await prisma.$transaction([
+      prisma.projectFile.deleteMany({
+        where: {
           projectId,
-          path: file.path,
-          content: file.content,
+          path: { notIn: incomingPaths },
         },
       }),
-    ),
-  ] as Prisma.PrismaPromise<unknown>[]);
+      ...normalized.map((file) =>
+        prisma.projectFile.upsert({
+          where: { projectId_path: { projectId, path: file.path } },
+          update: { content: file.content },
+          create: {
+            projectId,
+            path: file.path,
+            content: file.content,
+          },
+        }),
+      ),
+    ] as Prisma.PrismaPromise<unknown>[]);
+  }
 
   revalidatePath(`/chats/${chatId}`);
   return listFiles(projectId);
