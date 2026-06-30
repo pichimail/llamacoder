@@ -27,11 +27,4 @@ const TooltipContent = React.forwardRef<
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
-// Simple Tip wrapper for label on children (used across the app)
-const Tip = ({ label, children, ...props }: { label?: React.ReactNode; children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div title={typeof label === 'string' ? label : undefined} {...props}>
-    {children}
-  </div>
-)
-
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip }
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }

@@ -138,6 +138,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [envModalOpen, setEnvModalOpen] = useState(false);
   const [requiredEnvKeys, setRequiredEnvKeys] = useState<string[]>([]);
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  const [artifactSettingsOpen, setArtifactSettingsOpen] = useState(false);
   const [designSaving, setDesignSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   const [autoFixEnabled, setAutoFixEnabled] = useState(true);
@@ -949,7 +950,7 @@ Fix requirements:
               </div>
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
               {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
-              <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
+              <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} onOpenSettings={() => setArtifactSettingsOpen(true)} /></div>
               <div className="hidden md:block"><ThemeToggle /></div>
             </div>
           </header>
