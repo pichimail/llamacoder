@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getPrisma } from "@/lib/prisma";
+import { requireChatAccess, authErrorResponse } from "@/lib/authz";
 
 const schema = z.object({
   shadcn: z.boolean().optional(),
@@ -18,10 +18,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({ where: { id } });
-  if (!chat) {
-    return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  let prisma: any;
+  try {
+    const access = await requireChatAccess(id, "editor");
+    prisma = access.prisma;
+  } catch (error) {
+    return authErrorResponse(error);
   }
 
   const updated = await prisma.chat.update({

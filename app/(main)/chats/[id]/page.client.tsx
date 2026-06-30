@@ -459,13 +459,12 @@ Fix requirements:
   }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    // AGGRESSIVELY DISABLED for first version: auto-fixing is now backend-only and hidden.
-    // Only explicit user action (e.g. "fix this" in composer or future "Fix" button) will trigger fixes.
-    // User should not see separate auto-fix happening.
-    // Preview errors are logged but do not auto start new generations.
-    console.info("Preview error (auto-fix disabled for clean first-version flow):", error?.slice(0, 200));
-    // No triggerAutoFix call here for initial flow.
-  }, []);
+    if (!autoFixEnabled) {
+      setBuilderStatus("failed");
+      return;
+    }
+    void triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [] });
+  }, [autoFixEnabled, triggerAutoFix, activeMessage]);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -785,63 +784,48 @@ Fix requirements:
     if (builderMode === "database") return <ModeDatabase chatId={chat.id} files={artifactFiles} />;
     if (builderMode === "canvas") {
       return (
-        <div className="h-full w-full min-h-0 flex flex-col bg-background">
-          <div className="p-2 border-b flex items-center gap-2 text-xs">
-            <span>Canvas Editor (visual app structure - dynamically syncs to files)</span>
-            <button 
-              onClick={() => {
-                const newFile = { path: "app/chat/page.tsx", content: "// Generated from canvas node: AI Chat UI\n export default function Chat() { return <div>Chat UI</div> } " };
-                void syncWorkspaceFiles([newFile]);
-                toast({ title: "Canvas applied", description: "Added/updated file from canvas node" });
-              }}
-              className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs"
-            >
-              Apply Canvas to Code
-            </button>
+        <div className="flex h-full w-full min-h-0 flex-col items-center justify-center gap-4 bg-background text-center px-6">
+          <div className="flex size-12 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-2xl">🖼️</div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Canvas mode coming soon</h3>
+            <p className="mt-1 text-sm text-muted-foreground max-w-xs">Visual node editor for app structure is in development. Use Code or Design mode to edit your artifact now.</p>
           </div>
-          <div className="flex-1 h-[400px] border p-4 bg-muted/20 relative overflow-hidden" id="canvas-area">
-            <div className="absolute left-[100px] top-[100px] border p-2 bg-background rounded shadow">Main Layout Node</div>
-            <div className="absolute left-[300px] top-[150px] border p-2 bg-background rounded shadow">Chat UI Node</div>
-            <div className="absolute left-[180px] top-[130px] h-0.5 w-[120px] bg-primary" />
-            <div className="absolute top-2 right-2 text-xs">Canvas wired (add nodes manually in full; apply syncs files)</div>
-            <div className="absolute top-10 right-2 text-xs border p-1 rounded">Toolbar (demo)</div>
-          </div>
-          <div className="p-2 text-xs text-muted-foreground">Drag nodes, add connections. Click Apply to sync changes to project files dynamically.</div>
+          <button
+            type="button"
+            onClick={() => setModeSafely("code")}
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground transition hover:bg-accent"
+          >
+            Switch to Code
+          </button>
         </div>
       );
     }
     if (builderMode === "plan") {
-      // Full <Plan> card rendering when plan mode selected - 100% UI using ai-elements Plan, functional with current content
-      const planContent = activeMessage ? activeMessage.content : "Plan will appear here when generated in plan mode. Select plan in composer to start.";
+      const planContent = streamText || (activeMessage ? activeMessage.content : "");
+      const hasContent = planContent.trim().length > 0;
       return (
         <div className="h-full overflow-auto p-4">
           <Plan isStreaming={!!streamPromise} defaultOpen className="max-w-3xl mx-auto">
             <PlanHeader>
               <div>
                 <PlanTitle>Implementation Plan</PlanTitle>
-                <PlanDescription>Structured plan from AI for the requested app. Review before building.</PlanDescription>
+                <PlanDescription>{chat.title}</PlanDescription>
               </div>
               <PlanAction>
                 <PlanTrigger />
               </PlanAction>
             </PlanHeader>
             <PlanContent>
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <Streamdown>{planContent}</Streamdown>
-              </div>
-              {/* Additional tasks for full card */}
-              <div className="mt-4 text-sm">
-                <div className="font-medium mb-2">Key Steps:</div>
-                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                  <li>Analyze requirements</li>
-                  <li>Define UI/UX</li>
-                  <li>Plan backend and data</li>
-                  <li>Generate code files</li>
-                </ul>
-              </div>
+              {hasContent ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <Streamdown>{planContent}</Streamdown>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No plan generated yet. Use the composer with Plan mode to generate a structured plan first.</p>
+              )}
             </PlanContent>
             <PlanFooter>
-              <span className="text-xs text-muted-foreground">Switch to agent/code to build from this plan.</span>
+              <span className="text-xs text-muted-foreground">Switch to Agent mode to build from this plan.</span>
             </PlanFooter>
           </Plan>
         </div>
@@ -1038,28 +1022,6 @@ Fix requirements:
                 <SheetAction icon={<GitPullRequest className="size-4" />} label="Create PR" disabled={!canAct} onClick={handleCreatePrMobile} />
               </div>
 
-              {/* Full Env Modal injected for build flow - 100% functional, dynamic, per user */}
-              <Dialog open={envModalOpen} onOpenChange={setEnvModalOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Dynamic Env Vars for Build</DialogTitle>
-                    <DialogDescription>Detected keys needed (AI/DB etc). Enter or skip (add later via workspace envs). Backend encrypted.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-2">
-                    {requiredEnvKeys.map(k => (
-                      <div key={k} className="flex gap-2 items-center">
-                        <label className="w-32 text-sm font-mono">{k}</label>
-                        <input value={envValues[k]||''} onChange={e=>setEnvValues(p=>({...p,[k]:e.target.value}))} className="flex-1 border p-1 text-sm" placeholder="sk-..." />
-                      </div>
-                    ))}
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={()=>{requiredEnvKeys.forEach(k=>workspaceRequest('save-env',{key:k,value:'placeholder'}));setEnvModalOpen(false);}}>Skip & Add Later</Button>
-                    <Button onClick={saveEnvFromModal}>Save to Project</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
               {assistantVersions.length > 0 && (
                 <div className="grid gap-1 border-t border-border/70 pt-3">
                   <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Layers className="size-3.5" /> Versions</div>
@@ -1100,6 +1062,35 @@ Fix requirements:
             </div>
           </DrawerContent>
         </Drawer>
+
+        {/* Env vars modal — top-level so it renders on both desktop and mobile */}
+        <Dialog open={envModalOpen} onOpenChange={setEnvModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Environment Variables Detected</DialogTitle>
+              <DialogDescription>Your app needs these keys. Enter them now or skip to add later via workspace settings. Values are encrypted before storage.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {requiredEnvKeys.map(k => (
+                <div key={k} className="flex gap-2 items-center">
+                  <label className="w-40 shrink-0 text-sm font-mono text-muted-foreground">{k}</label>
+                  <input
+                    value={envValues[k] || ''}
+                    onChange={e => setEnvValues(p => ({ ...p, [k]: e.target.value }))}
+                    className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
+                    placeholder="sk-..."
+                    type="password"
+                    autoComplete="off"
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { requiredEnvKeys.forEach(k => void workspaceRequest('save-env', { key: k, value: 'placeholder' })); setEnvModalOpen(false); }}>Skip — Add Later</Button>
+              <Button onClick={saveEnvFromModal}>Save to Project</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </TooltipProvider>
   );
 }

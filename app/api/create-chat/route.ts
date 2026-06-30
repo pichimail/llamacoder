@@ -74,8 +74,9 @@ export async function POST(request: NextRequest) {
 
     const prisma = getPrisma();
 
+    type VerifiedAttachment = { kind: "image" | "file"; filename: string; url?: string; size?: number; uploadId?: string };
     // Verify attachments belong to this user (upload IDs or owned blob URLs)
-    const verifiedAttachments: any[] = [];
+    const verifiedAttachments: VerifiedAttachment[] = [];
     if (attachments && attachments.length > 0) {
       for (const att of attachments) {
         if (att.url) {
@@ -87,8 +88,8 @@ export async function POST(request: NextRequest) {
           }
           verifiedAttachments.push({ ...att, uploadId: existing.id });
           // link later
-        } else if ((att as any).uploadId) {
-          const up = await prisma.fileUpload.findUnique({ where: { id: (att as any).uploadId } });
+        } else if ((att as unknown as { uploadId?: string }).uploadId) {
+          const up = await prisma.fileUpload.findUnique({ where: { id: (att as unknown as { uploadId: string }).uploadId } });
           if (!up || up.userId !== user.id) {
             return NextResponse.json({ error: "Unowned upload ID rejected" }, { status: 403 });
           }
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
     // Link verified uploads to chat
     if (verifiedAttachments.length > 0) {
       for (const va of verifiedAttachments) {
-        const upId = va.uploadId || (va as any).uploadId;
+        const upId = va.uploadId;
         if (upId) {
           await prisma.fileUpload.update({ where: { id: upId }, data: { chatId: chat.id } }).catch(() => {});
         }

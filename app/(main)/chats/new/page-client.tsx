@@ -18,6 +18,14 @@ export default function NewChatPageClient({
   const context = use(Context);
   const availableModels = useAvailableModels();
   const [error, setError] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<{ defaultMode?: string; shadcnDefault?: boolean; quality?: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/user-settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUserSettings(d?.settings ?? {}))
+      .catch(() => setUserSettings({}));
+  }, []);
 
   const model = useMemo(() => {
     if (requestedModel) {
@@ -33,12 +41,17 @@ export default function NewChatPageClient({
 
   useEffect(() => {
     if (!availableModels) return;
+    if (userSettings === null) return;
     if (!prompt?.trim()) {
       router.replace("/");
       return;
     }
 
     let cancelled = false;
+
+    const mode = (userSettings.defaultMode as "ask" | "plan" | "agent") || "agent";
+    const shadcn = userSettings.shadcnDefault !== false;
+    const quality = (userSettings.quality as "low" | "high") || "low";
 
     const run = async () => {
       try {
@@ -48,9 +61,9 @@ export default function NewChatPageClient({
           body: JSON.stringify({
             prompt: prompt.trim(),
             model,
-            quality: "low",
-            mode: "agent",
-            shadcn: true,
+            quality,
+            mode,
+            shadcn,
           }),
         });
 
