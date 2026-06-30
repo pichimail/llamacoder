@@ -42,20 +42,21 @@ async function resolveUser() {
 }
 
 export async function GET() {
-  const resolved = await resolveUser();
-  if ((resolved as any).error) return (resolved as any).error;
-
-  const prisma = getPrisma();
-  const row = await prisma.setting.findUnique({
-    where: { key: settingKey(resolved.user?.id || null) },
-  });
-
-  if (!row) return NextResponse.json({ settings: defaultSettings });
-
   try {
+    const resolved = await resolveUser();
+    if ((resolved as any).error) return (resolved as any).error;
+
+    const prisma = getPrisma();
+    const row = await prisma.setting.findUnique({
+      where: { key: settingKey(resolved.user?.id || null) },
+    });
+
+    if (!row) return NextResponse.json({ settings: defaultSettings });
+
     const parsed = settingsSchema.parse({ ...defaultSettings, ...JSON.parse(row.value) });
     return NextResponse.json({ settings: parsed, updatedAt: row.updatedAt });
   } catch {
+    // Keep builder responsive even if auth/session/settings storage is unhealthy.
     return NextResponse.json({ settings: defaultSettings, recovered: true });
   }
 }

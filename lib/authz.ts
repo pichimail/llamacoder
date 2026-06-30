@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/admin-config";
-import { auth, isGoogleConfigured } from "@/lib/auth";
+import { auth, hasAuthSecret, isGoogleConfigured } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 
@@ -40,15 +40,20 @@ const REQUIRED_RANK: Record<AccessLevel, number> = {
 };
 
 export async function getCurrentUserOrNull(): Promise<CurrentUser | null> {
-  const session = await auth();
-  const rawUser = session?.user as any;
-  if (!rawUser?.id) return null;
-  const email = rawUser.email ? String(rawUser.email) : null;
-  return {
-    id: String(rawUser.id),
-    email,
-    isAdmin: rawUser.isAdmin === true || rawUser.role === "admin" || isAdminEmail(email),
-  };
+  try {
+    const session = await auth();
+    const rawUser = session?.user as any;
+    if (!rawUser?.id) return null;
+    const email = rawUser.email ? String(rawUser.email) : null;
+    return {
+      id: String(rawUser.id),
+      email,
+      isAdmin: rawUser.isAdmin === true || rawUser.role === "admin" || isAdminEmail(email),
+    };
+  } catch {
+    // Never hard-fail downstream APIs because auth/session resolution failed.
+    return null;
+  }
 }
 
 export async function requireCurrentUser(): Promise<CurrentUser> {
@@ -69,7 +74,7 @@ async function isAuthEnforced(): Promise<boolean> {
     return false;
   }
   const settings = await getSettings();
-  const googleReady = isGoogleConfigured();
+  const googleReady = isGoogleConfigured() && hasAuthSecret();
   return settings.saasMode === "on" && settings.googleAuth === "on" && googleReady;
 }
 

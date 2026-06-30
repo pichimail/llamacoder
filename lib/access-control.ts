@@ -7,7 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/admin-config";
-import { auth, isGoogleConfigured } from "@/lib/auth";
+import { auth, hasAuthSecret, isGoogleConfigured } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 
@@ -58,7 +58,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 export async function isAuthRequired() {
   const settings = await getSettings();
-  return settings.saasMode === "on" && settings.googleAuth === "on" && isGoogleConfigured();
+  return settings.saasMode === "on" && settings.googleAuth === "on" && isGoogleConfigured() && hasAuthSecret();
 }
 
 function memberCan(role: string | null | undefined, level: AccessLevel) {
