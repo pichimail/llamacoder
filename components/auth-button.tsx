@@ -14,6 +14,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function initials(name?: string | null, email?: string | null) {
   const base = name || email || "User";
   return base
@@ -36,13 +50,11 @@ export default function AuthButton() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/public-settings", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJsonWithTimeout("/api/public-settings")
       .then((d) => {
         if (d?.saasMode && d?.googleAuth) {
           setEnabled(true);
-          return fetch("/api/auth/session", { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
+          return fetchJsonWithTimeout("/api/auth/session")
             .then((s) => setUser(s?.user ?? null));
         }
       })

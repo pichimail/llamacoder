@@ -32,6 +32,20 @@ const guestUser: HomeSidebarUser = {
   isAdmin: false,
 }
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 4000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export function useHomeSidebarData(): HomeSidebarData {
   const [chats, setChats] = useState<HomeSidebarChat[]>([])
   const [user, setUser] = useState<HomeSidebarUser>(guestUser)
@@ -44,14 +58,12 @@ export function useHomeSidebarData(): HomeSidebarData {
 
     async function load() {
       try {
-        const settingsRes = await fetch("/api/public-settings", { cache: "no-store" })
-        const settings = settingsRes.ok ? await settingsRes.json() : null
+        const settings = await fetchJsonWithTimeout("/api/public-settings")
         const authOn = !!(settings?.saasMode && settings?.googleAuth)
         let sessionUser: any = null
 
         if (authOn) {
-          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" })
-          const session = sessionRes.ok ? await sessionRes.json() : null
+          const session = await fetchJsonWithTimeout("/api/auth/session")
           sessionUser = session?.user ?? null
         }
 

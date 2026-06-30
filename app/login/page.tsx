@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft, GalleryVerticalEnd, LogIn } from "lucide-react";
 
-import { auth } from "@/lib/auth";
-import { continueWithGoogle } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function LoginPage() {
-  const session = await auth();
-
   return (
     <main className="grid min-h-dvh bg-background text-foreground md:grid-cols-[0.9fr_1.1fr]">
       <section className="hidden border-r border-border bg-[#1F2023] p-8 text-[#F4F4F5] md:flex md:flex-col md:justify-between">
@@ -32,18 +28,12 @@ export default async function LoginPage() {
             <CardDescription>Continue with your Google account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {session?.user ? (
-              <Button asChild className="w-full">
-                <Link href="/">Continue to app</Link>
-              </Button>
-            ) : (
-              <form action={continueWithGoogle}>
-                <Button type="submit" className="w-full">
-                  <LogIn className="size-4" />
-                  Continue with Google
-                </Button>
-              </form>
-            )}
+            <Button asChild className="w-full">
+              <a href="/api/auth/signin/google?callbackUrl=%2F">
+                <LogIn className="size-4" />
+                Continue with Google
+              </a>
+            </Button>
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
                 <ArrowLeft className="size-4" />
