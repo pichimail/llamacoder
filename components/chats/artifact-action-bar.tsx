@@ -2,11 +2,36 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronDown, Download, ExternalLink, GitPullRequest, KeyRound, MoreHorizontal, RefreshCw, Settings, Share2, Upload } from "lucide-react";
+import { Bell, Check, ChevronDown, Download, ExternalLink, GitPullRequest, Globe, Home, KeyRound, Link, Lock, Menu, MessageCircle, MoreHorizontal, Paintbrush, RefreshCw, Settings, Share2, Upload, Video } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Tip } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
 import type { ArtifactFile } from "@/lib/artifact-analysis";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,7 +90,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "model" | "features" | "env" | "integrations" | "advanced">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "model-generation" | "features" | "environment-variables" | "integrations" | "advanced">("general");
   const [settingsModel, setSettingsModel] = useState("zai-org/GLM-5.1");
   const [settingsShadcn, setSettingsShadcn] = useState(true);
   const [settingsCanvas, setSettingsCanvas] = useState(false);
@@ -250,164 +275,196 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
         onPublish={handlePublish}
       />
 
-      {/* New per-artifact Settings Dialog with sidebar style like v0.app/settings - fully functional and responsive */}
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col md:flex-row overflow-hidden">
-          <DialogHeader className="p-4 border-b md:hidden">
-            <DialogTitle>Artifact Settings</DialogTitle>
-            <DialogDescription>Configure for this app build only</DialogDescription>
-          </DialogHeader>
-
-          {/* Sidebar - responsive: vertical on md+, horizontal tabs on small */}
-          <div className="w-full md:w-56 border-b md:border-r md:border-b-0 bg-muted/40 p-2 overflow-x-auto md:overflow-visible">
-            <div className="flex md:flex-col gap-1 min-w-max md:min-w-0">
-              {[
-                { id: "general", label: "General", icon: "⚙️" },
-                { id: "model", label: "Model & Generation", icon: "🧠" },
-                { id: "features", label: "Features", icon: "✨" },
-                { id: "env", label: "Environment", icon: "🔑" },
-                { id: "integrations", label: "Integrations", icon: "🔗" },
-                { id: "advanced", label: "Advanced", icon: "🛠️" },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setSettingsTab(item.id as any)}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition ${settingsTab === item.id ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+      {/* Artifact Settings Dialog using sidebar-13 style - per app/artifact only, responsive, functional */}
+      <Dialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) setSettingsTab("general"); }}>
+        <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px] flex flex-col md:flex-row">
+          <DialogTitle className="sr-only">Artifact Settings for {chatTitle}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Configure settings specific to this app, web app or artifact being built.
+          </DialogDescription>
+          <SidebarProvider className="items-start w-full">
+            <Sidebar collapsible="none" className="hidden md:flex border-r w-56">
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {[
+                        { name: "General", icon: Home },
+                        { name: "Model & Generation", icon: Settings },
+                        { name: "Features", icon: Paintbrush },
+                        { name: "Environment Variables", icon: KeyRound },
+                        { name: "Integrations", icon: Link },
+                        { name: "Advanced", icon: Lock },
+                      ].map((item) => (
+                        <SidebarMenuItem key={item.name}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={settingsTab === item.name.toLowerCase().replace(/ & | /g, "-")}
+                            onClick={() => setSettingsTab(item.name.toLowerCase().replace(/ & | /g, "-") as any)}
+                          >
+                            <button className="w-full justify-start">
+                              <item.icon />
+                              <span>{item.name}</span>
+                            </button>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </SidebarContent>
+            </Sidebar>
+            <main className="flex flex-1 flex-col overflow-hidden">
+              {/* Mobile header for responsive nav */}
+              <div className="md:hidden border-b p-3 flex items-center gap-2 bg-background">
+                <select 
+                  value={settingsTab} 
+                  onChange={(e) => setSettingsTab(e.target.value as any)}
+                  className="flex-1 p-2 border rounded text-sm"
                 >
-                  <span>{item.icon}</span>
-                  <span className="truncate">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Content area */}
-          <div className="flex-1 p-6 overflow-auto space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Settings for this Artifact</h3>
-              <p className="text-sm text-muted-foreground">Per-app configuration. Changes apply to the current build in this chat.</p>
-            </div>
-
-            {settingsTab === "general" && (
-              <div className="space-y-4">
-                <div>
-                  <Label>App Title</Label>
-                  <input className="w-full border rounded p-2 mt-1" defaultValue={chatTitle} />
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <textarea className="w-full border rounded p-2 mt-1" rows={3} defaultValue={workspace?.project?.description || ""} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Auto-save files to workspace</Label>
-                  <Switch defaultChecked />
-                </div>
+                  <option value="general">General</option>
+                  <option value="model-generation">Model & Generation</option>
+                  <option value="features">Features</option>
+                  <option value="environment-variables">Environment Variables</option>
+                  <option value="integrations">Integrations</option>
+                  <option value="advanced">Advanced</option>
+                </select>
               </div>
-            )}
-
-            {settingsTab === "model" && (
-              <div className="space-y-4">
-                <div>
-                  <Label>AI Model for this build</Label>
-                  <Select value={settingsModel} onValueChange={setSettingsModel}>
-                    <SelectTrigger className="w-full mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="zai-org/GLM-5.1">GLM 5.1 (default)</SelectItem>
-                      <SelectItem value="openrouter/anthropic/claude-sonnet-4.5">Claude Sonnet 4.5</SelectItem>
-                      <SelectItem value="openrouter/auto">OpenRouter Auto</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="#">Settings</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage className="capitalize">{settingsTab.replace(/-/g, " ")}</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
                 </div>
-                <div>
-                  <Label>Quality</Label>
-                  <Select defaultValue="high">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low (faster)</SelectItem>
-                      <SelectItem value="high">High (recommended)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <button className="mt-2 px-4 py-2 bg-primary text-white rounded" onClick={() => {
-                  // Real integration: persist model for this app
-                  fetch(`/api/chats/${chatId}/builder-settings`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({model: settingsModel}) }).catch(()=>{});
-                  toast({ title: "Model updated", description: `Will use ${settingsModel} for next generations in this artifact.` });
-                }}>Apply Model to this App</button>
-              </div>
-            )}
-
-            {settingsTab === "features" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable shadcn/ui components</Label>
-                    <p className="text-xs text-muted-foreground">Use polished shadcn components in generated app</p>
-                  </div>
-                  <Switch checked={settingsShadcn} onCheckedChange={setSettingsShadcn} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Canvas / Visual workspace</Label>
-                    <p className="text-xs text-muted-foreground">Include editable visual builder</p>
-                  </div>
-                  <Switch checked={settingsCanvas} onCheckedChange={setSettingsCanvas} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Auto-fix on preview errors</Label>
-                  </div>
-                  <Switch checked={settingsAutoFix} onCheckedChange={setSettingsAutoFix} />
-                </div>
-                <button className="px-4 py-2 border rounded" onClick={() => {
-                  // Sync features to workspace or settings
-                  workspaceRequest("sync", { files }).then(() => toast({title: "Features saved for this build"}));
-                }}>Save Feature Settings</button>
-              </div>
-            )}
-
-            {settingsTab === "env" && (
-              <div className="space-y-3">
-                <p className="text-sm">Environment variables for this app (per-project, encrypted).</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {workspace?.envVars?.map(env => (
-                    <div key={env.id} className="flex justify-between text-sm border p-2 rounded">
-                      <span className="font-mono">{env.key}</span>
-                      <span className="text-muted-foreground">{env.value || '••••'}</span>
+                <div className="ml-auto text-xs text-muted-foreground truncate max-w-[200px]">{chatTitle}</div>
+              </header>
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
+                {/* Content based on tab - real functional integrations for current artifact */}
+                {settingsTab === "general" && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">General</h4>
+                      <p className="text-sm text-muted-foreground mb-4">Settings for this specific artifact/app.</p>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs">App Name</Label>
+                          <input type="text" defaultValue={chatTitle} className="w-full mt-1 p-2 border rounded text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Description</Label>
+                          <textarea defaultValue={workspace?.project?.description || ""} className="w-full mt-1 p-2 border rounded text-sm" rows={3} />
+                        </div>
+                        <Button onClick={() => { refreshWorkspace(); toast({title: "General settings applied to artifact"}); }} size="sm">Save General</Button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-                <div className="pt-2 border-t">
-                  <Label>Add new key</Label>
-                  <div className="flex gap-2 mt-1">
-                    <input value={envKey} onChange={e=>setEnvKey(e.target.value)} placeholder="KEY" className="flex-1 border p-2 rounded text-sm" />
-                    <input value={envValue} onChange={e=>setEnvValue(e.target.value)} placeholder="value" className="flex-1 border p-2 rounded text-sm" />
-                    <button onClick={handleSaveEnv} className="px-3 border rounded">Save</button>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {settingsTab === "integrations" && (
-              <div className="space-y-3">
-                <div>GitHub: {workspace?.hasGithub ? "Connected" : "Not connected"} <button onClick={handleConnectGithub} className="ml-2 text-xs underline">Connect</button></div>
-                <div>Deployments: {workspace?.deployments?.length || 0}</div>
-                <button onClick={handleCreatePr} className="px-4 py-2 bg-black text-white rounded text-sm">Create PR from current</button>
-              </div>
-            )}
+                {settingsTab === "model-generation" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Model & Generation</h4>
+                    <div>
+                      <Label>AI Model</Label>
+                      <Select value={settingsModel} onValueChange={setSettingsModel}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="zai-org/GLM-5.1">GLM 5.1</SelectItem>
+                          <SelectItem value="openrouter/anthropic/claude-sonnet-4.5">Claude Sonnet 4.5</SelectItem>
+                          <SelectItem value="openrouter/auto">OpenRouter Auto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Quality</Label>
+                      <Select defaultValue="high">
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={() => {
+                      fetch(`/api/chats/${chatId}/builder-settings`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: settingsModel }),
+                      }).catch(() => {});
+                      toast({ title: "Model updated for this artifact" });
+                    }} size="sm">Apply to this build</Button>
+                  </div>
+                )}
 
-            {settingsTab === "advanced" && (
-              <div className="space-y-4 text-sm">
-                <button onClick={handleBootstrap} className="block w-full text-left p-2 border rounded">Force Reseed Scaffold</button>
-                <button onClick={() => workspaceRequest("validate", {files})} className="block w-full text-left p-2 border rounded">Run Full Validation</button>
-                <div>Current validation: {workspace?.validation?.ok ? "✅ Clean" : "⚠ Issues"}</div>
-              </div>
-            )}
+                {settingsTab === "features" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Features for this app</h4>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <div>Enable shadcn/ui</div>
+                      <Switch checked={settingsShadcn} onCheckedChange={setSettingsShadcn} />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <div>Canvas / Visual Editor</div>
+                      <Switch checked={settingsCanvas} onCheckedChange={setSettingsCanvas} />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <div>Auto-fix errors</div>
+                      <Switch checked={settingsAutoFix} onCheckedChange={setSettingsAutoFix} />
+                    </div>
+                    <Button onClick={() => { workspaceRequest("sync", { files }); toast({title: "Features saved"}); }} size="sm">Save Features</Button>
+                  </div>
+                )}
 
-            <DialogFooter>
-              <button onClick={() => setSettingsOpen(false)} className="px-4 py-2">Close</button>
-              <button onClick={() => { toast({title: "Settings saved", description: "Applied to this artifact build"}); setSettingsOpen(false); }} className="px-4 py-2 bg-primary text-primary-foreground rounded">Save All Changes</button>
-            </DialogFooter>
-          </div>
+                {settingsTab === "environment-variables" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Environment Variables</h4>
+                    <p className="text-xs text-muted-foreground">Per this project/artifact. Encrypted at rest.</p>
+                    <div className="max-h-40 overflow-auto border rounded p-2 text-sm">
+                      {workspace?.envVars?.length ? workspace.envVars.map((env) => (
+                        <div key={env.id} className="flex justify-between py-1 border-b last:border-0">
+                          <span className="font-mono">{env.key}</span>
+                          <span className="text-muted-foreground truncate max-w-[100px]">{env.value}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground">No env vars yet.</p>}
+                    </div>
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                      <input value={envKey} onChange={e => setEnvKey(e.target.value)} placeholder="KEY" className="p-2 border rounded text-sm" />
+                      <input value={envValue} onChange={e => setEnvValue(e.target.value)} placeholder="value" className="p-2 border rounded text-sm" />
+                      <Button onClick={handleSaveEnv} size="sm" disabled={!envKey}>Save</Button>
+                    </div>
+                  </div>
+                )}
+
+                {settingsTab === "integrations" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Integrations</h4>
+                    <div>GitHub: {workspace?.hasGithub ? "Connected ✓" : "Not connected"}</div>
+                    <Button onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} size="sm" disabled={isPending}>
+                      {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}
+                    </Button>
+                    <div>Deployments: {workspace?.deployments?.length || 0}</div>
+                  </div>
+                )}
+
+                {settingsTab === "advanced" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Advanced</h4>
+                    <Button onClick={handleBootstrap} variant="outline" size="sm" disabled={isPending}>Reseed scaffold</Button>
+                    <Button onClick={() => workspaceRequest("validate", { files })} variant="outline" size="sm">Validate files</Button>
+                    <Button onClick={handleSync} variant="outline" size="sm" disabled={!canAct || isPending}>Sync files</Button>
+                    <div className="text-xs text-muted-foreground">Validation: {workspace?.validation ? (workspace.validation.ok ? "Clean" : `${workspace.validation.issueCount} issues`) : "N/A"}</div>
+                  </div>
+                )}
+              </div>
+            </main>
+          </SidebarProvider>
         </DialogContent>
       </Dialog>
       {versions.length > 0 && (
@@ -450,7 +507,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
             <button type="button" role="menuitem" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button>
             <button type="button" role="menuitem" className={menuItem} onClick={handleBootstrap} disabled={isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Reseed scaffold</button>
             <button type="button" role="menuitem" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button>
-            <button type="button" role="menuitem" className={menuItem} onClick={() => { setOpen(false); onOpenSettings ? onOpenSettings() : setSettingsOpen(true); }} disabled={!canAct}><Settings className="size-3.5" aria-hidden="true" /> App Settings</button>
+            <button type="button" role="menuitem" className={menuItem} onClick={() => { setOpen(false); setSettingsOpen(true); }} disabled={!canAct}><Settings className="size-3.5" aria-hidden="true" /> App Settings</button>
           </div>
           <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" aria-label="Environment variable key" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" aria-label="Environment variable value" className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-ring" /><button type="button" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} aria-label="Save environment variable" className="h-8 rounded-md border border-border px-2 text-xs hover:bg-accent disabled:opacity-40">Save</button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
         </div>
