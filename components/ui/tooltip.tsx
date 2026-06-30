@@ -27,21 +27,23 @@ const TooltipContent = React.forwardRef<
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
-function Tip({
-  label,
-  children,
-  side = "bottom",
-}: {
-  label: string
-  children: React.ReactNode
-  side?: "top" | "bottom" | "left" | "right"
-}) {
-  return (
-    <Tooltip delayDuration={250}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side}>{label}</TooltipContent>
-    </Tooltip>
-  )
+export interface TipProps {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  side?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>["side"];
+  align?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>["align"];
+  className?: string;
 }
+
+const Tip = ({ label, children, ...props }: TipProps) => {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent {...props}>{label}</TooltipContent>
+    </Tooltip>
+  );
+};
+
+Tip.displayName = "Tip";
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip }

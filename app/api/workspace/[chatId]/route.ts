@@ -229,6 +229,31 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
+  if (action === "install-integration") {
+    const type = String(body.type || "").toLowerCase().trim();
+    if (!type) {
+      return NextResponse.json({ error: "Integration type is required" }, { status: 400 });
+    }
+    const config = {
+      ...(body.config || {}),
+      installed: true,
+      installedAt: new Date().toISOString(),
+    };
+    const integration = await prisma.integration.upsert({
+      where: { projectId_type: { projectId: project.id, type } },
+      update: { config: config as any },
+      create: { projectId: project.id, type, config: config as any },
+    });
+    await logAudit({
+      userId: accessUser.id,
+      action: "install-integration",
+      resource: "project",
+      resourceId: project.id,
+      metadata: { type },
+    });
+    return NextResponse.json({ ok: true, integration, workspace: await serializeWorkspace(chatId) });
+  }
+
   if (action === "bootstrap") {
     const spec = buildPhaseOneSpec({
       prompt: chat.prompt,
