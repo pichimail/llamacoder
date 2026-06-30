@@ -344,8 +344,16 @@ function ArtifactRouteControls({ routes, activeRoute, onPrevious, onNext }: { ro
 function PreviewModeSwitcher({ activeMode, onChange }: { activeMode: PreviewMode; onChange: (mode: PreviewMode) => void }) {
   const nextMode = activeMode === "web" ? "mobile" : "web";
   const Icon = activeMode === "web" ? Smartphone : Monitor;
+  if (activeMode === "mobile") {
+    return (
+      <button type="button" aria-pressed="true" aria-label={`Switch to ${nextMode} preview`} onClick={() => onChange(nextMode)} className="inline-flex h-7 items-center justify-center rounded-md border border-border/70 bg-transparent px-2 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/30 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </button>
+    );
+  }
+
   return (
-    <button type="button" aria-pressed={activeMode === "mobile"} aria-label={`Switch to ${nextMode} preview`} onClick={() => onChange(nextMode)} className="inline-flex h-7 items-center justify-center rounded-md border border-border/70 bg-transparent px-2 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/30 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+    <button type="button" aria-pressed="false" aria-label={`Switch to ${nextMode} preview`} onClick={() => onChange(nextMode)} className="inline-flex h-7 items-center justify-center rounded-md border border-border/70 bg-transparent px-2 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/30 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
       <Icon className="size-3.5" aria-hidden="true" />
     </button>
   );

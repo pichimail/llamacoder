@@ -75,14 +75,23 @@ export function ModeDatabase({ files = [] }: ModeDatabaseProps) {
           <div className="space-y-1 p-2">
             {schema.map((table) => {
               const active = activeTable?.name === table.name
-              return (
+              return active ? (
                 <button
                   key={table.name}
                   onClick={() => setSelectedTable(table.name)}
-                  aria-pressed={active}
-                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm font-mono transition-colors ${
-                    active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-background hover:text-foreground'
-                  }`}
+                  aria-pressed="true"
+                  className="flex w-full items-center gap-2 rounded bg-accent px-2 py-2 text-left text-sm font-mono text-accent-foreground transition-colors"
+                >
+                  <Table2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{table.name}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{table.columns.length}</span>
+                </button>
+              ) : (
+                <button
+                  key={table.name}
+                  onClick={() => setSelectedTable(table.name)}
+                  aria-pressed="false"
+                  className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm font-mono text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                 >
                   <Table2 className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{table.name}</span>

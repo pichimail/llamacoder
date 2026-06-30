@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, ReactNode, useState } from "react";
-import { ThemeProvider } from "@/components/theme-provider";
 
 export const Context = createContext<{
   streamPromise?: Promise<ReadableStream>;
@@ -14,8 +13,6 @@ export default function Providers({ children }: { children: ReactNode }) {
   const [streamPromise, setStreamPromise] = useState<Promise<ReadableStream>>();
 
   return (
-    <ThemeProvider>
-      <Context value={{ streamPromise, setStreamPromise }}>{children}</Context>
-    </ThemeProvider>
+    <Context value={{ streamPromise, setStreamPromise }}>{children}</Context>
   );
 }

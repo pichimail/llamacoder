@@ -27,23 +27,18 @@ const TooltipContent = React.forwardRef<
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
-export interface TipProps {
-  label: React.ReactNode;
+// Convenience wrapper for simple tooltips
+interface TipProps {
+  label: string;
   children: React.ReactNode;
-  side?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>["side"];
-  align?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>["align"];
-  className?: string;
+  side?: "top" | "right" | "bottom" | "left";
 }
 
-const Tip = ({ label, children, ...props }: TipProps) => {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent {...props}>{label}</TooltipContent>
-    </Tooltip>
-  );
-};
-
-Tip.displayName = "Tip";
+const Tip = ({ label, children, side = "top" }: TipProps) => (
+  <Tooltip>
+    <TooltipTrigger asChild>{children}</TooltipTrigger>
+    <TooltipContent side={side}>{label}</TooltipContent>
+  </Tooltip>
+);
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip }

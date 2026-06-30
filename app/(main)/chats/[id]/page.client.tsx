@@ -8,13 +8,13 @@ import { formatGeneratedCodeIssues, validateGeneratedCodeFiles } from "@/lib/gen
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { useTheme } from "@/components/theme-provider";
-import { useRouter, useSearchParams } from "next/navigation";
 import { startTransition, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { ChatCompletionStreamClient } from "@/lib/chat-completion-stream-client";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
-import ChatLog from "./chat-log";
+import { ChatPanel } from "./chat-panel";
+import { CanvasMode } from "./canvas-mode";
 import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewer";
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
@@ -121,10 +121,34 @@ function formatFixFileContext(files: RawGeneratedFile[]) {
 
 export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; sidebarChats?: SidebarChat[] }) {
   const context = use(Context);
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const getCurrentSearchParams = () =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
+  const [searchParams, setSearchParams] = useState<URLSearchParams>(
+    () => getCurrentSearchParams(),
+  );
+  const refreshPage = () => {
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+  const navigateTo = (href: string) => {
+    if (typeof window !== "undefined") {
+      window.location.assign(href);
+    }
+  };
   const isFullscreenPreview = searchParams.get("fs") === "1";
   const targetMessageId = searchParams.get("message");
+
+  useEffect(() => {
+    const syncSearchParams = () => {
+      setSearchParams(getCurrentSearchParams());
+    };
+    syncSearchParams();
+    window.addEventListener("popstate", syncSearchParams);
+    return () => window.removeEventListener("popstate", syncSearchParams);
+  }, []);
 
   const [streamPromise, setStreamPromise] = useState<Promise<ReadableStream> | undefined>(context.streamPromise);
   const [streamText, setStreamText] = useState("");
@@ -154,10 +178,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
   const [builderStatus, setBuilderStatus] = useState<BuilderStatus>(context.streamPromise ? "generating" : "ready");
-  const [activeMessage, setActiveMessage] = useState(
+  const [activeMessage, setActiveMessage] = useState<Message | undefined>(
     chat.messages
       .filter(
-        (m) =>
+        (m: Message) =>
           m.role === "assistant" &&
           (Boolean(extractFirstCodeBlock(m.content)) ||
             (Array.isArray(m.files) && (m.files as unknown[]).length > 0)),
@@ -196,12 +220,12 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       .catch(() => undefined);
   }, []);
 
-  const assistantVersions = useMemo(() => {
-    const assistants = chat.messages.filter((m) => m.role === "assistant" && ((m.files as any[])?.length || extractAllCodeBlocks(m.content).length > 0));
-    return assistants.map((m, idx) => ({ id: m.id, version: (chat.assistantMessagesCountBefore || 0) + idx + 1, label: `v${(chat.assistantMessagesCountBefore || 0) + idx + 1}` }));
+  const assistantVersions = useMemo<{ id: string; version: number; label: string }[]>(() => {
+    const assistants = chat.messages.filter((m: Message) => m.role === "assistant" && ((m.files as any[])?.length || extractAllCodeBlocks(m.content).length > 0));
+    return assistants.map((m: Message, idx: number) => ({ id: m.id, version: (chat.assistantMessagesCountBefore || 0) + idx + 1, label: `v${(chat.assistantMessagesCountBefore || 0) + idx + 1}` }));
   }, [chat.messages, chat.assistantMessagesCountBefore]);
 
-  const activeVersion = useMemo(() => activeMessage ? assistantVersions.find((v) => v.id === activeMessage.id) : undefined, [activeMessage, assistantVersions]);
+  const activeVersion = useMemo(() => activeMessage ? assistantVersions.find((v: { id: string; version: number; label: string }) => v.id === activeMessage.id) : undefined, [activeMessage, assistantVersions]);
   const activeFileCount = useMemo(() => activeMessage ? getMessageFiles(activeMessage).length : 0, [activeMessage]);
 
   const sandpackOptions = useMemo<SandpackBuildOptions>(
@@ -279,7 +303,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   }, [setModeSafely]);
 
   const handleSwitchVersion = useCallback((messageId: string) => {
-    const msg = chat.messages.find((m) => m.id === messageId);
+    const msg = chat.messages.find((m: Message) => m.id === messageId);
     if (!msg) return;
     setActiveMessage(msg);
     setActiveTab("code");
@@ -289,7 +313,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const handleUndo = useCallback(() => {
     if (assistantVersions.length < 2) return;
-    const currentIdx = activeMessage ? assistantVersions.findIndex((v) => v.id === activeMessage.id) : assistantVersions.length - 1;
+    const currentIdx = activeMessage ? assistantVersions.findIndex((v: { id: string; version: number; label: string }) => v.id === activeMessage.id) : assistantVersions.length - 1;
     const targetIdx = currentIdx > 0 ? currentIdx - 1 : currentIdx === -1 ? assistantVersions.length - 2 : -1;
     if (targetIdx < 0) return;
     handleSwitchVersion(assistantVersions[targetIdx].id);
@@ -297,7 +321,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   useEffect(() => {
     if (!targetMessageId) return;
-    const target = chat.messages.find((m) => m.id === targetMessageId && m.role === "assistant");
+    const target = chat.messages.find((m: Message) => m.id === targetMessageId && m.role === "assistant");
     if (target) handleSwitchVersion(target.id);
   }, [targetMessageId, chat.messages, handleSwitchVersion]);
 
@@ -410,8 +434,8 @@ Fix requirements:
     setBuilderMode("code");
     setMobilePanel("code");
     setChatCollapsed(false);
-    router.refresh();
-  }, [artifactFiles, chat.id, chat.model, router]);
+    refreshPage();
+  }, [artifactFiles, chat.id, chat.model]);
 
   const triggerAutoFix = useCallback(async ({ error, files, fallback = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean }) => {
     if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
@@ -616,7 +640,7 @@ Fix requirements:
                 setBuilderMode("preview");
                 setMobilePanel("preview");
                 setChatCollapsed(false);
-                router.refresh();
+                refreshPage();
               });
             });
           });
@@ -628,7 +652,7 @@ Fix requirements:
       }
     }
     readStream();
-  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
+  }, [chat.id, chat.messages, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
 
   const detectRequiredEnvKeys = useCallback((files: ArtifactFile[]) => {
     const keys = new Set<string>();
@@ -685,9 +709,9 @@ Fix requirements:
       hasAutoSwitchedPreviewRef.current = false;
       setBuilderStatus("validating");
       setActiveMessage(newMessage);
-      router.refresh();
+      refreshPage();
     });
-  }, [chat.id, router, syncWorkspaceFiles]);
+  }, [chat.id, syncWorkspaceFiles]);
 
   const handleDownloadZip = useCallback(() => {
     const files = activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : [];
@@ -777,13 +801,13 @@ Fix requirements:
             setShowUnsavedOverlay(false);
             if (message) setActiveMessage(message as Message);
             else if (savedFiles?.length) {
-              setActiveMessage((current) => (current ? { ...current, files: savedFiles } as Message : current));
+              setActiveMessage((current: Message | undefined) => (current ? { ...current, files: savedFiles } as Message : current));
             }
             if (pendingMode) {
               applyMode(pendingMode);
               setPendingMode(null);
             }
-            router.refresh();
+            refreshPage();
           }}
           saveRequest={designSaveRequest}
           previewMode={previewMode}
@@ -794,20 +818,17 @@ Fix requirements:
     if (builderMode === "database") return <ModeDatabase chatId={chat.id} files={artifactFiles} />;
     if (builderMode === "canvas") {
       return (
-        <div className="flex h-full w-full min-h-0 flex-col items-center justify-center gap-4 bg-background text-center px-6">
-          <div className="flex size-12 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-2xl">🖼️</div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Canvas mode coming soon</h3>
-            <p className="mt-1 text-sm text-muted-foreground max-w-xs">Visual node editor for app structure is in development. Use Code or Design mode to edit your artifact now.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setModeSafely("code")}
-            className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground transition hover:bg-accent"
-          >
-            Switch to Code
-          </button>
-        </div>
+        <CanvasMode
+          files={artifactFiles}
+          isStreaming={!!streamPromise}
+          onRequestChange={(description) => {
+            // Handle canvas node interaction by creating a new message
+            startTransition(async () => {
+              await createMessage(chat.id, description, "user");
+              refreshPage();
+            });
+          }}
+        />
       );
     }
     if (builderMode === "plan") {
@@ -930,7 +951,7 @@ Fix requirements:
                 <SidebarTrigger className="inline-flex size-8 md:hidden" />
               </Tip>
               <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
-                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
+                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
               </Tip>
               <div className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
                 <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
@@ -939,7 +960,7 @@ Fix requirements:
               </div>
             </div>
 
-            <div className="hidden items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:flex" role="tablist" aria-label="Artifact mode">
+            <div className="hidden items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:flex" aria-label="Artifact mode">
               <BuilderModeButton mode="preview" current={builderMode} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => setModeSafely("preview")} />
               <BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} />
               <BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} />
@@ -949,7 +970,7 @@ Fix requirements:
             </div>
 
             <div className="flex items-center justify-end gap-1">
-              <div className="flex items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:hidden" role="tablist" aria-label="Mobile panels">
+              <div className="flex items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:hidden" aria-label="Mobile panels">
                 <MobilePanelButton panel="chat" current={mobilePanel} label="Chat" icon={<MessageSquare className="size-3.5" />} onClick={() => switchMobilePanel("chat")} />
                 <MobilePanelButton panel="code" current={mobilePanel} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => switchMobilePanel("code")} />
                 <MobilePanelButton panel="preview" current={mobilePanel} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => switchMobilePanel("preview")} />
@@ -967,7 +988,28 @@ Fix requirements:
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
                     {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-                    <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <ChatPanel
+                        chat={chat}
+                        messages={chat.messages}
+                        activeMessage={activeMessage}
+                        onMessageClick={(message) => {
+                          if (message !== activeMessage) {
+                            setActiveMessage(message);
+                            setActiveTab("code");
+                            setBuilderMode("code");
+                            setMobilePanel("code");
+                          }
+                        }}
+                        streamText={streamText}
+                        reasoningText={reasoningText}
+                        isReasoningStreaming={isReasoningStreaming}
+                        isStreaming={!!streamPromise}
+                        showPlanMode={builderMode === "plan"}
+                        checkpoints={assistantVersions}
+                        onRestoreCheckpoint={handleSwitchVersion}
+                      />
+                    </div>
                     <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                   </section>
                 </ResizablePanel>
@@ -991,7 +1033,7 @@ Fix requirements:
           autoFixEnabled={autoFixEnabled}
           previewMode={previewMode}
           onClose={() => setContextMenu(null)}
-          onNewChat={() => router.push("/")}
+          onNewChat={() => navigateTo("/")}
           onCopyUrl={handleCopyCurrentUrl}
           onShare={handleShareLink}
           onPublish={handlePublishMobile}
@@ -1035,7 +1077,7 @@ Fix requirements:
               {assistantVersions.length > 0 && (
                 <div className="grid gap-1 border-t border-border/70 pt-3">
                   <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Layers className="size-3.5" /> Versions</div>
-                  {assistantVersions.slice().reverse().map((version) => (
+                  {assistantVersions.slice().reverse().map((version: { id: string; version: number; label: string }) => (
                     <button key={version.id} type="button" onClick={() => { handleSwitchVersion(version.id); setMobileOptionsOpen(false); }} className={`flex items-center justify-between rounded-md px-2 py-2 text-left text-xs ${activeMessage?.id === version.id ? "text-foreground shadow-[inset_0_-1px_0_hsl(var(--foreground)/0.45)]" : "text-muted-foreground"}`}>
                       <span>{version.label}</span>
                       <span>{version.version === activeVersion?.version ? "Current" : "Revert"}</span>
@@ -1107,12 +1149,12 @@ Fix requirements:
 
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
-  return <button type="button" role="tab" aria-selected={active} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+  return <button type="button" aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
 }
 
 function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
   const active = current === panel;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
+  return <button type="button" onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
 }
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {

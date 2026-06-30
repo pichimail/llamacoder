@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
 import { GlobalAppShell } from "@/components/global-app-shell";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { Public_Sans } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -52,7 +53,9 @@ export default function RootLayout({
         className="min-h-full bg-background font-sans text-foreground antialiased"
         suppressHydrationWarning
       >
-        <GlobalAppShell>{children}</GlobalAppShell>
+        <ThemeProvider>
+          <GlobalAppShell>{children}</GlobalAppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

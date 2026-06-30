@@ -3,7 +3,7 @@
  * Tests for lib/authz.ts helper functions
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 describe('Authorization Helpers', () => {
   describe('AuthError', () => {

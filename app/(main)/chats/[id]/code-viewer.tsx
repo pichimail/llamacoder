@@ -610,19 +610,30 @@ export default function CodeViewer({
       <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.08),transparent_20%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_18%),transparent] text-foreground">
         <div className="flex h-10 shrink-0 items-center justify-between border-b border-fuchsia-500/15 bg-zinc-950/65 px-2 text-sm backdrop-blur">
           <div className="flex items-center gap-0.5" role="tablist" aria-label="Output view">
-            {(["code", "preview"] as const).map((tab) => (
-              <button
-                key={tab}
-                role="tab"
-                aria-selected={activeTab === tab}
-                onClick={() => onTabChange(tab)}
-                className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-                  activeTab === tab ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.14)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            {(["code", "preview"] as const).map((tab) => {
+              const isActive = activeTab === tab;
+              return isActive ? (
+                <button
+                  key={tab}
+                  role="tab"
+                  aria-selected="true"
+                  onClick={() => onTabChange(tab)}
+                  className="rounded-md border px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.14)]"
+                >
+                  {tab}
+                </button>
+              ) : (
+                <button
+                  key={tab}
+                  role="tab"
+                  aria-selected="false"
+                  onClick={() => onTabChange(tab)}
+                  className="rounded-md border border-transparent px-3 py-1 text-xs font-medium capitalize text-muted-foreground transition hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {tab}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-1">
@@ -637,21 +648,21 @@ export default function CodeViewer({
             {activeTab === "code" ? (
               <>
                 <Tip label={codeLayout === "split-preview" ? "Single editor" : "Split with preview"}>
-                  <button className={`${iconBtn} ${codeLayout === "split-preview" ? "text-foreground" : ""}`} onClick={() => setCodeLayout((layout) => (layout === "split-preview" ? "editor" : "split-preview"))} aria-pressed={codeLayout === "split-preview"} aria-label="Toggle side by side editor and preview">
+                  <button className={`${iconBtn} ${codeLayout === "split-preview" ? "text-foreground" : ""}`} onClick={() => setCodeLayout((layout) => (layout === "split-preview" ? "editor" : "split-preview"))} aria-label="Toggle side by side editor and preview">
                     <Columns3 className="size-3.5" aria-hidden="true" />
                   </button>
                 </Tip>
                 <Tip label={codeLayout === "split-editor" ? "Close side editor" : "Open side editor"}>
-                  <button className={`${iconBtn} ${codeLayout === "split-editor" ? "text-foreground" : ""}`} onClick={() => { setSidePath((path) => path || selectedFile?.path || null); setCodeLayout((layout) => (layout === "split-editor" ? "editor" : "split-editor")); }} disabled={!selectedFile} aria-pressed={codeLayout === "split-editor"} aria-label="Toggle side editor">
+                  <button className={`${iconBtn} ${codeLayout === "split-editor" ? "text-foreground" : ""}`} onClick={() => { setSidePath((path) => path || selectedFile?.path || null); setCodeLayout((layout) => (layout === "split-editor" ? "editor" : "split-editor")); }} disabled={!selectedFile} aria-label="Toggle side editor">
                     {codeLayout === "split-editor" ? <PanelRightClose className="size-3.5" aria-hidden="true" /> : <PanelRightOpen className="size-3.5" aria-hidden="true" />}
                   </button>
                 </Tip>
-                <Tip label="Toggle minimap"><button className={`${iconBtn} ${showMinimap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowMinimap((value) => !value)} aria-pressed={showMinimap} aria-label="Toggle minimap"><MapIcon className="size-3.5" aria-hidden="true" /></button></Tip>
-                <Tip label="Toggle word wrap"><button className={`${iconBtn} ${wordWrap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setWordWrap((value) => !value)} aria-pressed={wordWrap} aria-label="Toggle word wrap"><WrapText className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle minimap"><button className={`${iconBtn} ${showMinimap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowMinimap((value) => !value)} aria-label="Toggle minimap"><MapIcon className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle word wrap"><button className={`${iconBtn} ${wordWrap ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setWordWrap((value) => !value)} aria-label="Toggle word wrap"><WrapText className="size-3.5" aria-hidden="true" /></button></Tip>
                 {hasUnsaved ? <Tip label="Save changes as new version (⌘S)"><button onClick={saveAll} className="inline-flex h-7 items-center gap-1 rounded-md border border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] px-2 text-xs font-medium text-zinc-50 shadow-[0_0_16px_rgba(244,114,182,0.14)] transition hover:border-fuchsia-300/40" aria-label="Save changes"><Save className="size-3.5 text-amber-300" aria-hidden="true" /> Save</button></Tip> : null}
                 <Tip label="Undo (⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.undo()} aria-label="Undo"><Undo2 className="size-3.5" aria-hidden="true" /></button></Tip>
                 <Tip label="Redo (⇧⌘Z)"><button className={iconBtn} onClick={() => editorApiRef.current?.redo()} aria-label="Redo"><Redo2 className="size-3.5" aria-hidden="true" /></button></Tip>
-                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-pressed={showTerminal} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
+                <Tip label="Toggle terminal (⌘`)"><button className={`${iconBtn} ${showTerminal ? "border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-amber-300" : ""}`} onClick={() => setShowTerminal((value) => !value)} aria-label="Toggle terminal"><TerminalIconLucide className="size-3.5" aria-hidden="true" /></button></Tip>
               </>
             ) : null}
             {activeTab === "code" ? (
@@ -847,16 +858,7 @@ function GeneratingPreviewSurface({
 
   return (
     <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-[#050505] text-white" aria-live="polite" aria-label="Generating live preview">
-      <div
-        className="absolute inset-0 opacity-45"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(255,255,255,0.2) 1px, transparent 1.5px), radial-gradient(circle, rgba(244,114,182,0.24) 1px, transparent 1.5px)",
-          backgroundPosition: "0 0, 10px 10px",
-          backgroundSize: "20px 20px",
-        }}
-        aria-hidden="true"
-      />
+      <div className="code-viewer-preview-grid absolute inset-0 opacity-45" aria-hidden="true" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(244,114,182,0.22),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.2),transparent_28%),radial-gradient(circle_at_50%_90%,rgba(251,191,36,0.16),transparent_34%)]" aria-hidden="true" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-fuchsia-300/70 to-transparent" aria-hidden="true" />
       <div className="absolute inset-y-0 left-1/2 w-px bg-gradient-to-b from-transparent via-violet-300/20 to-transparent" aria-hidden="true" />

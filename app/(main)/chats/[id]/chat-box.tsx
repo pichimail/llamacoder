@@ -3,7 +3,6 @@
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { Brain, Code2, Database, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
@@ -56,7 +55,6 @@ export default function ChatBox({
   onInputFocused?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
   const disabled = isPending || isStreaming;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -322,7 +320,9 @@ export default function ChatBox({
 
       onNewStreamPromise(streamPromise, { reasoning: false });
       startTransition(() => {
-        router.refresh();
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
         setPrompt("");
         setScreenshotUrl(undefined);
         setAttachedImages([]);

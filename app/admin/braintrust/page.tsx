@@ -182,9 +182,12 @@ export default function BraintrustAdminPage() {
                       <TableCell>
                         <div className="flex items-center gap-2 min-w-[120px]">
                           <span className="font-mono text-xs w-9">{log.score.toFixed(2)}</span>
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-1.5 bg-primary rounded-full" style={{ width: `${log.score * 100}%` }} />
-                          </div>
+                          <progress
+                            className="h-1.5 w-full flex-1 overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
+                            value={Math.round(log.score * 100)}
+                            max={100}
+                            aria-label={`Quality score ${Math.round(log.score * 100)} percent`}
+                          />
                         </div>
                       </TableCell>
                       <TableCell>

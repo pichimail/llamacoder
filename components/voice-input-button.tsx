@@ -97,21 +97,40 @@ export function VoiceInputButton({
     ? "Voice input is not supported in this browser"
     : lastError || (recording ? "Listening" : label);
 
+  if (recording) {
+    return (
+      <button
+        type="button"
+        onClick={stop}
+        disabled={disabled || !supported}
+        aria-label="Stop voice input"
+        aria-pressed="true"
+        title={tooltip}
+        className={cn(
+          "relative inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
+          "border-red-400/50 bg-red-500/15 text-red-200 before:absolute before:inset-[-3px] before:rounded-full before:border before:border-red-400/25 before:animate-pulse",
+          className,
+        )}
+      >
+        <MicOff className={cn("size-4", iconClassName)} />
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
-      onClick={recording ? stop : start}
+      onClick={start}
       disabled={disabled || !supported}
-      aria-label={recording ? "Stop voice input" : label}
-      aria-pressed={recording}
+      aria-label={label}
+      aria-pressed="false"
       title={tooltip}
       className={cn(
         "relative inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
-        recording && "border-red-400/50 bg-red-500/15 text-red-200 before:absolute before:inset-[-3px] before:rounded-full before:border before:border-red-400/25 before:animate-pulse",
         className,
       )}
     >
-      {recording ? <MicOff className={cn("size-4", iconClassName)} /> : <Mic className={cn("size-4", iconClassName)} />}
+      <Mic className={cn("size-4", iconClassName)} />
     </button>
   );
 }
