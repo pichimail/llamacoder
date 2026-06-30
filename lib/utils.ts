@@ -198,13 +198,17 @@ function finalizeGeneratedPath(
   return finalPath;
 }
 
+// FIXED: Enhanced extractAllCodeBlocks with better regex matching and fallback handling
 export function extractAllCodeBlocks(input: string): Array<{
   code: string;
   language: string;
   path: string;
   fullMatch: string;
 }> {
-  const codeBlockRegex = /```([^\n]*)\n([\s\S]*?)\n```/g;
+  if (!input || typeof input !== 'string') return [];
+  
+  // Support both ```\n and ``` endings (with or without trailing newline)
+  const codeBlockRegex = /```([^\n]*)\n([\s\S]*?)(?:\n```|```)/g;
   const files: Array<{
     code: string;
     language: string;
@@ -217,14 +221,34 @@ export function extractAllCodeBlocks(input: string): Array<{
   let lastIndex = 0;
   while ((match = codeBlockRegex.exec(input)) !== null) {
     const fenceTag = match[1] || "";
-    const code = match[2];
+    const code = match[2] || "";
     const fullMatch = match[0];
+    
+    // Skip empty code blocks
+    if (!code.trim()) {
+      lastIndex = match.index + fullMatch.length;
+      continue;
+    }
+    
     const pathHint = extractPathHintFromText(input.slice(lastIndex, match.index));
     const { language, path } = parseFenceTag(fenceTag, pathHint);
     const finalPath = finalizeGeneratedPath(path, language, code, existingPaths);
 
     files.push({ code, language, path: finalPath, fullMatch });
     lastIndex = match.index + fullMatch.length;
+  }
+
+  // Fallback: if no files found but input looks like code, create a default file
+  if (files.length === 0 && input.trim().length > 50) {
+    const hasReactCode = /import\s+.*from|export\s+default|function\s+\w+|const\s+\w+\s*=/.test(input);
+    if (hasReactCode) {
+      files.push({
+        code: input.trim(),
+        language: 'tsx',
+        path: 'App.tsx',
+        fullMatch: input
+      });
+    }
   }
 
   return files;

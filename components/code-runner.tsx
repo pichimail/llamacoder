@@ -110,7 +110,20 @@ export default function CodeRunner({
         : typeof f.code === "string"
           ? f.code
           : "",
-  }));
+  })).filter((f) => f.path && f.content.trim()); // FIXED: Filter out empty files
+  
+  // FIXED: Return empty state if no valid files
+  if (actualFiles.length === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-background/50 text-muted-foreground">
+        <div className="text-center">
+          <p className="text-sm">No files to preview</p>
+          <p className="mt-1 text-xs">Waiting for generated code...</p>
+        </div>
+      </div>
+    );
+  }
+  
   const runtime = detectArtifactRuntime(actualFiles);
   if (runtime === "python" || runtime === "streamlit") {
     return <PythonArtifactRunner files={actualFiles} runtime={runtime} />;

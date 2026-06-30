@@ -70,8 +70,18 @@ const FIX_CONTEXT_CHAR_BUDGET = 70000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
-  if (stored && Array.isArray(stored) && stored.length > 0) return stored;
-  return extractAllCodeBlocks(message.content) as RawGeneratedFile[];
+  if (stored && Array.isArray(stored) && stored.length > 0) {
+    // Filter out any invalid files
+    return stored.filter(f => f && typeof f.path === 'string' && f.path.trim() && (f.code || f.content));
+  }
+  // FIXED: Extract from content with better error handling
+  try {
+    const extracted = extractAllCodeBlocks(message.content || "") as RawGeneratedFile[];
+    return extracted.filter(f => f && f.path && (f.code || f.content));
+  } catch (error) {
+    console.warn('Failed to extract code blocks:', error);
+    return [];
+  }
 }
 
 function normalizeFile(file: RawGeneratedFile): ArtifactFile {
