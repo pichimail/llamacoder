@@ -4,11 +4,10 @@ import type { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
 import {
-  getCurrentUser,
   getScopedChatListWhere,
-  isAuthRequired,
   requireChatAccess,
-} from '@/lib/access-control'
+  requireCurrentUser,
+} from '@/lib/authz'
 import { getPrisma } from '@/lib/prisma'
 
 async function getScopedChatOrThrow(chatId: string, level: 'viewer' | 'editor' | 'owner' = 'viewer') {
@@ -31,18 +30,15 @@ export async function createChat(data: {
   model: string
 }) {
   const prisma = getPrisma()
-  const user = await getCurrentUser()
-  if ((await isAuthRequired()) && !user) throw new Error('Unauthorized')
+  const user = await requireCurrentUser()
 
-  const project = user
-    ? await prisma.project.create({
-        data: {
-          name: data.title || 'Untitled App',
-          description: data.prompt || null,
-          userId: user.id,
-        },
-      })
-    : null
+  const project = await prisma.project.create({
+    data: {
+      name: data.title || 'Untitled App',
+      description: data.prompt || null,
+      userId: user.id,
+    },
+  })
 
   const chat = await prisma.chat.create({
     data: {
@@ -52,7 +48,7 @@ export async function createChat(data: {
       quality: 'high',
       shadcn: true,
       llamaCoderVersion: 'v2',
-      projectId: project?.id,
+      projectId: project.id,
     },
   })
 

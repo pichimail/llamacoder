@@ -9,7 +9,8 @@ import {
 } from "@/lib/github-repo-import";
 import { extractPreviewDependencies } from "@/lib/package-deps";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
-import { getCurrentUser, isAuthRequired } from "@/lib/access-control";
+import { requireCurrentUser } from "@/lib/authz";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   url: z.string().url(),
@@ -27,10 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await getCurrentUser();
-    if ((await isAuthRequired()) && !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireCurrentUser();
 
     const spec = parseGithubRepoUrl(parsed.data.url);
     if (!spec) {
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
 
-    await rateLimitOrThrow(`github-repo-import:${user?.id || request.headers.get("x-forwarded-for") || "local"}`, {
+    await rateLimitOrThrow(`github-repo-import:${user.id}`, {
       limit: 10,
       windowSeconds: 60,
     });
@@ -77,15 +75,13 @@ export async function POST(request: NextRequest) {
     const markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
 
     const prisma = getPrisma();
-    const project = user
-      ? await prisma.project.create({
-          data: {
-            name: title,
-            description: userPrompt,
-            userId: user.id,
-          },
-        })
-      : null;
+    const project = await prisma.project.create({
+      data: {
+        name: title,
+        description: userPrompt,
+        userId: user.id,
+      },
+    });
 
     const chat = await prisma.chat.create({
       data: {
@@ -94,7 +90,7 @@ export async function POST(request: NextRequest) {
         prompt: userPrompt,
         title,
         shadcn: true,
-        projectId: project?.id,
+        projectId: project.id,
         messages: {
           create: [
             {
@@ -125,6 +121,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await logAudit({ userId: user.id, action: "import-github", resource: "chat", resourceId: chat.id });
+
     return NextResponse.json({
       id: chat.id,
       chatId: chat.id,
@@ -134,7 +132,8 @@ export async function POST(request: NextRequest) {
       dependencies: previewDependencies,
       hasReadme: Boolean(imported.readme),
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 401) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.json(
       {
         error:

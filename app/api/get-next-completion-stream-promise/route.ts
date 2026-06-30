@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { AccessControlError, requireChatAccess } from "@/lib/access-control";
-import { getFallbackModel, getHistoryCompressionModel, resolveModel } from "@/lib/constants";
+import { AuthzError, requireChatAccess } from "@/lib/authz";
+import { assertValidModel, getFallbackModel, getHistoryCompressionModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import {
   anyProviderConfigured,
@@ -151,7 +151,7 @@ export async function POST(req: Request) {
   try {
     access = await requireChatAccess(message.chatId, "editor");
   } catch (error) {
-    if (error instanceof AccessControlError) {
+    if (error instanceof AuthzError) {
       return new Response(error.message, { status: error.status });
     }
     throw error;
@@ -255,7 +255,12 @@ export async function POST(req: Request) {
   }
 
   messages = addPromptLock(messages);
-  const requestedModel = resolveModel(model);
+  let requestedModel: string;
+  try {
+    requestedModel = assertValidModel(model);
+  } catch (e) {
+    return new Response("Invalid model", { status: 400 });
+  }
   const latestPrompt = latestUserPrompt(messages);
 
   logGeneration({

@@ -35,6 +35,7 @@ model Chat {
   historySummaryKey String?
   historySummaryAt  DateTime?
   fileUploads       FileUpload[]
+  designCheckpoints DesignCheckpoint[]
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -207,6 +208,7 @@ model User {
   projects      Project[]
   projectMembers ProjectMember[]
   fileUploads   FileUpload[]
+  auditLogs     AuditLog[]
   createdAt     DateTime  @default(now())
 }
 
@@ -250,6 +252,7 @@ model FileUpload {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   blobUrl   String   @unique
+  pathname  String?
   filename  String
   mimeType  String
   size      Int
@@ -278,5 +281,39 @@ model RateLimit {
   @@unique([userId, route, windowStart])
   @@index([userId])
   @@index([route])
+  @@index([createdAt])
+}
+
+// ===== Audit Log for sensitive actions =====
+model AuditLog {
+  id        String   @id @default(nanoid(12))
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  resource  String?
+  resourceId String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ===== Design checkpoints for visual editor =====
+model DesignCheckpoint {
+  id        String   @id @default(nanoid(12))
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  projectId String?
+  userId    String
+  name      String   @default("")
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  @@index([chatId])
+  @@index([projectId])
+  @@index([userId])
   @@index([createdAt])
 }

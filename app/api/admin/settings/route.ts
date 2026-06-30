@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequest } from "@/lib/admin-auth";
+import { isAdminRequest, requireAdminUser } from "@/lib/admin-auth";
 import { getSettings, setSetting } from "@/lib/settings";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
   if (!(await isAdminRequest())) {
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
   }
   try {
     await setSetting(parsed.data.key, parsed.data.value);
+    const admin = await requireAdminUser().catch(() => null);
+    await logAudit({ userId: admin?.id || null, action: "admin-setting", resource: "setting", resourceId: parsed.data.key, metadata: { value: parsed.data.value } });
   } catch (e) {
     return NextResponse.json(
       { error: "Settings table missing — run `npx prisma db push` once." },

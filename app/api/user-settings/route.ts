@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getCurrentUser, isAuthRequired } from "@/lib/access-control";
+import { getCurrentUserOrNull } from "@/lib/authz";
 import { getPrisma } from "@/lib/prisma";
 
 const settingsSchema = z.object({
@@ -36,16 +36,14 @@ function settingKey(userId: string | null) {
 }
 
 async function resolveUser() {
-  const [authNeeded, user] = await Promise.all([isAuthRequired(), getCurrentUser()]);
-  if (authNeeded && !user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
+  const user = await getCurrentUserOrNull();
+  // settings can be lenient; if no user return guest defaults
   return { user };
 }
 
 export async function GET() {
   const resolved = await resolveUser();
-  if (resolved.error) return resolved.error;
+  if ((resolved as any).error) return (resolved as any).error;
 
   const prisma = getPrisma();
   const row = await prisma.setting.findUnique({
@@ -64,7 +62,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const resolved = await resolveUser();
-  if (resolved.error) return resolved.error;
+  if ((resolved as any).error) return (resolved as any).error;
 
   const json = await request.json().catch(() => null);
   const parsed = settingsSchema.safeParse({ ...defaultSettings, ...(json?.settings || json || {}) });

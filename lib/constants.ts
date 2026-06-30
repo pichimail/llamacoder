@@ -211,6 +211,50 @@ export function getVisibleModels() {
   ];
 }
 
+export function assertValidModel(model: string | undefined | null): string {
+  if (!model || typeof model !== "string") {
+    throw new Error("Model is required");
+  }
+  const resolved = resolveModel(model);
+  const visible = getVisibleModels();
+  const match = visible.find(
+    (m) => m.value === resolved || m.nativeModel === resolved || m.value === model,
+  );
+  if (!match) {
+    // Only allow openrouter/* if it's explicitly present or dev, else reject unknown
+    if (resolved.startsWith("openrouter/") && visible.some(v => v.provider === "openrouter")) {
+      return resolved;
+    }
+    throw new Error(`Unknown or unsupported model: ${model}`);
+  }
+  return resolved;
+}
+
+export function getDefaultAvailableModel(): string {
+  const togetherKey = process.env.TOGETHER_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (togetherKey) {
+    return WORKING_FALLBACK_MODEL;
+  }
+  if (openrouterKey) {
+    return "openrouter/auto";
+  }
+  // safe default that will be rejected later if no keys
+  return WORKING_FALLBACK_MODEL;
+}
+
+export function isModelAvailable(model: string): boolean {
+  try {
+    const resolved = assertValidModel(model);
+    const config = getModelConfig(resolved);
+    if (config.provider === "together" && !process.env.TOGETHER_API_KEY) return false;
+    if (config.provider === "openrouter" && !process.env.OPENROUTER_API_KEY) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const SUGGESTED_PROMPTS = [
   {
     title: "Kanban Board",

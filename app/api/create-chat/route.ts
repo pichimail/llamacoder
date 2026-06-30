@@ -3,13 +3,14 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getMainCodingPrompt } from "@/lib/prompts";
 import { z } from "zod";
-import { resolveModel } from "@/lib/constants";
+import { assertValidModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import { anyProviderConfigured } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { buildPhaseOneSpec } from "@/lib/build-engine";
 import { seedBuildArtifacts } from "@/lib/build-workspace";
-import { getCurrentUser, isAuthRequired } from "@/lib/access-control";
+import { requireCurrentUser } from "@/lib/authz";
+import { logAudit } from "@/lib/audit";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -58,40 +59,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request body" }, { status: 400 });
     }
 
-    const user = await getCurrentUser();
-    if ((await isAuthRequired()) && !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireCurrentUser();
 
     const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn } = parsed.data;
-    const resolvedModel = resolveModel(model);
+    let resolvedModel: string;
+    try {
+      resolvedModel = assertValidModel(model);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid model" }, { status: 400 });
+    }
+    if (!anyProviderConfigured()) {
+      return NextResponse.json({ error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" }, { status: 500 });
+    }
+
+    const prisma = getPrisma();
+
+    // Verify attachments belong to this user (upload IDs or owned blob URLs)
+    const verifiedAttachments: any[] = [];
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        if (att.url) {
+          const existing = await prisma.fileUpload.findFirst({
+            where: { blobUrl: att.url, userId: user.id },
+          });
+          if (!existing) {
+            return NextResponse.json({ error: "Unowned attachment URL rejected" }, { status: 403 });
+          }
+          verifiedAttachments.push({ ...att, uploadId: existing.id });
+          // link later
+        } else if ((att as any).uploadId) {
+          const up = await prisma.fileUpload.findUnique({ where: { id: (att as any).uploadId } });
+          if (!up || up.userId !== user.id) {
+            return NextResponse.json({ error: "Unowned upload ID rejected" }, { status: 403 });
+          }
+          verifiedAttachments.push(att);
+        }
+      }
+    }
+
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
     const buildSpec = buildPhaseOneSpec({ prompt: promptWithAttachments, mode, shadcn });
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
-    if (!anyProviderConfigured()) {
-      return NextResponse.json({ error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" }, { status: 500 });
-    }
 
     try {
-      const rateKey = user?.id || request.headers.get("x-forwarded-for") || "local";
-      await rateLimitOrThrow(`create-chat:${rateKey}`, { limit: 18, windowSeconds: 60 });
+      await rateLimitOrThrow(`create-chat:${user.id}`, { limit: 18, windowSeconds: 60 });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
     }
 
-    const prisma = getPrisma();
-    const project = user
-      ? await prisma.project.create({
-          data: {
-            name: buildSpec.title || "Untitled App",
-            description: promptWithAttachments || null,
-            userId: user.id,
-          },
-        })
-      : null;
+    const project = await prisma.project.create({
+      data: {
+        name: buildSpec.title || "Untitled App",
+        description: promptWithAttachments || null,
+        userId: user.id,
+      },
+    });
 
     const chat = await prisma.chat.create({
       data: {
@@ -100,7 +125,7 @@ export async function POST(request: NextRequest) {
         prompt,
         title: buildSpec.title,
         shadcn,
-        projectId: project?.id,
+        projectId: project.id,
       },
     });
 
@@ -140,6 +165,16 @@ export async function POST(request: NextRequest) {
       include: { messages: true },
     });
 
+    // Link verified uploads to chat
+    if (verifiedAttachments.length > 0) {
+      for (const va of verifiedAttachments) {
+        const upId = va.uploadId || (va as any).uploadId;
+        if (upId) {
+          await prisma.fileUpload.update({ where: { id: upId }, data: { chatId: chat.id } }).catch(() => {});
+        }
+      }
+    }
+
     const lastMessage = newChat.messages.sort((a, b) => a.position - b.position).at(-1);
     if (!lastMessage) throw new Error("No new message");
 
@@ -150,10 +185,12 @@ export async function POST(request: NextRequest) {
       buildSpec.artifactFiles,
     );
 
+    await logAudit({ userId: user.id, action: "create-chat", resource: "chat", resourceId: chat.id });
+
     logGeneration({
       chatId: chat.id,
       model: resolvedModel,
-      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode, userId: user?.id || null },
+      input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode, userId: user.id },
       output: userMessage,
       metadata: { type: "initial_generation", title: buildSpec.title, template: buildSpec.templateId },
     });
@@ -167,6 +204,9 @@ export async function POST(request: NextRequest) {
       seededArtifacts,
     });
   } catch (error) {
+    if ((error as any)?.status === 401) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Error creating chat:", error);
     const isDev = process.env.NODE_ENV !== "production";
     const message = isDev && error instanceof Error ? `Failed to create chat: ${error.message}` : "Failed to create chat";

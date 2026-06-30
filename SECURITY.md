@@ -11,7 +11,12 @@ LlamaCoder is a production-ready SaaS platform for AI-powered code generation. T
 - **Google OAuth 2.0** is the primary authentication provider
 - Sessions are stored in the database via NextAuth with secure session tokens
 - Auth Secret is required in production via `AUTH_SECRET` environment variable
-- Local development can disable authentication via `REQUIRE_GOOGLE_AUTH=false`
+- Local development can disable authentication via `REQUIRE_GOOGLE_AUTH=false` (prod always enforces)
+- All protected routes use strict `requireCurrentUser()` + `requireChatAccess` (owner/editor/viewer)
+- Uploads tracked in FileUpload, ownership verified
+- Env vars encrypted at rest (AES-GCM via ENCRYPTION_SECRET/AUTH_SECRET)
+- Rate limits fail closed when no storage in prod
+- Design apply and checkpoints authenticated + validated
 
 ### Authorization
 

@@ -7,10 +7,12 @@ import {
   validateGeneratedCodeFiles,
 } from "@/lib/generated-code-validation";
 import {
-  accessErrorResponse,
+  authErrorResponse,
   requireChatAccess,
   type AccessLevel,
-} from "@/lib/access-control";
+} from "@/lib/authz";
+import { encryptEnvValue, decryptEnvValue, maskEnvValue } from "@/lib/env-encryption";
+import { logAudit } from "@/lib/audit";
 
 type ArtifactFileInput = {
   path: string;
@@ -35,8 +37,6 @@ type ValidationSummary = {
   issues: Array<{ path: string; line: number; column: number; message: string }>;
   formatted: string;
 };
-
-const LOCAL_USER_ID = "local-workspace-user";
 
 function cleanFiles(files: ArtifactFileInput[] = []) {
   return files
@@ -117,17 +117,9 @@ async function ensureWorkspace(chatId: string) {
   });
   if (!chat) return null;
   if (chat.projectId && chat.project) return { prisma, chat, project: chat.project };
-
-  const user = await prisma.user.upsert({
-    where: { id: LOCAL_USER_ID },
-    update: {},
-    create: { id: LOCAL_USER_ID, name: "Local Workspace", email: "workspace@hyperspeed.local", role: "owner" },
-  });
-  const project = await prisma.project.create({
-    data: { name: chat.title || "Untitled App", description: chat.prompt || null, userId: user.id },
-  });
-  await prisma.chat.update({ where: { id: chatId }, data: { projectId: project.id } });
-  return { prisma, chat, project };
+  // No auto local user/project creation in production paths.
+  // Orphans must be backfilled explicitly via script or will 404 here.
+  return null;
 }
 
 async function serializeWorkspace(chatId: string) {
@@ -149,7 +141,7 @@ async function serializeWorkspace(chatId: string) {
   return {
     project: { id: project.id, name: project.name, description: project.description || "" },
     integrations: integrations.map((integration) => ({ id: integration.id, type: integration.type, connected: true })),
-    envVars: envVars.map((env) => ({ id: env.id, key: env.key, value: env.value ? "••••••••" : "" })),
+    envVars: envVars.map((env) => ({ id: env.id, key: env.key, value: maskEnvValue(decryptEnvValue(env.value)) })),
     deployments: deployments.map((deployment) => ({
       id: deployment.id,
       status: deployment.status,
@@ -187,11 +179,11 @@ export async function GET(_: Request, context: { params: Promise<{ chatId: strin
   try {
     await requireChatAccess(chatId, "viewer");
   } catch (error) {
-    return accessErrorResponse(error);
+    return authErrorResponse(error);
   }
 
   const workspace = await serializeWorkspace(chatId);
-  if (!workspace) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  if (!workspace) return NextResponse.json({ error: "Chat not found or no project workspace" }, { status: 404 });
   return NextResponse.json(workspace);
 }
 
@@ -200,10 +192,12 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "");
 
+  let accessUser: any;
   try {
-    await requireChatAccess(chatId, accessLevelForAction(action));
+    const acc = await requireChatAccess(chatId, accessLevelForAction(action));
+    accessUser = acc.user;
   } catch (error) {
-    return accessErrorResponse(error);
+    return authErrorResponse(error);
   }
 
   if (action === "sync") {
@@ -218,17 +212,20 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   }
 
   const workspace = await ensureWorkspace(chatId);
-  if (!workspace) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  if (!workspace) return NextResponse.json({ error: "Chat not found or no associated project" }, { status: 404 });
   const { prisma, project, chat } = workspace;
 
   if (action === "save-env") {
     const key = String(body.key || "").trim().replace(/[^A-Z0-9_]/gi, "_").toUpperCase();
     if (!key) return NextResponse.json({ error: "Env key is required" }, { status: 400 });
+    const rawValue = String(body.value || "");
+    const encrypted = encryptEnvValue(rawValue);
     await prisma.environmentVariable.upsert({
       where: { projectId_key: { projectId: project.id, key } },
-      update: { value: String(body.value || "") },
-      create: { projectId: project.id, key, value: String(body.value || "") },
+      update: { value: encrypted },
+      create: { projectId: project.id, key, value: encrypted },
     });
+    await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } });
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
@@ -247,6 +244,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       }, { status: 409 });
     }
     const result = await syncFiles(chatId, spec.artifactFiles);
+    await logAudit({ userId: accessUser.id, action: "bootstrap", resource: "project", resourceId: project.id });
     return NextResponse.json({
       ok: true,
       fileCount: result?.count || spec.artifactFiles.length,
@@ -302,6 +300,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       update: { isPublic: true },
       create: { projectId: project.id, token, isPublic: true },
     });
+    await logAudit({ userId: accessUser.id, action: "publish", resource: "project", resourceId: project.id });
     const url = `/share/v2/${messageId}`;
     const existingDeployment = await prisma.deployment.findFirst({
       where: { projectId: project.id, status: "published", productionUrl: url },
@@ -343,6 +342,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
         productionUrl: pr.ok ? pr.url : undefined,
       },
     });
+    await logAudit({ userId: accessUser.id, action: "create-pr", resource: "project", resourceId: project.id });
     if (!pr.ok) return NextResponse.json({ ok: false, reason: pr.reason, workspace: await serializeWorkspace(chatId) }, { status: 409 });
     return NextResponse.json({ ok: true, prUrl: pr.url, branch: pr.branch, fileCount: result?.count || 0, workspace: await serializeWorkspace(chatId) });
   }
