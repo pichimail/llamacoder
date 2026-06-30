@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
+import { requireMessageAccess } from "@/lib/authz";
+import { rateLimitOrThrow } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 const bodySchema = z.object({
   previewImageUrl: z.string().url(),
@@ -18,24 +21,26 @@ export async function POST(
     return NextResponse.json({ error: "Invalid preview image URL" }, { status: 400 });
   }
 
+  let access;
+  try {
+    access = await requireMessageAccess(id, "editor");
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Forbidden" }, { status: e?.status || 403 });
+  }
+
+  try {
+    await rateLimitOrThrow(`preview:${access.user.id}`, { limit: 60, windowSeconds: 60 });
+  } catch (error) {
+    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+  }
+
   const prisma = getPrisma();
-  const message = await prisma.message.findUnique({ where: { id } });
-
-  if (!message) {
-    return NextResponse.json({ error: "Message not found" }, { status: 404 });
-  }
-
-  if (message.role !== "assistant") {
-    return NextResponse.json(
-      { error: "Preview images can only be saved on assistant messages" },
-      { status: 400 },
-    );
-  }
-
   await prisma.message.update({
     where: { id },
     data: { previewImageUrl: parsed.data.previewImageUrl },
   });
+
+  await logAudit({ userId: access.user.id, action: "save-preview", resource: "message", resourceId: id });
 
   return NextResponse.json({ ok: true });
 }

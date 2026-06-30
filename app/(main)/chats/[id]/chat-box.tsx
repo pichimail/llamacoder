@@ -62,7 +62,7 @@ export default function ChatBox({
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(chat.model);
-  const [quality, setQuality] = useState<"low" | "high">(
+  const [quality] = useState<"low" | "high">(
     chat.quality === "high" ? "high" : "low",
   );
   const [mode, setMode] = useState<ComposerMode>("agent");

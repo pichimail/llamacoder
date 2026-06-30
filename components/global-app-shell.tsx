@@ -12,7 +12,6 @@ import {
   Images,
   LayoutDashboard,
   Menu,
-  MessageSquare,
   MoreHorizontal,
   Plus,
   Search,

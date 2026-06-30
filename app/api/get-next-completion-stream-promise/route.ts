@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
 import { z } from "zod";
-import { getFallbackModel, getHistoryCompressionModel, resolveModel } from "@/lib/constants";
+import { AuthzError, requireChatAccess } from "@/lib/authz";
+import { assertValidModel, getFallbackModel, getHistoryCompressionModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import {
   anyProviderConfigured,
@@ -12,6 +10,7 @@ import {
 } from "@/lib/providers/generation";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { patchModeSystemHint } from "@/lib/code-patch";
+import { getPrisma } from "@/lib/prisma";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -144,18 +143,26 @@ export async function POST(req: Request) {
   if (!parsed.success) return new Response("Invalid request", { status: 400 });
   const { messageId, model, reasoning, quality } = parsed.data;
 
+  const prisma = getPrisma();
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) return new Response(null, { status: 404 });
+
+  let access;
   try {
-    await rateLimitOrThrow(`generation:${messageId}`, { limit: 20, windowSeconds: 60 });
+    access = await requireChatAccess(message.chatId, "editor");
+  } catch (error) {
+    if (error instanceof AuthzError) {
+      return new Response(error.message, { status: error.status });
+    }
+    throw error;
+  }
+
+  try {
+    const rateKey = access.user?.id || req.headers.get("x-forwarded-for") || message.chatId;
+    await rateLimitOrThrow(`generation:${rateKey}`, { limit: 20, windowSeconds: 60 });
   } catch (error) {
     return new Response(error instanceof Error ? error.message : "Rate limited", { status: 429 });
   }
-
-  const neon = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaNeon(neon);
-  const prisma = new PrismaClient({ adapter });
-
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) return new Response(null, { status: 404 });
 
   const messagesRes = await prisma.message.findMany({
     where: { chatId: message.chatId, position: { lte: message.position } },
@@ -248,13 +255,18 @@ export async function POST(req: Request) {
   }
 
   messages = addPromptLock(messages);
-  const requestedModel = resolveModel(model);
+  let requestedModel: string;
+  try {
+    requestedModel = assertValidModel(model);
+  } catch (e) {
+    return new Response("Invalid model", { status: 400 });
+  }
   const latestPrompt = latestUserPrompt(messages);
 
   logGeneration({
     chatId: message.chatId,
     model: requestedModel,
-    input: { messagesCount: messages.length, lastUser: latestPrompt.slice(0, 300) },
+    input: { messagesCount: messages.length, lastUser: latestPrompt.slice(0, 300), userId: access.user?.id || null },
     output: "[streamed]",
     metadata: { type: "followup", messageId, fallbackModel: getFallbackModel().value },
   });
@@ -280,5 +292,5 @@ export async function POST(req: Request) {
   }
 }
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const maxDuration = 300;

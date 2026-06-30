@@ -7,6 +7,8 @@
   An open source Claude Artifacts – generate small apps with one prompt. Powered by Llama 3 on Together.ai.
 </p>
 
+> Production branch: `release/production-ready`. All authz, security, rate limits, encryption, tests and Design Mode rebuilt. See FINAL_PRODUCTION_PASS_PROMPT.md.
+
 ## Tech stack
 
 - [Llama 3.1 405B](https://ai.meta.com/blog/meta-llama-3-1/) from Meta for the LLM

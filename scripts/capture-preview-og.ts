@@ -31,7 +31,7 @@ function parseArgs(argv: string[]): Args {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const { chromium } = await import("playwright");
+  const { chromium } = await import("playwright-core");
   await mkdir(args.outDir, { recursive: true });
 
   let targets: string[] = [];

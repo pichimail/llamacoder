@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Metadata } from "next";
 import PageClientWrapper from "./page-client-wrapper";
+import { getScopedChatListWhere, requireChatAccess } from "@/lib/access-control";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -57,7 +58,7 @@ export default async function Page({
 const getSidebarChats = cache(async () => {
   const prisma = getPrisma();
   const chats = await prisma.chat.findMany({
-    where: { isArchived: false },
+    where: await getScopedChatListWhere(),
     orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
     take: 60,
     select: {
@@ -76,6 +77,12 @@ const getSidebarChats = cache(async () => {
 
 const getChatById = cache(async (id: string) => {
   const prisma = getPrisma();
+  try {
+    await requireChatAccess(id, "viewer");
+  } catch {
+    return null;
+  }
+
   const chat = await prisma.chat.findFirst({
     where: { id },
   });

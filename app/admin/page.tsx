@@ -11,7 +11,6 @@ import {
   FolderOpen, 
   MessageSquare, 
   BarChart3, 
-  RefreshCw, 
   Download, 
   Play 
 } from "lucide-react";

@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Tip } from "@/components/ui/tooltip";
 
 type BrowserSpeechRecognition = {
-  lang: string;
+  lang?: string;
   continuous: boolean;
   interimResults: boolean;
   start: () => void;
@@ -15,12 +14,24 @@ type BrowserSpeechRecognition = {
   abort: () => void;
   onresult: ((event: { resultIndex: number; results: any }) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event?: { error?: string }) => void) | null;
 };
 
 function getRecognitionConstructor() {
   if (typeof window === "undefined") return null;
   return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
+}
+
+function resolveAutoSpeechLanguage() {
+  if (typeof navigator === "undefined") return "en-US";
+  return navigator.language || navigator.languages?.[0] || "en-US";
+}
+
+function transcriptJoin(current: string, next: string) {
+  const clean = next.trim();
+  if (!clean) return current;
+  if (!current.trim()) return clean;
+  return `${current}${/[\s\n]$/.test(current) ? "" : " "}${clean}`;
 }
 
 export function VoiceInputButton({
@@ -39,6 +50,7 @@ export function VoiceInputButton({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [recording, setRecording] = useState(false);
   const [supported, setSupported] = useState(true);
+  const [lastError, setLastError] = useState("");
 
   useEffect(() => {
     setSupported(Boolean(getRecognitionConstructor()));
@@ -58,8 +70,9 @@ export function VoiceInputButton({
       return;
     }
 
+    setLastError("");
     const recognition = new Recognition() as BrowserSpeechRecognition;
-    recognition.lang = navigator.language || "en-US";
+    recognition.lang = resolveAutoSpeechLanguage();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.onresult = (event) => {
@@ -70,7 +83,10 @@ export function VoiceInputButton({
       }
       if (finalTranscript.trim()) onTranscript(finalTranscript.trim());
     };
-    recognition.onerror = () => setRecording(false);
+    recognition.onerror = (event) => {
+      setLastError(event?.error ? `Voice input stopped: ${event.error}` : "Voice input stopped.");
+      setRecording(false);
+    };
     recognition.onend = () => setRecording(false);
     recognitionRef.current = recognition;
     recognition.start();
@@ -79,26 +95,25 @@ export function VoiceInputButton({
 
   const tooltip = !supported
     ? "Voice input is not supported in this browser"
-    : recording
-      ? "Stop voice input"
-      : `${label} · any browser-supported language`;
+    : lastError || (recording ? "Listening" : label);
 
   return (
-    <Tip label={tooltip}>
-      <button
-        type="button"
-        onClick={recording ? stop : start}
-        disabled={disabled || !supported}
-        aria-label={recording ? "Stop voice input" : label}
-        aria-pressed={recording}
-        className={cn(
-          "inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
-          recording && "border-red-400/50 bg-red-500/15 text-red-200",
-          className,
-        )}
-      >
-        {recording ? <MicOff className={cn("size-4", iconClassName)} /> : <Mic className={cn("size-4", iconClassName)} />}
-      </button>
-    </Tip>
+    <button
+      type="button"
+      onClick={recording ? stop : start}
+      disabled={disabled || !supported}
+      aria-label={recording ? "Stop voice input" : label}
+      aria-pressed={recording}
+      title={tooltip}
+      className={cn(
+        "relative inline-flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
+        recording && "border-red-400/50 bg-red-500/15 text-red-200 before:absolute before:inset-[-3px] before:rounded-full before:border before:border-red-400/25 before:animate-pulse",
+        className,
+      )}
+    >
+      {recording ? <MicOff className={cn("size-4", iconClassName)} /> : <Mic className={cn("size-4", iconClassName)} />}
+    </button>
   );
 }
+
+export { transcriptJoin };

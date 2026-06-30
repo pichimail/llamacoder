@@ -3,9 +3,9 @@
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-import { getCurrentUser } from "@/app/auth";
 import { getPrisma } from "@/lib/prisma";
 import { getMonacoLanguage } from "@/lib/utils";
+import { requireChatAccess } from "@/lib/authz";
 
 export type WorkspaceFile = {
   path: string;
@@ -14,7 +14,6 @@ export type WorkspaceFile = {
   updatedAt?: string;
 };
 
-const LOCAL_WORKSPACE_USER_ID = "local-workspace-user";
 const FOLDER_MARKER = ".gitkeep";
 
 function normalizePath(path: string) {
@@ -55,27 +54,8 @@ function normalizeSeedFiles(files: Array<{ path: string; code?: string; content?
     });
 }
 
-async function ensureLocalUser() {
-  const prisma = getPrisma();
-  const currentUser = await getCurrentUser();
-  if (currentUser?.id) return currentUser.id;
-
-  await prisma.user.upsert({
-    where: { id: LOCAL_WORKSPACE_USER_ID },
-    update: {},
-    create: {
-      id: LOCAL_WORKSPACE_USER_ID,
-      email: "local-workspace@llamacoder.local",
-      name: "Local Workspace",
-      role: "system",
-    },
-  });
-
-  return LOCAL_WORKSPACE_USER_ID;
-}
-
 async function ensureProjectForChat(chatId: string) {
-  const prisma = getPrisma();
+  const { prisma } = await requireChatAccess(chatId, "editor");
   const chat = await prisma.chat.findUnique({
     where: { id: chatId },
     select: { id: true, title: true, projectId: true },
@@ -84,22 +64,8 @@ async function ensureProjectForChat(chatId: string) {
   if (!chat) throw new Error("Chat not found.");
   if (chat.projectId) return chat.projectId;
 
-  const userId = await ensureLocalUser();
-  const project = await prisma.project.create({
-    data: {
-      name: chat.title || "Untitled workspace",
-      description: `Workspace files for chat ${chat.id}`,
-      userId,
-    },
-    select: { id: true },
-  });
-
-  await prisma.chat.update({
-    where: { id: chat.id },
-    data: { projectId: project.id },
-  });
-
-  return project.id;
+  // Projects are created at chat creation time with owner.
+  throw new Error("Chat has no project. Ownership required.");
 }
 
 async function listFiles(projectId: string) {

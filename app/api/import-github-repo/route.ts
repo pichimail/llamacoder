@@ -9,6 +9,8 @@ import {
 } from "@/lib/github-repo-import";
 import { extractPreviewDependencies } from "@/lib/package-deps";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
+import { requireCurrentUser } from "@/lib/authz";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   url: z.string().url(),
@@ -26,6 +28,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const user = await requireCurrentUser();
+
     const spec = parseGithubRepoUrl(parsed.data.url);
     if (!spec) {
       return NextResponse.json(
@@ -41,7 +45,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
 
-    await rateLimitOrThrow(`github-repo-import:${request.headers.get("x-forwarded-for") || "local"}`, {
+    await rateLimitOrThrow(`github-repo-import:${user.id}`, {
       limit: 10,
       windowSeconds: 60,
     });
@@ -71,6 +75,14 @@ export async function POST(request: NextRequest) {
     const markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
 
     const prisma = getPrisma();
+    const project = await prisma.project.create({
+      data: {
+        name: title,
+        description: userPrompt,
+        userId: user.id,
+      },
+    });
+
     const chat = await prisma.chat.create({
       data: {
         model: "openrouter/auto",
@@ -78,6 +90,7 @@ export async function POST(request: NextRequest) {
         prompt: userPrompt,
         title,
         shadcn: true,
+        projectId: project.id,
         messages: {
           create: [
             {
@@ -108,7 +121,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await logAudit({ userId: user.id, action: "import-github", resource: "chat", resourceId: chat.id });
+
     return NextResponse.json({
+      id: chat.id,
       chatId: chat.id,
       fileCount: imported.files.length,
       ref: imported.ref,
@@ -116,7 +132,8 @@ export async function POST(request: NextRequest) {
       dependencies: previewDependencies,
       hasReadme: Boolean(imported.readme),
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 401) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.json(
       {
         error:
