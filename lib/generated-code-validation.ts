@@ -27,6 +27,30 @@ function isValidatablePath(path: string) {
   return VALIDATABLE_EXTENSIONS.has(ext);
 }
 
+const ALLOWED_DEPS = new Set([
+  "react", "react-dom", "lucide-react", "framer-motion", "tailwindcss", "zod",
+  "@radix-ui/react-dialog", "@radix-ui/react-slot", "sonner", "next", "clsx", "tailwind-merge"
+]);
+
+function hasPathTraversal(p: string): boolean {
+  return p.includes("..") || p.startsWith("/") || p.includes("://") || /\0/.test(p);
+}
+
+function detectBadImports(code: string): string[] {
+  const bad: string[] = [];
+  const importRe = /from\s+["']([^"']+)["']/g;
+  let m;
+  while ((m = importRe.exec(code))) {
+    const spec = m[1];
+    if (spec.startsWith(".") || spec.startsWith("/")) continue;
+    const pkg = spec.split("/")[0];
+    if (!ALLOWED_DEPS.has(pkg) && !pkg.startsWith("@/") && !pkg.startsWith("node:")) {
+      bad.push(spec);
+    }
+  }
+  return bad;
+}
+
 export async function validateGeneratedCodeFiles(
   files: Array<{ path: string; code?: string; content?: string }>,
 ): Promise<GeneratedCodeIssue[]> {
@@ -36,6 +60,16 @@ export async function validateGeneratedCodeFiles(
   for (const file of files) {
     const code = file.code ?? file.content ?? "";
     if (!code.trim() || !isValidatablePath(file.path)) continue;
+
+    if (hasPathTraversal(file.path)) {
+      issues.push({ path: file.path, line: 1, column: 1, message: "Path traversal or absolute path rejected", excerpt: file.path });
+      continue;
+    }
+
+    const bad = detectBadImports(code);
+    for (const b of bad) {
+      issues.push({ path: file.path, line: 1, column: 1, message: `Unapproved external dependency: ${b}`, excerpt: b });
+    }
 
     const scriptKind = getScriptKind(ts, file.path);
     const sourceFile = ts.createSourceFile(file.path, code, ts.ScriptTarget.Latest, true, scriptKind);

@@ -32,6 +32,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import BuilderTerminal from "@/components/builder-terminal";
+import { Terminal, TerminalHeader, TerminalTitle } from "@/components/ai-elements/terminal";
 import { extractPreviewDependencies } from "@/lib/package-deps";
 import {
   FileTree,
@@ -317,9 +318,23 @@ export default function CodeViewer({
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [extraDeps, setExtraDeps] = useState<Record<string, string>>({});
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set(["app", "components", "lib"])); // start with common roots expanded; effect will expand all for default expanded mode
   const [refresh, setRefresh] = useState(0);
   const [showTerminal, setShowTerminal] = useState(false);
+
+  // Default expanded mode for FileTree: expand all paths when files change
+  useEffect(() => {
+    const all = new Set<string>();
+    draft.forEach(f => {
+      const parts = f.path.split('/');
+      let cur = '';
+      parts.forEach((p, i) => {
+        cur = i === 0 ? p : cur + '/' + p;
+        if (i < parts.length - 1) all.add(cur); // folders
+      });
+    });
+    if (all.size) setExpandedPaths(all);
+  }, [draft.length]); // when file count changes during generation
   const [creating, setCreating] = useState<null | "file" | "folder">(null);
   const [newName, setNewName] = useState("");
   const [explorerPanel, setExplorerPanel] = useState<ExplorerPanel>("files");
@@ -727,7 +742,13 @@ export default function CodeViewer({
                       </ResizablePanel>
                       <ResizableHandle withHandle />
                       <ResizablePanel id="terminal" defaultSize="28%" minSize="16%" maxSize="45%" className="min-h-0 overflow-hidden">
-                        <BuilderTerminal files={draft} deps={extraDeps} onCreateFile={createFile} onDeleteFile={deleteFile} onInstall={(pkg, version) => setExtraDeps((dependencies) => ({ ...dependencies, [pkg]: version || "latest" }))} />
+                        <Terminal output={draft.map((f) => `> ${f.path} ${f.isPartial ? '(writing...)' : 'written'}`).join('\n') || 'No files yet. Generating...'} isStreaming={!!streamText}>
+                          <TerminalHeader>
+                            <TerminalTitle>Terminal • file ops</TerminalTitle>
+                          </TerminalHeader>
+                          {/* legacy full terminal hidden */}
+                          <div className="hidden"><BuilderTerminal files={draft} deps={extraDeps} onCreateFile={createFile} onDeleteFile={deleteFile} onInstall={(pkg, version) => setExtraDeps((dependencies) => ({ ...dependencies, [pkg]: version || "latest" }))} /></div>
+                        </Terminal>
                       </ResizablePanel>
                     </ResizablePanelGroup>
                   ) : (

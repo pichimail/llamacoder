@@ -1,28 +1,11 @@
 import { getPrisma } from "@/lib/prisma";
 
-const LOCAL_WORKSPACE_USER_ID = "local-workspace-user";
-
 function normalizePath(path: string) {
   const cleaned = path.trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+/g, "/");
   if (!cleaned || cleaned === "." || cleaned.includes("..")) {
     throw new Error("Use a valid workspace path.");
   }
   return cleaned;
-}
-
-async function ensureLocalUser() {
-  const prisma = getPrisma();
-  await prisma.user.upsert({
-    where: { id: LOCAL_WORKSPACE_USER_ID },
-    update: {},
-    create: {
-      id: LOCAL_WORKSPACE_USER_ID,
-      email: "local-workspace@llamacoder.local",
-      name: "Local Workspace",
-      role: "system",
-    },
-  });
-  return LOCAL_WORKSPACE_USER_ID;
 }
 
 async function ensureProject(chatId: string, title: string, prompt: string) {
@@ -34,22 +17,9 @@ async function ensureProject(chatId: string, title: string, prompt: string) {
   if (!chat) throw new Error("Chat not found.");
   if (chat.projectId) return chat.projectId;
 
-  const userId = await ensureLocalUser();
-  const project = await prisma.project.create({
-    data: {
-      name: title || "Untitled workspace",
-      description: prompt || null,
-      userId,
-    },
-    select: { id: true },
-  });
-
-  await prisma.chat.update({
-    where: { id: chat.id },
-    data: { projectId: project.id },
-  });
-
-  return project.id;
+  // In production auth paths, project must be pre-created by create-chat.
+  // Do not create placeholder user/project automatically.
+  throw new Error("No project associated with chat. Use explicit owner project creation.");
 }
 
 export async function seedBuildArtifacts(

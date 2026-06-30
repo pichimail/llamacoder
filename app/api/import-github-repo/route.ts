@@ -9,7 +9,8 @@ import {
 } from "@/lib/github-repo-import";
 import { extractPreviewDependencies } from "@/lib/package-deps";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
-import { getCurrentUserOrNull, AuthError, authErrorResponse } from "@/lib/authz";
+import { requireCurrentUser } from "@/lib/authz";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   url: z.string().url(),
@@ -18,12 +19,6 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
-    const user = await getCurrentUserOrNull();
-    if (!user) {
-      throw new AuthError("Unauthorized", 401);
-    }
-
     const json = await request.json().catch(() => null);
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
@@ -32,6 +27,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const user = await requireCurrentUser();
 
     const spec = parseGithubRepoUrl(parsed.data.url);
     if (!spec) {
@@ -78,8 +75,6 @@ export async function POST(request: NextRequest) {
     const markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
 
     const prisma = getPrisma();
-
-    // Create a project for the authenticated user
     const project = await prisma.project.create({
       data: {
         name: title,
@@ -126,7 +121,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await logAudit({ userId: user.id, action: "import-github", resource: "chat", resourceId: chat.id });
+
     return NextResponse.json({
+      id: chat.id,
       chatId: chat.id,
       fileCount: imported.files.length,
       ref: imported.ref,
@@ -134,11 +132,8 @@ export async function POST(request: NextRequest) {
       dependencies: previewDependencies,
       hasReadme: Boolean(imported.readme),
     });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return authErrorResponse(error);
-    }
-    console.error("GitHub import error:", error);
+  } catch (error: any) {
+    if (error?.status === 401) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.json(
       {
         error:

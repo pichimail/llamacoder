@@ -1,306 +1,174 @@
 import "server-only";
 
-import { auth, getCurrentUser, AppUser } from "@/app/auth";
-import { getPrisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
+
 import { isAdminEmail } from "@/lib/admin-config";
+import { auth, isGoogleConfigured } from "@/lib/auth";
+import { getPrisma } from "@/lib/prisma";
+import { getSettings } from "@/lib/settings";
 
-const REQUIRE_AUTH = process.env.REQUIRE_GOOGLE_AUTH !== "false";
+export type AccessLevel = "viewer" | "editor" | "owner";
 
-/**
- * Get current user or throw 401 if not authenticated
- */
-export async function requireCurrentUser(): Promise<AppUser> {
-  if (!REQUIRE_AUTH) {
-    // Dev mode without auth: return a mock user with id "local"
-    return {
-      id: "local",
-      email: "local@dev.local",
-      name: "Local Developer",
-      role: "admin",
-      isAdmin: true,
-    };
+export type CurrentUser = {
+  id: string;
+  email: string | null;
+  isAdmin: boolean;
+};
+
+export class AuthzError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "AuthzError";
+    this.status = status;
   }
+}
 
-  const user = await getCurrentUser();
+const ROLE_RANK: Record<string, number> = {
+  viewer: 1,
+  member: 1,
+  editor: 2,
+  admin: 3,
+  owner: 3,
+};
+
+const REQUIRED_RANK: Record<AccessLevel, number> = {
+  viewer: 1,
+  editor: 2,
+  owner: 3,
+};
+
+export async function getCurrentUserOrNull(): Promise<CurrentUser | null> {
+  const session = await auth();
+  const rawUser = session?.user as any;
+  if (!rawUser?.id) return null;
+  const email = rawUser.email ? String(rawUser.email) : null;
+  return {
+    id: String(rawUser.id),
+    email,
+    isAdmin: rawUser.isAdmin === true || rawUser.role === "admin" || isAdminEmail(email),
+  };
+}
+
+export async function requireCurrentUser(): Promise<CurrentUser> {
+  const user = await getCurrentUserOrNull();
   if (!user) {
-    throw new AuthError("Unauthorized", 401);
+    throw new AuthzError(401, "Unauthorized");
   }
   return user;
 }
 
-/**
- * Get current user or null (non-throwing)
- */
-export async function getCurrentUserOrNull(): Promise<AppUser | null> {
-  if (!REQUIRE_AUTH) {
-    return {
-      id: "local",
-      email: "local@dev.local",
-      name: "Local Developer",
-      role: "admin",
-      isAdmin: true,
-    };
+async function isAuthEnforced(): Promise<boolean> {
+  // Production: always enforce for protected routes (secure default)
+  if (process.env.NODE_ENV === "production") {
+    return true;
   }
-  return getCurrentUser();
+  // Dev: respect explicit disable for local
+  if (process.env.REQUIRE_GOOGLE_AUTH === "false") {
+    return false;
+  }
+  const settings = await getSettings();
+  const googleReady = isGoogleConfigured();
+  return settings.saasMode === "on" && settings.googleAuth === "on" && googleReady;
 }
 
-/**
- * Require admin role or throw 403
- */
-export async function requireAdmin(): Promise<AppUser> {
+function memberCan(role: string | null | undefined, level: AccessLevel): boolean {
+  return (ROLE_RANK[String(role || "viewer").toLowerCase()] || 0) >= REQUIRED_RANK[level];
+}
+
+function canAccessProject(
+  user: CurrentUser,
+  project: { userId: string; members: Array<{ userId: string; role: string }> },
+  level: AccessLevel,
+): boolean {
+  if (user.isAdmin) return true;
+  if (project.userId === user.id) return true;
+  const member = project.members.find((item) => item.userId === user.id);
+  return memberCan(member?.role, level);
+}
+
+export async function requireProjectAccess(projectId: string, level: AccessLevel = "viewer") {
+  const prisma = getPrisma();
   const user = await requireCurrentUser();
-  if (!user.isAdmin && !isAdminEmail(user.email)) {
-    throw new AuthError("Forbidden: Admin role required", 403);
-  }
-  return user;
-}
-
-/**
- * Check if user can access a chat
- * @param chatId - Chat ID to check access for
- * @param userId - User ID (from session)
- * @param action - Type of action: 'read', 'write', 'delete'
- */
-export async function requireChatAccess(
-  chatId: string,
-  userId: string,
-  action: "read" | "write" | "delete" = "read"
-): Promise<void> {
-  const prisma = getPrisma();
-
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: {
-      id: true,
-      projectId: true,
-      project: {
-        select: {
-          id: true,
-          userId: true,
-          members: {
-            select: {
-              userId: true,
-              role: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!chat) {
-    throw new AuthError("Chat not found", 404);
-  }
-
-  // If no project, this is a legacy local chat - allow only if user is owner
-  if (!chat.projectId) {
-    // In dev mode, allow access
-    if (!REQUIRE_AUTH) return;
-
-    // In prod, local chats should have been migrated to projects
-    throw new AuthError("Chat not found", 404);
-  }
-
-  const project = chat.project;
-  if (!project) {
-    throw new AuthError("Chat not found", 404);
-  }
-
-  // Check if user is project owner
-  if (project.userId === userId) {
-    return;
-  }
-
-  // Check if user is a project member
-  const member = project.members.find((m) => m.userId === userId);
-  if (member) {
-    // Validate action permissions based on role
-    if (action === "delete" && member.role !== "owner") {
-      throw new AuthError("Forbidden: Insufficient permissions", 403);
-    }
-    return;
-  }
-
-  // No access
-  throw new AuthError("Forbidden: Cannot access this chat", 403);
-}
-
-/**
- * Check if user can access a project
- * @param projectId - Project ID to check access for
- * @param userId - User ID (from session)
- * @param action - Type of action: 'read', 'write', 'delete', 'manage'
- */
-export async function requireProjectAccess(
-  projectId: string,
-  userId: string,
-  action: "read" | "write" | "delete" | "manage" = "read"
-): Promise<void> {
-  const prisma = getPrisma();
-
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: {
-      id: true,
-      userId: true,
-      members: {
-        select: {
-          userId: true,
-          role: true,
-        },
+    include: { members: true },
+  });
+  if (!project) throw new AuthzError(404, "Project not found");
+  if (!canAccessProject(user, project, level)) throw new AuthzError(403, "Forbidden");
+  return { prisma, user, project };
+}
+
+export async function requireChatAccess(chatId: string, level: AccessLevel = "viewer") {
+  const prisma = getPrisma();
+  const user = await requireCurrentUser();
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    include: {
+      project: {
+        include: { members: true },
       },
     },
   });
-
-  if (!project) {
-    throw new AuthError("Project not found", 404);
-  }
-
-  // Check if user is project owner
-  if (project.userId === userId) {
-    return;
-  }
-
-  // Check if user is a project member
-  const member = project.members.find((m) => m.userId === userId);
-  if (member) {
-    // Validate action permissions based on role
-    if (action === "delete" && member.role !== "owner") {
-      throw new AuthError("Forbidden: Insufficient permissions", 403);
-    }
-    if (action === "manage" && member.role !== "owner") {
-      throw new AuthError("Forbidden: Insufficient permissions", 403);
-    }
-    return;
-  }
-
-  // No access
-  throw new AuthError("Forbidden: Cannot access this project", 403);
+  if (!chat) throw new AuthzError(404, "Chat not found");
+  if (user.isAdmin) return { prisma, user, chat };
+  if (!chat.project) throw new AuthzError(403, "Forbidden");
+  if (!canAccessProject(user, chat.project, level)) throw new AuthzError(403, "Forbidden");
+  return { prisma, user, chat };
 }
 
-/**
- * Check if user can access a message
- */
-export async function requireMessageAccess(
-  messageId: string,
-  userId: string,
-  action: "read" | "delete" = "read"
-): Promise<void> {
+export async function requireMessageAccess(messageId: string, level: AccessLevel = "viewer") {
   const prisma = getPrisma();
-
+  const user = await requireCurrentUser();
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    select: {
-      id: true,
+    include: {
       chat: {
-        select: {
-          id: true,
-          projectId: true,
-          project: {
-            select: {
-              userId: true,
-              members: {
-                select: {
-                  userId: true,
-                  role: true,
-                },
-              },
-            },
-          },
+        include: {
+          project: { include: { members: true } },
         },
       },
     },
   });
-
-  if (!message) {
-    throw new AuthError("Message not found", 404);
-  }
-
-  const project = message.chat.project;
-  if (!project) {
-    // Legacy local message
-    if (!REQUIRE_AUTH) return;
-    throw new AuthError("Message not found", 404);
-  }
-
-  // Check if user is project owner
-  if (project.userId === userId) {
-    return;
-  }
-
-  // Check if user is a project member
-  const member = project.members.find((m) => m.userId === userId);
-  if (member) {
-    if (action === "delete" && member.role !== "owner") {
-      throw new AuthError("Forbidden: Insufficient permissions", 403);
-    }
-    return;
-  }
-
-  // No access
-  throw new AuthError("Forbidden: Cannot access this message", 403);
+  if (!message) throw new AuthzError(404, "Message not found");
+  const chat = message.chat;
+  if (!chat) throw new AuthzError(404, "Chat not found");
+  if (user.isAdmin) return { prisma, user, message, chat };
+  if (!chat.project) throw new AuthzError(403, "Forbidden");
+  if (!canAccessProject(user, chat.project, level)) throw new AuthzError(403, "Forbidden");
+  return { prisma, user, message, chat };
 }
 
-/**
- * Check authentication status based on config
- * Throws 401 if auth is required but not provided
- */
-export async function checkAuth(isRequired = REQUIRE_AUTH): Promise<AppUser | null> {
-  if (!isRequired) {
-    return getCurrentUserOrNull();
-  }
-  return requireCurrentUser();
+export async function getScopedChatListWhere(options: { includeArchived?: boolean } = {}): Promise<Prisma.ChatWhereInput> {
+  const enforced = await isAuthEnforced();
+  const base: Prisma.ChatWhereInput = options.includeArchived ? {} : { isArchived: false };
+  if (!enforced) return base;
+  const user = await getCurrentUserOrNull();
+  if (!user) return { ...base, id: "__no_access__" };
+  if (user.isAdmin) return base;
+  return {
+    ...base,
+    project: {
+      OR: [
+        { userId: user.id },
+        { members: { some: { userId: user.id } } },
+      ],
+    },
+  };
 }
 
-/**
- * Custom Auth Error for consistent error handling
- */
-export class AuthError extends Error {
-  constructor(
-    message: string,
-    public status: number = 401
-  ) {
-    super(message);
-    this.name = "AuthError";
+export function authErrorResponse(error: unknown) {
+  if (error instanceof AuthzError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
+  return NextResponse.json({ error: "Access check failed" }, { status: 500 });
 }
 
-/**
- * Helper to convert AuthError to Response
- */
-export function authErrorResponse(error: AuthError): Response {
-  return new Response(
-    JSON.stringify({
-      error: error.message,
-      status: error.status,
-    }),
-    {
-      status: error.status,
-      headers: { "Content-Type": "application/json" },
-    }
-  );
-}
-
-/**
- * Helper for route handlers to check and return proper errors
- */
-export async function withAuth<T>(
-  handler: (user: AppUser) => Promise<T>,
-  isRequired = REQUIRE_AUTH
-): Promise<T | Response> {
-  try {
-    const user = await checkAuth(isRequired);
-    if (!user && isRequired) {
-      throw new AuthError("Unauthorized", 401);
-    }
-    if (user) {
-      return handler(user);
-    }
-    throw new AuthError("Unauthorized", 401);
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return authErrorResponse(error);
-    }
-    throw error;
+export async function requireAdmin() {
+  const user = await requireCurrentUser();
+  if (!user.isAdmin) {
+    throw new AuthzError(403, "Admin access required");
   }
+  return user;
 }

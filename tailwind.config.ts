@@ -35,7 +35,7 @@ const config: Config = {
   				'500': '#326DF5',
   				'700': '#1F326F'
   			},
-  			gray: colors.zinc,
+  			gray: 'colors.zinc',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
@@ -107,29 +107,29 @@ const config: Config = {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			}
-		},
-		keyframes: {
-			'accordion-down': {
-				from: {
-					height: '0'
-				},
-				to: {
-					height: 'var(--radix-accordion-content-height)'
-				}
-			},
-			'accordion-up': {
-				from: {
-					height: 'var(--radix-accordion-content-height)'
-				},
-				to: {
-					height: '0'
-				}
-			}
-		},
-		animation: {
-			'accordion-down': 'accordion-down 0.2s ease-out',
-			'accordion-up': 'accordion-up 0.2s ease-out'
-		}
+  		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
   	}
   },
   plugins: [typography, animate],

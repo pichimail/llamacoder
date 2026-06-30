@@ -1,7 +1,6 @@
 "use server";
 
-import { getPrisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { requireChatAccess } from "@/lib/access-control";
 
 export async function createMessage(
   chatId: string,
@@ -9,23 +8,18 @@ export async function createMessage(
   role: "assistant" | "user",
   files?: any[],
 ) {
-  const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    include: { messages: true },
+  const { prisma } = await requireChatAccess(chatId, "editor");
+  const maxPosition = await prisma.message.aggregate({
+    where: { chatId },
+    _max: { position: true },
   });
-  if (!chat) notFound();
-
-  const maxPosition = chat.messages.length
-    ? Math.max(...chat.messages.map((m) => m.position))
-    : -1;
 
   const newMessage = await prisma.message.create({
     data: {
       role,
       content: text,
       files: files ? JSON.parse(JSON.stringify(files)) : null,
-      position: maxPosition + 1,
+      position: (maxPosition._max.position ?? -1) + 1,
       chatId,
     },
   });

@@ -14,7 +14,8 @@ import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { PlanModePanel } from "@/components/plan-mode-panel";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { VoiceInputButton } from "@/components/voice-input-button";
+import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Context, ContextTrigger, ContextContent, ContextContentHeader, ContextContentBody, ContextContentFooter } from "@/components/ai-elements/context";
 
 const ghostTrigger =
   "h-7 px-1.5 text-xs text-muted-foreground transition hover:text-foreground";
@@ -62,7 +63,7 @@ export default function ChatBox({
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(chat.model);
-  const [quality, setQuality] = useState<"low" | "high">(
+  const [quality] = useState<"low" | "high">(
     chat.quality === "high" ? "high" : "low",
   );
   const [mode, setMode] = useState<ComposerMode>("agent");
@@ -274,6 +275,12 @@ export default function ChatBox({
           .join("\n")}`;
       }
 
+      // When iterating on an existing app, give the model a strong signal.
+      // The patch system prompt in the backend + previous assistant message already contain the files.
+      if (versions && versions.length > 0 && currentVersionId) {
+        finalPrompt = `Iterate on the existing application (current version: ${versions.find(v => v.id === currentVersionId)?.label || 'latest'}).\n\nUser request:\n${finalPrompt}\n\nReturn only the files that need to change or be added. Use exact \`\`\`lang{path=...} format. Preserve all working structure.`;
+      }
+
       const controller = new AbortController();
       onAbortController?.(controller);
       const message = await createMessage(
@@ -414,11 +421,11 @@ export default function ChatBox({
           }
           rightActions={
             <div className="flex items-center gap-1">
-              <VoiceInputButton
-                onTranscript={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
+              <SpeechInput
+                onTranscriptionChange={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
                 disabled={disabled}
                 className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
-                label="Dictate chat prompt"
+                aria-label="Dictate chat prompt (speech-to-text)"
               />
 
               <OptionDropdown
@@ -441,6 +448,38 @@ export default function ChatBox({
                   disabled: "available" in item ? !item.available : false,
                 }))}
               />
+
+              {/* Subtle Context icon wired with model context - exactly in chats prompt, functional */}
+              <Context 
+                usedTokens={Math.floor(prompt.length / 4) + 200} 
+                maxTokens={model.includes('GLM') ? 128000 : model.includes('claude') ? 200000 : 128000} 
+                modelId={model}
+              >
+                <ContextTrigger asChild>
+                  <button 
+                    type="button" 
+                    className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground flex items-center justify-center text-xs" 
+                    aria-label="Model context"
+                    title="Model context usage"
+                  >
+                    📊
+                  </button>
+                </ContextTrigger>
+                <ContextContent>
+                  <ContextContentHeader>
+                    <span className="text-sm font-medium">Context • {model.split('/').pop()}</span>
+                  </ContextContentHeader>
+                  <ContextContentBody>
+                    <div className="text-xs text-muted-foreground">
+                      ~{Math.floor(prompt.length / 4)} tokens used in prompt<br />
+                      Approx context usage for model
+                    </div>
+                  </ContextContentBody>
+                  <ContextContentFooter>
+                    <span className="text-[10px] text-muted-foreground">Click for details (demo)</span>
+                  </ContextContentFooter>
+                </ContextContent>
+              </Context>
 
               {versions.length > 0 && onSwitchVersion && (
                 <OptionDropdown
