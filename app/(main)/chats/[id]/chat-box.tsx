@@ -13,8 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { PlanModePanel } from "@/components/plan-mode-panel";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestionimport { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Context, ContextTrigger, ContextContent, ContextContentHeader, ContextContentBody, ContextContentFooter } from "@/components/ai-elements/context";
 
 const ghostTrigger =

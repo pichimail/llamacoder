@@ -40,8 +40,8 @@ type VisualPreviewState = {
   inaccessible?: boolean;
 };
 
-const VISUAL_PREVIEW_TIMEOUT_MS = 7000;
-const VISUAL_PREVIEW_POLL_MS = 300;
+const VISUAL_PREVIEW_TIMEOUT_MS = 12000;
+const VISUAL_PREVIEW_POLL_MS = 400;
 
 const previewModes: Array<{
   value: PreviewMode;
@@ -107,17 +107,20 @@ function inspectPreviewDocument(document: Document): VisualPreviewState {
     .replace(/^(Loading|Document|Preview)$/i, "")
     .trim();
 
+  // More lenient: any visibly rendered interactive or structural element counts
   const meaningfulElements = Array.from(
     body.querySelectorAll(
-      "main,section,article,nav,header,footer,button,input,textarea,select,canvas,svg,img,[role],h1,h2,h3,p,li,a",
+      "main,section,article,nav,header,footer,button,input,textarea,select,canvas,svg,img,[role],h1,h2,h3,p,li,a,div[class],span[class]",
     ),
   ).filter(isElementVisiblyRendered).length;
 
-  const root = body.querySelector("#root");
+  const root = body.querySelector("#root") || body;
   const mountedRootChildren = root?.children.length ?? 0;
-  const visualMedia = Boolean(body.querySelector("canvas,svg,img,video"));
+  const visualMedia = Boolean(body.querySelector("canvas,svg,img,video,form,table"));
 
-  if (bodyText.length >= 2 || meaningfulElements >= 2 || (mountedRootChildren > 0 && visualMedia)) {
+  // Accept if there's actual DOM content or the app mounted something substantial.
+  // This helps modern dashboards, forms, and shadcn UIs that may have less plain text.
+  if (bodyText.length >= 1 || meaningfulElements >= 1 || mountedRootChildren >= 1) {
     return { ready: true };
   }
 
@@ -443,7 +446,25 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
   }, [listen, onLog, onPreviewError, onPreviewReady, sandpack.error]);
 
   const errorMessage = sandpack.error?.message || lastRuntimeError;
-  if (!errorMessage || !useConsoleOverlay) return null;
+  if (!errorMessage) return null;
+
+  // When using web chrome (main preview), show a non-blocking top banner so the actual preview content remains visible.
+  if (!useConsoleOverlay) {
+    return (
+      <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 border-b border-red-500/30 bg-red-950/80 px-3 py-1 text-xs text-red-200 backdrop-blur">
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle className="size-3.5" />
+          <span>Preview not rendering visible content — auto-repair in progress…</span>
+        </div>
+        <button
+          onClick={() => onRequestFix?.(errorMessage)}
+          className="rounded border border-red-400/40 px-2 py-0.5 text-[10px] hover:bg-red-900"
+        >
+          Force fix
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/55 p-4 text-base backdrop-blur-sm" role="alert">

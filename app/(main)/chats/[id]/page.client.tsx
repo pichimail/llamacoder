@@ -64,7 +64,7 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database" | "canvas" | "plan";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
-const MAX_AUTO_FIX_ATTEMPTS = 3;
+const MAX_AUTO_FIX_ATTEMPTS = 5;
 const FIX_CONTEXT_FILE_LIMIT = 18;
 const FIX_CONTEXT_CHAR_BUDGET = 70000;
 
@@ -351,10 +351,15 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     const singleFileArtifact = normalizedFiles.length <= 1 || (normalizedFiles.length === 1 && normalizedFiles[0]?.path === "app/page.tsx");
     const isCrammedSinglePage = !hasLayout && !hasMultipleRoutes && normalizedFiles.length < 5;
     const shouldRebuild = fallback || singleFileArtifact || isCrammedSinglePage || attempt > 1;
+    const isBlankPreview = /blank|visible UI|did not render|no content|preview.*(not|fail|white|black)/i.test(error);
     const prefix = auto
       ? shouldRebuild
-        ? "The current app has errors. Fix it by improving the EXISTING files. Return complete updated versions of only the files that need changes, plus any new supporting files. Do NOT start from a blank scaffold — preserve routes, layout, components and state that were already working. Use app/layout + proper routes."
-        : "Apply the smallest working fix for this preview error. Return only the changed files (with full content) and any minimal new support files required. Preserve all other existing files."
+        ? isBlankPreview
+          ? "The preview is completely blank or shows no visible UI even though files exist. Diagnose root causes in layout.tsx, page.tsx, providers, global CSS, root components, missing 'use client', or rendering logic. Make the smallest targeted changes so the main app UI, pages or dashboard actually renders with visible interactive content in the sandbox preview. Return complete versions of only changed + supporting files. Preserve existing structure."
+          : "The current app has errors. Fix it by improving the EXISTING files. Return complete updated versions of only the files that need changes, plus any new supporting files. Do NOT start from a blank scaffold — preserve routes, layout, components and state that were already working. Use app/layout + proper routes."
+        : isBlankPreview
+          ? "The preview shows no visible content. Return the smallest precise fixes (changed files only) so that the generated app renders real UI, buttons, text, and layout when loaded in preview. Keep all other files untouched."
+          : "Apply the smallest working fix for this preview error. Return only the changed files (with full content) and any minimal new support files required. Preserve all other existing files."
       : shouldRebuild
         ? "The code is not working. Improve the existing structure. Provide full content for every file you touch or add. Keep previous working routes and layout intact."
         : "The code is not working. Fix it with the smallest working patch. Return full content only for files that change.";
@@ -398,10 +403,15 @@ Fix requirements:
     setReasoningText("");
     setStreamReasoningEnabled(false);
     hasAutoSwitchedPreviewRef.current = false;
-    setActiveTab("code");
-    setBuilderMode("code");
-    setMobilePanel("code");
-    setChatCollapsed(false);
+
+    // For automatic repairs, stay on current view (usually preview) instead of forcing code tab.
+    // User will see the "Generating" state in place.
+    if (!auto) {
+      setActiveTab("code");
+      setBuilderMode("code");
+      setMobilePanel("code");
+      setChatCollapsed(false);
+    }
     router.refresh();
   }, [artifactFiles, chat.id, chat.model, router]);
 
@@ -416,7 +426,9 @@ Fix requirements:
     const normalized = error.trim();
     const now = Date.now();
     const same = normalized === lastAutoFixErrorRef.current;
-    if (same && now - lastAutoFixAtRef.current < 4500) return;
+    const isPreviewBlank = /visible|blank|no content|did not render|preview/i.test(normalized);
+    const cooldown = isPreviewBlank ? 8000 : 4500;
+    if (same && now - lastAutoFixAtRef.current < cooldown) return;
     const currentFiles = files && files.length > 0 ? files : artifactFiles;
     if (!same) autoFixAttemptRef.current = 0;
     const shouldForceFallback = fallback || currentFiles.length <= 1 || autoFixAttemptRef.current > 0;
@@ -461,13 +473,20 @@ Fix requirements:
   }, [activeMessage]);
 
   const handlePreviewError = useCallback((error: string) => {
-    // AGGRESSIVELY DISABLED for first version: auto-fixing is now backend-only and hidden.
-    // Only explicit user action (e.g. "fix this" in composer or future "Fix" button) will trigger fixes.
-    // User should not see separate auto-fix happening.
-    // Preview errors are logged but do not auto start new generations.
-    console.info("Preview error (auto-fix disabled for clean first-version flow):", error?.slice(0, 200));
-    // No triggerAutoFix call here for initial flow.
-  }, []);
+    if (!error) return;
+    if (streamPromiseRef.current || streamTextRef.current) return; // don't repair during active generation
+    if (!autoFixEnabled) {
+      console.info("Preview error (auto-repair disabled by user):", error.slice(0, 200));
+      setBuilderStatus("failed");
+      return;
+    }
+    // Automatically trigger backend repair using the error details.
+    // This runs the model again with a targeted fix prompt until the preview renders visible content.
+    console.info("Preview error detected — triggering automatic repair:", error.slice(0, 160));
+    startTransition(() => {
+      void triggerAutoFix({ error, files: artifactFiles, fallback: true });
+    });
+  }, [autoFixEnabled, artifactFiles, triggerAutoFix]);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -892,7 +911,6 @@ Fix requirements:
     !streamText &&
     builderStatus !== "ready" &&
     builderStatus !== "failed" &&
-    activeTab !== "preview" &&
     builderMode !== "design";
 
   return (
