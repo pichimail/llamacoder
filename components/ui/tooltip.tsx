@@ -46,4 +46,5 @@ const Tip = ({ label, children, ...props }: TipProps) => {
 
 Tip.displayName = "Tip";
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip }
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+export { Tip };

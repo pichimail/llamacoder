@@ -20,7 +20,7 @@ import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
-import { Tip, TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
@@ -954,12 +954,12 @@ Fix requirements:
       <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
           <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/70 bg-transparent px-3 text-sm">
             <div className="flex min-w-0 items-center gap-2">
-              <Tip label="Open app menu">
+              <div title="Open app menu">
                 <SidebarTrigger className="inline-flex size-8 md:hidden" />
-              </Tip>
-              <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
-                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
-              </Tip>
+              </div>
+              <div title={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
+                <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"} aria-pressed={chatCollapsed ? 'true' : 'false'}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
+              </div>
               <div className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
                 <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
                 <span className="hidden sm:inline">•</span>
@@ -983,7 +983,7 @@ Fix requirements:
                 <MobilePanelButton panel="preview" current={mobilePanel} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => switchMobilePanel("preview")} />
               </div>
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
-              {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
+              {(builderMode === "preview" || builderMode === "design") && <div title={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></div>}
               <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
               <div className="hidden md:block"><ThemeToggle /></div>
             </div>
@@ -1128,12 +1128,12 @@ Fix requirements:
 
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
-  return <button type="button" role="tab" aria-selected={active} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active ? 'true' : 'false'} aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
 }
 
 function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
   const active = current === panel;
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
+  return <button type="button" role="tab" aria-selected={active ? 'true' : 'false'} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
 }
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {

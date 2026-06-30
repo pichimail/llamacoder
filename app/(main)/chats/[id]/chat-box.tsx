@@ -13,7 +13,8 @@ import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { PlanModePanel } from "@/components/plan-mode-panel";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestionimport { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Context, ContextTrigger, ContextContent, ContextContentHeader, ContextContentBody, ContextContentFooter } from "@/components/ai-elements/context";
 
 const ghostTrigger =
@@ -366,7 +367,7 @@ export default function ChatBox({
             <Suggestion
               key={item.label}
               suggestion={item.value}
-              onClick={(value) => setPrompt(value)}
+              onClick={(value: string) => setPrompt(value)}
               disabled={disabled}
               className="h-8 shrink-0 gap-1.5 border-border/70 bg-zinc-950/70 px-3 text-xs text-muted-foreground hover:border-fuchsia-400/30 hover:bg-zinc-900 hover:text-foreground"
             >
@@ -421,7 +422,7 @@ export default function ChatBox({
           rightActions={
             <div className="flex items-center gap-1">
               <SpeechInput
-                onTranscriptionChange={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
+                onTranscriptionChange={(text: string) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
                 disabled={disabled}
                 className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
                 aria-label="Dictate chat prompt (speech-to-text)"

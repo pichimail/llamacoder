@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { ChangeEvent } from "react";
-import { Bell, Check, ChevronDown, Download, ExternalLink, GitPullRequest, Globe, Home, KeyRound, Link, Lock, Menu, MessageCircle, MoreHorizontal, Paintbrush, RefreshCw, Settings, Share2, Upload, Video } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, GitPullRequest, KeyRound, Link, Lock, MoreHorizontal, RefreshCw, Settings, Share2, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Tip } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
@@ -20,8 +20,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -37,7 +35,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceState = {
   project: { id: string; name: string; description: string };
@@ -305,9 +302,9 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {[
-                        { name: "General", icon: Home },
+                        { name: "General", icon: Settings },
                         { name: "Model & Generation", icon: Settings },
-                        { name: "Features", icon: Paintbrush },
+                        { name: "Features", icon: Settings },
                         { name: "Environment Variables", icon: KeyRound },
                         { name: "Integrations", icon: Link },
                         { name: "Advanced", icon: Lock },
