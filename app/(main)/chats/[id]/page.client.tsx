@@ -4,7 +4,7 @@ import { createMessage } from "@/app/(main)/actions";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { mergeArtifactFiles } from "@/lib/code-patch";
-import { formatGeneratedCodeIssues, validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
+import { validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { useTheme } from "@/components/theme-provider";
@@ -152,11 +152,12 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           (Boolean(extractFirstCodeBlock(m.content)) ||
             (Array.isArray(m.files) && (m.files as unknown[]).length > 0)),
       )
-      .at(-1),
+      .at(-1) || undefined,
   );
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
   const streamPromiseRef = useRef(streamPromise);
   const streamTextRef = useRef(streamText);
+  const activeMessageRef = useRef(activeMessage);
   const isHandlingStreamRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoFixAttemptRef = useRef(0);
@@ -167,6 +168,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
+  useEffect(() => { activeMessageRef.current = activeMessage; }, [activeMessage]);
 
   useEffect(() => {
     if (searchParams.get("preview") !== "1") return;
@@ -270,7 +272,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const handleSwitchVersion = useCallback((messageId: string) => {
     const msg = chat.messages.find((m) => m.id === messageId);
-    if (!msg) return;
+    if (!msg || msg.role !== "assistant") return;
     setActiveMessage(msg);
     setActiveTab("code");
     setBuilderMode("code");
@@ -501,6 +503,9 @@ Fix requirements:
     return () => window.removeEventListener("keydown", onKey);
   }, [streamPromise, stopStreaming, setModeSafely, showUnsavedOverlay]);
 
+  // IMPORTANT: stream consumer is deliberately isolated.
+  // We only re-enter on a *new* streamPromise object. We avoid chat.messages / router / derived callbacks
+  // in the dep array to prevent re-entrancy, aborts, or visual resets during long generations.
   useEffect(() => {
     async function readStream() {
       if (!streamPromise || isHandlingStreamRef.current) return;
@@ -559,7 +564,7 @@ Fix requirements:
             startTransition(async () => {
               // Always base merge on the last successfully committed activeMessage (stable base)
               // + whatever the new response provides. This prevents accidental loss of files across turns.
-              const baseFiles = activeMessage ? getMessageFiles(activeMessage) : [];
+              const baseFiles = activeMessageRef.current ? getMessageFiles(activeMessageRef.current) : [];
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
               const mergedFiles = mergeArtifactFiles(baseFiles, currentFiles);
               if (mergedFiles.length === 0) {
@@ -573,18 +578,14 @@ Fix requirements:
                 });
                 return;
               }
+              // Do NOT hard-block and drop the generation on pre-commit validation.
+              // Always persist what the model actually produced so the user sees the real output
+              // (even if imperfect). The live preview + explicit "fix" will surface issues.
+              // Previously this was causing generations to "stop", synthetic fix prompts to appear,
+              // and UI to collapse back to only the original user prompt.
               const validationIssues = await validateGeneratedCodeFiles(mergedFiles);
               if (validationIssues.length > 0) {
-                const validationError = `Generated code validation failed before preview commit.\n\n${formatGeneratedCodeIssues(validationIssues)}`;
-                isHandlingStreamRef.current = false;
-                abortControllerRef.current = null;
-                streamPromiseRef.current = undefined;
-                streamTextRef.current = "";
-                setStreamText("");
-                setStreamPromise(undefined);
-                setStreamReasoningEnabled(false);
-                await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
-                return;
+                console.warn("Generated code had validation notes (committing anyway):", validationIssues.map(i => i.message).slice(0, 3));
               }
               const message = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
               void syncWorkspaceFiles(mergedFiles);
@@ -603,11 +604,13 @@ Fix requirements:
                 // Strictly commit the version and auto-switch to full preview once files are written.
                 hasAutoSwitchedPreviewRef.current = false;
                 setActiveMessage(message);
+                // Do NOT router.refresh() immediately here - it can cause parent re-render + effect thrash
+                // while the UI is trying to show the new artifact. Let the user continue; a soft refresh
+                // can happen on explicit actions.
                 setActiveTab("preview");
                 setBuilderMode("preview");
                 setMobilePanel("preview");
                 setChatCollapsed(false);
-                router.refresh();
               });
             });
           });
@@ -619,7 +622,8 @@ Fix requirements:
       }
     }
     readStream();
-  }, [chat.id, chat.messages, router, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamPromise]);  // ONLY on the promise object itself. Everything else via refs to avoid interrupting live streams.
 
   const detectRequiredEnvKeys = useCallback((files: ArtifactFile[]) => {
     const keys = new Set<string>();
@@ -973,7 +977,7 @@ Fix requirements:
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
                     {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-                    <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage) { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
+                    <div className="min-h-0 flex-1 overflow-hidden"><ChatLog chat={chat} streamText={streamText} reasoningText={reasoningText} isReasoningStreaming={isReasoningStreaming} activeMessage={activeMessage} onMessageClick={(message) => { if (message !== activeMessage && message.role === "assistant") { setActiveMessage(message); setActiveTab("code"); setBuilderMode("code"); setMobilePanel("code"); } }} /></div>
                     <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                   </section>
                 </ResizablePanel>

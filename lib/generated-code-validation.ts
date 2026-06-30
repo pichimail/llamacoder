@@ -29,7 +29,10 @@ function isValidatablePath(path: string) {
 
 const ALLOWED_DEPS = new Set([
   "react", "react-dom", "lucide-react", "framer-motion", "tailwindcss", "zod",
-  "@radix-ui/react-dialog", "@radix-ui/react-slot", "sonner", "next", "clsx", "tailwind-merge"
+  "@radix-ui/react-dialog", "@radix-ui/react-slot", "sonner", "next", "clsx", "tailwind-merge",
+  "date-fns", "recharts", "three", "@react-three/fiber", "@react-three/drei", "gsap",
+  "sonner", "cmdk", "vaul", "embla-carousel-react", "react-hook-form", "@hookform/resolvers",
+  "zustand", "jotai", "swr", "use-debounce", "react-hot-toast", "nanoid", "uuid"
 ]);
 
 function hasPathTraversal(p: string): boolean {

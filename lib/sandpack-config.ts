@@ -364,6 +364,18 @@ function getPageForRoute(pathname: string): React.ComponentType<any> {
 
 ensureTwind();
 
+class SafeBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; err?: any }> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError(err: any) { return { hasError: true, err }; }
+  componentDidCatch(err: any) { console.error("Preview render error", err); }
+  render() {
+    if (this.state.hasError) {
+      return <div className="min-h-[200px] p-8 text-sm">Preview component failed to mount.<br/>Check Code tab or try "Fix".<br/><pre className="text-[10px] mt-2 opacity-70">{String(this.state.err?.message || this.state.err)}</pre></div>;
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   // Prefer virtual injected route for reliable preview switching across remounts/iframes
   let initialRoute = "${currentRoute}";
@@ -408,15 +420,31 @@ export default function App() {
     };
   }, []);
 
-  const PageComponent = getPageForRoute(currentPath) || (() => <div>Page not found</div>);
+  const RawPage = getPageForRoute(currentPath) || (() => <div>Page not found</div>);
+  const PageComponent = () => <SafeBoundary><RawPage /></SafeBoundary>;
 
   return (
     <div className="${themeClass} min-h-dvh bg-background text-foreground">
-      ${inspectorWrap(wrapWithLayout("<PageComponent />"))}
+      <React.Suspense fallback={<div className="p-8 text-sm opacity-60">Loading preview…</div>}>
+        ${inspectorWrap(wrapWithLayout("<PageComponent />"))}
+      </React.Suspense>
     </div>
   );
 }`;
     }
+  }
+
+  // Ultimate fallback: guarantee *something* visible so we never get a pure black/empty preview surface.
+  if (!sandpackFiles["App.tsx"] && previewUserFiles.length === 0) {
+    sandpackFiles["App.tsx"] = `import React from 'react';
+export default function App() {
+  return <div className="min-h-dvh flex items-center justify-center p-8 text-center">
+    <div>
+      <div className="text-xl font-semibold mb-2">Preview ready</div>
+      <div className="text-sm opacity-70">The generated artifact was committed. Open the Code tab to inspect files or trigger a rebuild if the UI did not mount.</div>
+    </div>
+  </div>;
+}`;
   }
 
   for (const [path, content] of Object.entries(sandpackFiles)) {
