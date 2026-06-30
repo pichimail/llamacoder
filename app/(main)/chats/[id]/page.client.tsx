@@ -627,10 +627,23 @@ Fix requirements:
     // Dynamic detection based on common patterns and prompt hints
     if (/openai|gpt|chatgpt|ai.*key|OPENAI_API_KEY/i.test(code)) keys.add('OPENAI_API_KEY');
     if (/supabase|SUPABASE|database.*url|DATABASE_URL/i.test(code)) keys.add('DATABASE_URL');
+    if (/neon|NEON|postgres|postgresql/i.test(code)) keys.add('DATABASE_URL');
     if (/stripe|STRIPE|payment/i.test(code)) keys.add('STRIPE_SECRET_KEY');
+    if (/stripe|STRIPE|payment/i.test(code)) keys.add('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
     if (/gemini|GEMINI_API_KEY/i.test(code)) keys.add('GEMINI_API_KEY');
     if (/anthropic|claude|ANTHROPIC/i.test(code)) keys.add('ANTHROPIC_API_KEY');
     if (/auth|nextauth|AUTH_SECRET|clerk/i.test(code)) keys.add('AUTH_SECRET');
+    if (/clerk/i.test(code)) keys.add('CLERK_SECRET_KEY');
+    if (/clerk/i.test(code)) keys.add('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
+    if (/google.*auth|GOOGLE_CLIENT_ID|oauth.*google/i.test(code)) keys.add('GOOGLE_CLIENT_ID');
+    if (/google.*auth|GOOGLE_CLIENT_SECRET/i.test(code)) keys.add('GOOGLE_CLIENT_SECRET');
+    if (/grok|xai|GROK_API_KEY/i.test(code)) keys.add('GROK_API_KEY');
+    if (/upstash|UPSTASH_REDIS/i.test(code)) keys.add('UPSTASH_REDIS_REST_URL');
+    if (/upstash|UPSTASH_REDIS/i.test(code)) keys.add('UPSTASH_REDIS_REST_TOKEN');
+    if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_API_KEY');
+    if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_API_SECRET');
+    if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_STORE_DOMAIN');
+    if (/chinna|openrouter|OPENROUTER_API_KEY/i.test(code)) keys.add('OPENROUTER_API_KEY');
     return Array.from(keys);
   }, []);
 
