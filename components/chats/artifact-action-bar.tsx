@@ -80,6 +80,19 @@ interface ArtifactActionBarProps {
 const iconButton = "inline-flex size-8 items-center justify-center rounded-md border border-fuchsia-500/12 bg-zinc-950/75 text-violet-300 shadow-[0_0_0_1px_rgba(168,85,247,0.06)] transition hover:border-violet-400/25 hover:bg-zinc-900 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40 [&_svg]:drop-shadow-[0_0_8px_rgba(168,85,247,0.26)]";
 const menuItem = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45";
 
+const EASY_INSTALL_INTEGRATIONS = [
+  { type: "neon-db", label: "Neon DB", description: "Serverless Postgres", requiredKeys: ["DATABASE_URL"] },
+  { type: "supabase", label: "Supabase", description: "Backend as a service", requiredKeys: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] },
+  { type: "chinna-llm-ai", label: "ChinnaLLM-AI", description: "Our AI (OpenRouter powered)", requiredKeys: ["OPENROUTER_API_KEY"] },
+  { type: "open-ai", label: "OpenAI", description: "GPT models", requiredKeys: ["OPENAI_API_KEY"] },
+  { type: "stripe", label: "Stripe", description: "Payments", requiredKeys: ["STRIPE_SECRET_KEY", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"] },
+  { type: "grok", label: "Grok (xAI)", description: "Grok AI", requiredKeys: ["GROK_API_KEY"] },
+  { type: "upstash", label: "Upstash", description: "Redis & Vector", requiredKeys: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"] },
+  { type: "shopify", label: "Shopify", description: "E-commerce", requiredKeys: ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "SHOPIFY_STORE_DOMAIN"] },
+  { type: "google-auth", label: "Google Auth", description: "OAuth login", requiredKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+  { type: "clerk-auth", label: "Clerk Auth", description: "User auth", requiredKeys: ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] },
+];
+
 export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVersionLabel, versions, files, onSwitchVersion, onDownload, onOpenSettings }: ArtifactActionBarProps) {
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
   const [open, setOpen] = useState(false);
@@ -95,6 +108,8 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [settingsShadcn, setSettingsShadcn] = useState(true);
   const [settingsCanvas, setSettingsCanvas] = useState(false);
   const [settingsAutoFix, setSettingsAutoFix] = useState(true);
+  const [pendingInstall, setPendingInstall] = useState<string | null>(null);
+  const [installKeys, setInstallKeys] = useState<Record<string, string>>({});
   const uploadRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -444,12 +459,54 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
                 {settingsTab === "integrations" && (
                   <div className="space-y-4">
-                    <h4 className="font-medium">Integrations</h4>
-                    <div>GitHub: {workspace?.hasGithub ? "Connected ✓" : "Not connected"}</div>
-                    <Button onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} size="sm" disabled={isPending}>
-                      {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}
-                    </Button>
-                    <div>Deployments: {workspace?.deployments?.length || 0}</div>
+                    <h4 className="font-medium">Easy Install Integrations</h4>
+                    <p className="text-xs text-muted-foreground">One-click install into this app/artifact. Saves integration record + env keys.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {EASY_INSTALL_INTEGRATIONS.map((integ) => {
+                        const isInstalled = !!workspace?.integrations?.some((i: any) => i.type === integ.type && i.config?.installed);
+                        return (
+                          <div key={integ.type} className="border rounded p-3 flex flex-col gap-2 text-sm">
+                            <div>
+                              <div className="font-medium">{integ.label}</div>
+                              <div className="text-[10px] text-muted-foreground">{integ.description}</div>
+                            </div>
+                            {isInstalled ? (
+                              <div className="text-green-600 text-xs">✓ Installed</div>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => {
+                                setPendingInstall(integ.type);
+                                const init: Record<string,string> = {};
+                                integ.requiredKeys.forEach(k => init[k] = "");
+                                setInstallKeys(init);
+                              }}>Install</Button>
+                            )}
+                            {pendingInstall === integ.type && (
+                              <div className="mt-2 p-2 border rounded bg-muted/30 text-xs space-y-1.5">
+                                {integ.requiredKeys.map((key) => (
+                                  <div key={key}>
+                                    <Label className="text-[10px]">{key}</Label>
+                                    <input value={installKeys[key] || ''} onChange={e => setInstallKeys(p => ({...p, [key]: e.target.value}))} className="w-full p-1 border rounded text-xs" placeholder="Enter key" />
+                                  </div>
+                                ))}
+                                <div className="flex gap-1 pt-1">
+                                  <Button size="sm" onClick={async () => {
+                                    await workspaceRequest("install-integration", { type: pendingInstall, config: { installed: true } });
+                                    for (const [k,v] of Object.entries(installKeys)) {
+                                      if (v) await workspaceRequest("save-env", { key: k, value: v });
+                                    }
+                                    setPendingInstall(null);
+                                    setInstallKeys({});
+                                    refreshWorkspace();
+                                    toast({ title: `${integ.label} installed for this app` });
+                                  }}>Confirm & Save Keys</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => {setPendingInstall(null); setInstallKeys({});}}>Cancel</Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
