@@ -2,8 +2,6 @@ import { ImageResponse } from "next/og";
 import { domain } from "@/lib/domain";
 import { getShareScreenshotUrl } from "@/lib/og-utils";
 
-export const runtime = "edge";
-
 function truncatePrompt(text: string, max = 140) {
   const trimmed = text.trim();
   if (trimmed.length <= max) return trimmed;
