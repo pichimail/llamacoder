@@ -9,11 +9,9 @@
  *   { "messages": [{ "role": "user", ... }, { "role": "assistant", ... }] }
  */
 
-import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { getPrisma } from "../lib/prisma";
 import { extractAllCodeBlocks } from "../lib/utils";
 
 type ExportRow = {
@@ -60,13 +58,12 @@ function buildAssistantPayload(content: string, files: unknown) {
 async function main() {
   const { out, limit, minFiles } = parseArgs(process.argv.slice(2));
 
-  if (!process.env.DATABASE_URL) {
-    console.error("DATABASE_URL is required.");
+  if (!process.env.POSTGRES_PRISMA_URL && !process.env.DATABASE_URL) {
+    console.error("DATABASE_URL or POSTGRES_PRISMA_URL is required.");
     process.exit(1);
   }
 
-  const neon = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaNeon(neon) });
+  const prisma = getPrisma();
 
   const chats = await prisma.chat.findMany({
     orderBy: { createdAt: "desc" },
