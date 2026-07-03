@@ -17,7 +17,7 @@ const settingsSchema = z.object({
   webSearchDefault: z.boolean().default(false),
   deepThinkingDefault: z.boolean().default(false),
   canvasDefault: z.boolean().default(false),
-  shadcnDefault: z.boolean().default(true),
+  shadcnDefault: z.boolean().default(false),
   autoStartGeneration: z.boolean().default(true),
   autoRepairPreview: z.boolean().default(true),
   memoryCompression: z.boolean().default(true),

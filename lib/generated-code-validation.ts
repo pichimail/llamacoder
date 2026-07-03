@@ -51,6 +51,26 @@ function detectBadImports(code: string): string[] {
   return bad;
 }
 
+function detectPlaceholderCode(code: string): string | null {
+  const compact = code.trim().replace(/\s+/g, " ");
+  if (!compact) return null;
+
+  if (/^\.{2,}\s*code\s*\.{2,}$/i.test(compact)) {
+    return "Placeholder ellipsis code is not a runnable implementation";
+  }
+  if (/^(?:\/\/|\/\*|#)?\s*(?:todo|implementation goes here|insert code here|your code here|full file content|complete runnable implementation goes here)/i.test(compact)) {
+    return "Placeholder implementation text is not runnable code";
+  }
+  if (compact.length < 24 && !/[{}=();]/.test(compact)) {
+    return "Generated file is too small to be a real runnable source file";
+  }
+  if (/\.\.\.\s*(?:code|implementation|rest of|remaining)|(?:code|implementation)\s*\.\.\./i.test(compact)) {
+    return "Generated file contains ellipsis placeholders instead of complete code";
+  }
+
+  return null;
+}
+
 export async function validateGeneratedCodeFiles(
   files: Array<{ path: string; code?: string; content?: string }>,
 ): Promise<GeneratedCodeIssue[]> {
@@ -63,6 +83,12 @@ export async function validateGeneratedCodeFiles(
 
     if (hasPathTraversal(file.path)) {
       issues.push({ path: file.path, line: 1, column: 1, message: "Path traversal or absolute path rejected", excerpt: file.path });
+      continue;
+    }
+
+    const placeholderIssue = detectPlaceholderCode(code);
+    if (placeholderIssue) {
+      issues.push({ path: file.path, line: 1, column: 1, message: placeholderIssue, excerpt: getExcerpt(code, 0) });
       continue;
     }
 

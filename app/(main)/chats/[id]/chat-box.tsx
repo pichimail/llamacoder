@@ -290,6 +290,7 @@ export default function ChatBox({
 
       const streamPromise = fetch("/api/get-next-completion-stream-promise", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
           messageId: message.id,
@@ -320,9 +321,6 @@ export default function ChatBox({
 
       onNewStreamPromise(streamPromise, { reasoning: false });
       startTransition(() => {
-        if (typeof window !== "undefined") {
-          window.location.reload();
-        }
         setPrompt("");
         setScreenshotUrl(undefined);
         setAttachedImages([]);

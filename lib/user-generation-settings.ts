@@ -52,7 +52,7 @@ export const DEFAULT_USER_GENERATION_SETTINGS: UserGenerationSettings = {
   mcpServers: [],
   connectors: [],
   artifactPrefs: {
-    shadcn: true,
+    shadcn: false,
     accessibility: true,
     responsive: true,
     strictBackend: true,

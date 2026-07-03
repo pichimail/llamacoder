@@ -494,7 +494,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       maxFileSizeMb = 10,
       toolbarEnd,
       footer,
-      shadcnEnabled = true,
+      shadcnEnabled = false,
       onShadcnChange,
     } = props;
 

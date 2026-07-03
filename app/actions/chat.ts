@@ -46,7 +46,7 @@ export async function createChat(data: {
       prompt: data.prompt,
       model: data.model,
       quality: 'high',
-      shadcn: true,
+      shadcn: false,
       llamaCoderVersion: 'v2',
       projectId: project.id,
     },

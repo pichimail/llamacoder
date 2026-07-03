@@ -63,7 +63,7 @@ function addPromptLock(messages: ChatMessage[]): ChatMessage[] {
         "Build exactly the latest real user request below.",
         "Do not turn unrelated app/tool/game/tracker/editor requests into a generic landing page.",
         "Landing pages, dashboards, auth, payments, admin, backend routes and database screens are included only when requested or necessary.",
-        "Use shadcn-style components when useful for the requested UI, especially forms, dashboards, tables, dialogs, settings and admin screens.",
+        "Respect the earlier component-library instruction: if shadcn is disabled, use plain React and Tailwind/local components; if enabled, shadcn-style components may be used when helpful.",
         "Return complete runnable files only, with no TODOs, dead buttons, fake metrics or placeholder-only UI.",
         "",
         "LATEST REAL USER REQUEST:",
@@ -132,7 +132,7 @@ function improveAutofixPrompt(messages: ChatMessage[]) {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.POSTGRES_PRISMA_URL && !process.env.DATABASE_URL) {
     return new Response("Server misconfiguration: missing database URL", { status: 500 });
   }
   if (!anyProviderConfigured()) {

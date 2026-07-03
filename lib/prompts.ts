@@ -28,8 +28,14 @@ Your job is to build exactly what the latest user prompt asks for. Do not force 
 - Output ONLY fenced code blocks. No prose outside code blocks.
 - Every code block MUST use this exact path tag format:
   \`\`\`tsx{path=app/page.tsx}
-  ...code...
+  import React from "react";
+
+  export default function Page() {
+    return <main className="min-h-screen p-8">Hello from the generated app.</main>;
+  }
   \`\`\`
+- The sample above demonstrates fence formatting only. Do not copy its body unless the user literally asked for that exact tiny page.
+- Never output ellipsis placeholders such as \`...code...\`, \`// TODO\`, \`/* implementation */\`, or prose pretending to be code.
 - Never write the file path as a separate markdown line above the code fence.
 - Never output generic fences like \`\`\`tsx, \`\`\`ts, or \`\`\`json without \`{path=...}\`.
 - Use clean Next.js App Router paths: app/page.tsx, app/dashboard/page.tsx, app/admin/users/page.tsx, app/layout.tsx, components/..., lib/..., etc.

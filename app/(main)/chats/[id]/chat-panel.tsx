@@ -28,6 +28,10 @@ interface ChatPanelProps {
   tasks?: Array<{ id: string; title: string; status: "pending" | "in-progress" | "completed"; description?: string }>;
 }
 
+function isInternalUserPrompt(content: string) {
+  return /Generated code validation failed before preview commit|Preview error:|Current artifact source:|The current app has errors|Apply the smallest working fix|Auto-fix mode|Return complete updated versions/i.test(content);
+}
+
 export function ChatPanel({
   chat,
   messages,
@@ -43,6 +47,9 @@ export function ChatPanel({
   tasks = [],
 }: ChatPanelProps) {
   const [accordionValue, setAccordionValue] = useState<string[]>(["messages", "reasoning"]);
+  const visibleMessages = messages.filter(
+    (message) => message.role !== "system" && !(message.role === "user" && isInternalUserPrompt(message.content)),
+  );
 
   // Derive tasks from streaming or existing messages
   const activeTasks = tasks.length > 0 ? tasks : (
@@ -59,7 +66,7 @@ export function ChatPanel({
         <MessageSquare className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold text-foreground">Conversation</h2>
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          <span>{messages.length} messages</span>
+          <span>{visibleMessages.length} messages</span>
         </div>
       </div>
 
@@ -77,13 +84,13 @@ export function ChatPanel({
                 <MessageSquare className="size-4 text-fuchsia-400" />
                 <span>Messages</span>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {messages.length}
+                  {visibleMessages.length}
                 </span>
               </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2 py-2">
-                {messages.map((message) => (
+                {visibleMessages.map((message) => (
                   <button
                     key={message.id}
                     onClick={() => onMessageClick?.(message)}

@@ -6,7 +6,7 @@ import { buildPhaseOneResponse } from "@/lib/build-engine";
 const schema = z.object({
   prompt: z.string().trim().min(1),
   mode: z.enum(["ask", "plan", "agent"]).optional().default("agent"),
-  shadcn: z.boolean().optional().default(true),
+  shadcn: z.boolean().optional().default(false),
 });
 
 export async function POST(request: NextRequest) {

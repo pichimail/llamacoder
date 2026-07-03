@@ -29,7 +29,7 @@ const createChatSchema = z.object({
     )
     .optional()
     .default([]),
-  shadcn: z.boolean().optional().default(true),
+  shadcn: z.boolean().optional().default(false),
 });
 
 function attachmentContext(attachments: {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
     const buildSpec = buildPhaseOneSpec({ prompt: promptWithAttachments, mode, shadcn });
 
-    if (!process.env.DATABASE_URL) {
+    if (!process.env.POSTGRES_PRISMA_URL && !process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
     }
 

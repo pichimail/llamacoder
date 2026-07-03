@@ -89,13 +89,13 @@ export async function POST(request: NextRequest) {
         quality: "low",
         prompt: userPrompt,
         title,
-        shadcn: true,
+        shadcn: false,
         projectId: project.id,
         messages: {
           create: [
             {
               role: "system",
-              content: getMainCodingPrompt("agent", false, false, userPrompt, true),
+              content: getMainCodingPrompt("agent", false, false, userPrompt, false),
               position: 0,
             },
             {

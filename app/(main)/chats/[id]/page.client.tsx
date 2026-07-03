@@ -193,6 +193,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const streamPromiseRef = useRef(streamPromise);
   const streamTextRef = useRef(streamText);
   const isHandlingStreamRef = useRef(false);
+  const generationStartKeyRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoFixAttemptRef = useRef(0);
   const autoFixPendingRef = useRef(false);
@@ -355,6 +356,62 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     setBuilderStatus(activeMessage ? "validating" : "ready");
   }, [activeMessage, autoFixEnabled]);
 
+  useEffect(() => {
+    const messageId = searchParams.get("generate");
+    if (!messageId || streamPromiseRef.current || streamTextRef.current) return;
+
+    const requestedModel = searchParams.get("model") || chat.model;
+    const requestedQuality = searchParams.get("quality") === "high" ? "high" : "low";
+    const reasoning =
+      searchParams.get("reasoning") === "1" ||
+      searchParams.get("reasoning") === "true";
+    const startKey = `${messageId}:${requestedModel}:${requestedQuality}:${reasoning}`;
+    if (generationStartKeyRef.current === startKey) return;
+    generationStartKeyRef.current = startKey;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setStreamText("");
+    streamTextRef.current = "";
+    setReasoningText("");
+    setStreamReasoningEnabled(reasoning);
+    setBuilderStatus("generating");
+    setActiveTab("code");
+    setBuilderMode("code");
+    setMobilePanel("code");
+
+    const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messageId,
+        model: requestedModel,
+        reasoning,
+        quality: requestedQuality,
+      }),
+    }).then(async (res) => {
+      if (!res.ok) throw new Error((await res.text()) || "Failed to start generation");
+      if (!res.body) throw new Error("No body on response");
+      return res.body;
+    });
+
+    streamPromiseRef.current = nextStreamPromise;
+    setStreamPromise(nextStreamPromise);
+
+    if (typeof window !== "undefined") {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("generate");
+      nextParams.delete("model");
+      nextParams.delete("reasoning");
+      nextParams.delete("quality");
+      const nextSearch = nextParams.toString();
+      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+      window.history.replaceState(null, "", nextUrl);
+      setSearchParams(nextParams);
+    }
+  }, [chat.model, searchParams]);
+
   const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     const response = await fetch(`/api/workspace/${chat.id}`, {
       method: "POST",
@@ -416,6 +473,7 @@ Fix requirements:
     abortControllerRef.current = controller;
     const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messageId: message.id, model: chat.model, reasoning: false }),
       signal: controller.signal,
     }).then(async (res) => {
@@ -434,7 +492,6 @@ Fix requirements:
     setBuilderMode("code");
     setMobilePanel("code");
     setChatCollapsed(false);
-    refreshPage();
   }, [artifactFiles, chat.id, chat.model]);
 
   const triggerAutoFix = useCallback(async ({ error, files, fallback = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean }) => {
@@ -543,7 +600,18 @@ Fix requirements:
       context.setStreamPromise(undefined);
       let stream: ReadableStream | null = null;
       try { stream = await streamPromise; }
-      catch { isHandlingStreamRef.current = false; abortControllerRef.current = null; setStreamPromise(undefined); return; }
+      catch (error) {
+        isHandlingStreamRef.current = false;
+        abortControllerRef.current = null;
+        setStreamPromise(undefined);
+        setBuilderStatus("failed");
+        toast({
+          title: "Generation failed",
+          description: error instanceof Error ? error.message : "Failed to start generation.",
+          variant: "destructive",
+        });
+        return;
+      }
       if (!stream) { isHandlingStreamRef.current = false; setStreamPromise(undefined); return; }
       let didPushToCode = false;
       try {

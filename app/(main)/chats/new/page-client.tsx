@@ -50,7 +50,7 @@ export default function NewChatPageClient({
     let cancelled = false;
 
     const mode = (userSettings.defaultMode as "ask" | "plan" | "agent") || "agent";
-    const shadcn = userSettings.shadcnDefault !== false;
+    const shadcn = userSettings.shadcnDefault === true;
     const quality = (userSettings.quality as "low" | "high") || "low";
 
     const run = async () => {
@@ -81,6 +81,7 @@ export default function NewChatPageClient({
 
         const streamPromise = fetch("/api/get-next-completion-stream-promise", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messageId: lastMessageId,
             model,
@@ -97,7 +98,12 @@ export default function NewChatPageClient({
         void streamPromise.catch(() => undefined);
         context.setStreamPromise(streamPromise);
 
-        router.replace(`/chats/${chatId}`);
+        const params = new URLSearchParams({
+          generate: lastMessageId,
+          model,
+          quality: "low",
+        });
+        router.replace(`/chats/${chatId}?${params.toString()}`);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to start chat");

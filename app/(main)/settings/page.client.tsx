@@ -45,7 +45,7 @@ const defaults: BuilderSettings = {
   webSearchDefault: false,
   deepThinkingDefault: false,
   canvasDefault: false,
-  shadcnDefault: true,
+  shadcnDefault: false,
   autoStartGeneration: true,
   autoRepairPreview: true,
   memoryCompression: true,
