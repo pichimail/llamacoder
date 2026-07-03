@@ -180,12 +180,12 @@ export function getFallbackModel(): ModelConfig {
 
 export function getHistoryCompressionModel(): string {
   if (process.env.TOGETHER_API_KEY) {
-    return "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+    return "zai-org/GLM-5";
   }
   if (process.env.OPENROUTER_API_KEY) {
     return "openrouter/auto";
   }
-  return WORKING_FALLBACK_MODEL;
+  return "zai-org/GLM-5";
 }
 
 export function getFinetunedModelConfig(): ModelConfig | null {

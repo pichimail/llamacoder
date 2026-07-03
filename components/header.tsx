@@ -15,8 +15,8 @@ function Header({ hideLogo = false }: HeaderProps) {
     >
       {!hideLogo ? (
         <Link href="/" className="inline-flex items-center justify-center">
-          <img src="/chinna-coder-logo.svg" alt="Chinna-Coder" className="h-9 w-auto object-contain sm:h-10 dark:hidden" />
-          <img src="/chinna-coder-logo-dark.svg" alt="Chinna-Coder" className="hidden h-9 w-auto object-contain sm:h-10 dark:block" />
+          <img src="/chinna-coder-logo.svg" alt="Chinna-Coder" loading="lazy" decoding="async" className="h-9 w-auto object-contain sm:h-10 dark:hidden" />
+          <img src="/chinna-coder-logo-dark.svg" alt="Chinna-Coder" loading="lazy" decoding="async" className="hidden h-9 w-auto object-contain sm:h-10 dark:block" />
         </Link>
       ) : null}
       <div className="flex items-center gap-2">

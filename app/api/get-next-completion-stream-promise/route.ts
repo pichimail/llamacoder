@@ -87,12 +87,12 @@ async function compressHistoryWithSmallModel(
     const result = await createTextWithFallback({
       model: getHistoryCompressionModel(),
       temperature: 0.2,
-      maxTokens: 700,
+      maxTokens: 900,
       messages: [
         {
           role: "system",
           content:
-            "Compress this app-building chat history into one dense paragraph under 350 tokens. Preserve the user's requested product type, current goal, selected features, what changed, errors/fixes, and current artifact state. Output only the summary.",
+            "Compress this app-building chat history for a code-generation agent. Keep it under 420 tokens. Preserve: exact product type requested, current user goal, committed artifact files/routes/components, backend/integration decisions, validation errors already seen, fixes already attempted, and any constraints that prevent repeating failed fixes. Output only the summary.",
         },
         { role: "user", content: historyText },
       ],

@@ -149,8 +149,8 @@ function isPreviewRuntimeFile(path: string, content: string) {
   return /\.(tsx|ts|jsx|js|css)$/.test(normalizedPath);
 }
 
-function sanitizePreviewContent(content: string) {
-  return content
+function sanitizePreviewContent(content: string, normalizedPath = "") {
+  let sanitized = content
     .replace(/^.*tailwindcss-animate.*$/gm, "")
     .replace(/plugins\s*:\s*\[[^\]]*tailwindcss-animate[^\]]*\]\s*,?/g, "")
     .replace(/plugins\s*:\s*\[\s*animate\s*\]\s*,?/g, "")
@@ -159,6 +159,18 @@ function sanitizePreviewContent(content: string) {
     .replace(/from\s+["']next\/navigation["']/g, 'from "@/lib/next-navigation"')
     .replace(/from\s+["']next\/link["']/g, 'from "@/lib/next-link"')
     .replace(/from\s+["']next\/image["']/g, 'from "@/lib/next-image"');
+
+  if (normalizedPath === "app/layout.tsx" || normalizedPath === "app/layout.ts") {
+    // The preview mounts generated Next layouts inside a React wrapper. Root
+    // <html>/<body> tags are valid Next code, but invalid nested preview DOM.
+    sanitized = sanitized
+      .replace(/<html\b[^>]*>/g, "<>")
+      .replace(/<\/html>/g, "</>")
+      .replace(/<body\b([^>]*)>/g, "<div$1>")
+      .replace(/<\/body>/g, "</div>");
+  }
+
+  return sanitized;
 }
 
 function isLikelyRenderableReactFile(path: string, content: string) {
@@ -240,7 +252,7 @@ export function getSandpackConfig(
     const normalizedPath = normalizePreviewPath(inferPathFromContent(file.path, file.content));
     const sanitizedContent = normalizedPath.endsWith(".css")
       ? sanitizePreviewCssContent(file.content)
-      : sanitizePreviewContent(file.content);
+      : sanitizePreviewContent(file.content, normalizedPath);
     const previewContent = designInspector
       ? instrumentFileForInspector({ path: normalizedPath, code: sanitizedContent })
       : sanitizedContent;
@@ -259,7 +271,8 @@ export function getSandpackConfig(
   );
   let hasLayout = false;
   if (rootLayoutFile) {
-    const layoutContent = sanitizePreviewContent(rootLayoutFile.content || "");
+    const layoutPath = normalizePreviewPath(rootLayoutFile.path);
+    const layoutContent = sanitizePreviewContent(rootLayoutFile.content || "", layoutPath);
     sandpackFiles["/app/layout.tsx"] = layoutContent;
     hasLayout = true;
   }

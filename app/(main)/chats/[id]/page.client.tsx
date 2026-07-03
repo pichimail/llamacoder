@@ -19,24 +19,12 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Star, Trash2 } from "lucide-react";
+import { Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Star, Trash2 } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
-
-import {
-  Plan,
-  PlanHeader,
-  PlanTitle,
-  PlanDescription,
-  PlanAction,
-  PlanContent,
-  PlanFooter,
-  PlanTrigger,
-} from "@/components/ai-elements/plan";
-import { Streamdown } from "streamdown";
 
 import {
   Dialog,
@@ -61,7 +49,7 @@ import type { PreviewMode } from "@/components/code-runner-react";
 
 const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: false });
 
-type BuilderMode = "preview" | "code" | "design" | "database" | "canvas" | "plan";
+type BuilderMode = "preview" | "code" | "design" | "database" | "canvas";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
 const MAX_AUTO_FIX_ATTEMPTS = 1;
@@ -89,6 +77,14 @@ function normalizeFile(file: RawGeneratedFile): ArtifactFile {
   const code = typeof file.code === "string" ? file.code : file.content || "";
   const language = file.language || path.split(".").pop() || "tsx";
   return { path, code, language };
+}
+
+function isPlanModeConversation(messages: Message[]) {
+  return messages.some(
+    (message) =>
+      message.role === "system" &&
+      /PLAN mode|Buildable Scope|Not Possible \/ Needs Input/i.test(message.content || ""),
+  );
 }
 
 
@@ -244,6 +240,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   );
   const isReasoningStreaming =
     !!streamPromise && streamReasoningEnabled && !hasCodeInStream;
+  const isPlanConversation = useMemo(
+    () => isPlanModeConversation(chat.messages),
+    [chat.messages],
+  );
 
   // Stable file source for preview and editor.
   // We keep the last committed good files as base. Live stream segments only overlay/add/replace during the current turn.
@@ -583,7 +583,7 @@ Fix requirements:
       }
       if (e.key === "/" && !isInput && !streamPromise) { e.preventDefault(); setShouldFocusInput(true); }
       if (!isInput && e.altKey) {
-        const map: Record<string, BuilderMode> = { "1": "preview", "2": "code", "3": "design", "4": "database", "5": "plan" };
+        const map: Record<string, BuilderMode> = { "1": "preview", "2": "code", "3": "design", "4": "database", "5": "canvas" };
         if (map[e.key]) { e.preventDefault(); setModeSafely(map[e.key]); }
       }
     };
@@ -664,6 +664,18 @@ Fix requirements:
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
               const mergedFiles = mergeArtifactFiles(baseFiles, currentFiles);
               if (mergedFiles.length === 0) {
+                if (isPlanConversation) {
+                  await createMessage(chat.id, resolvedText, "assistant", []);
+                  isHandlingStreamRef.current = false;
+                  setStreamText("");
+                  setStreamPromise(undefined);
+                  setStreamReasoningEnabled(false);
+                  setBuilderStatus("ready");
+                  setChatCollapsed(false);
+                  setMobilePanel("chat");
+                  refreshPage();
+                  return;
+                }
                 isHandlingStreamRef.current = false;
                 setStreamPromise(undefined);
                 setBuilderStatus("failed");
@@ -720,7 +732,7 @@ Fix requirements:
       }
     }
     readStream();
-  }, [chat.id, chat.messages, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix]);
+  }, [chat.id, chat.messages, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix, isPlanConversation]);
 
   const detectRequiredEnvKeys = useCallback((files: ArtifactFile[]) => {
     const keys = new Set<string>();
@@ -937,37 +949,6 @@ Fix requirements:
         />
       );
     }
-    if (builderMode === "plan") {
-      const planContent = streamText || (activeMessage ? activeMessage.content : "");
-      const hasContent = planContent.trim().length > 0;
-      return (
-        <div className="h-full overflow-auto p-4">
-          <Plan isStreaming={!!streamPromise} defaultOpen className="max-w-3xl mx-auto">
-            <PlanHeader>
-              <div>
-                <PlanTitle>Implementation Plan</PlanTitle>
-                <PlanDescription>{chat.title}</PlanDescription>
-              </div>
-              <PlanAction>
-                <PlanTrigger />
-              </PlanAction>
-            </PlanHeader>
-            <PlanContent>
-              {hasContent ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <Streamdown>{planContent}</Streamdown>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No plan generated yet. Use the composer with Plan mode to generate a structured plan first.</p>
-              )}
-            </PlanContent>
-            <PlanFooter>
-              <span className="text-xs text-muted-foreground">Switch to Agent mode to build from this plan.</span>
-            </PlanFooter>
-          </Plan>
-        </div>
-      );
-    }
     return (
       <CodeViewer
         streamText={streamText}
@@ -1096,8 +1077,7 @@ Fix requirements:
               <BuilderModeButton mode="code" current={builderMode} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => setModeSafely("code")} />
               <BuilderModeButton mode="design" current={builderMode} label="Design" icon={<Palette className="size-3.5" />} onClick={() => setModeSafely("design")} />
               <BuilderModeButton mode="database" current={builderMode} label="Database" icon={<Database className="size-3.5" />} onClick={() => setModeSafely("database")} />
-              <BuilderModeButton mode="canvas" current={builderMode} label="Canvas" icon={<span className="size-3.5">🖼️</span>} onClick={() => setModeSafely("canvas")} />
-              <BuilderModeButton mode="plan" current={builderMode} label="Plan" icon={<span className="size-3.5">📋</span>} onClick={() => setModeSafely("plan")} />
+              <BuilderModeButton mode="canvas" current={builderMode} label="Canvas" icon={<ImageIcon className="size-3.5" />} onClick={() => setModeSafely("canvas")} />
             </div>
 
             <div className="flex items-center justify-end gap-1">
@@ -1136,7 +1116,7 @@ Fix requirements:
                         reasoningText={reasoningText}
                         isReasoningStreaming={isReasoningStreaming}
                         isStreaming={!!streamPromise}
-                        showPlanMode={builderMode === "plan"}
+                        showPlanMode={isPlanConversation || (!!streamPromise && !hasCodeInStream && streamText.length > 0)}
                         checkpoints={assistantVersions}
                         onRestoreCheckpoint={handleSwitchVersion}
                       />
@@ -1187,14 +1167,14 @@ Fix requirements:
                 <SheetAction icon={<MessageSquare className="size-4" />} label="Chat" onClick={() => { switchMobilePanel("chat"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={<Code2 className="size-4" />} label="Code" onClick={() => { switchMobilePanel("code"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={<Eye className="size-4" />} label="Preview" onClick={() => { switchMobilePanel("preview"); setMobileOptionsOpen(false); }} />
-                <SheetAction icon={<span className="size-4">📋</span>} label="Plan" onClick={() => { setModeSafely("plan"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<ImageIcon className="size-4" />} label="Canvas" onClick={() => { setModeSafely("canvas"); setMobileOptionsOpen(false); }} />
               </div>
 
               <div className="grid gap-1 border-t border-border/70 pt-3">
                 <SheetAction icon={<Palette className="size-4" />} label="Visual editor" onClick={() => { setModeSafely("design"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
                 <SheetAction icon={previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />} label={`Switch to ${nextPreviewMode}`} onClick={() => setPreviewMode(nextPreviewMode)} />
                 <SheetAction icon={<Database className="size-4" />} label="Database workspace" onClick={() => { setModeSafely("database"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
-                <SheetAction icon={<span className="size-4">📋</span>} label="Plan" onClick={() => { setModeSafely("plan"); setMobileOptionsOpen(false); }} />
+                <SheetAction icon={<ImageIcon className="size-4" />} label="Canvas workspace" onClick={() => { setModeSafely("canvas"); setMobilePanel("preview"); setMobileOptionsOpen(false); }} />
                 <OpenAppMenuAction onOpen={() => setMobileOptionsOpen(false)} />
               </div>
 

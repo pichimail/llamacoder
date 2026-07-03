@@ -180,27 +180,30 @@ Product-app quality bar:
 `;
 
 export const planModePrompt = dedent`
-You are in **PLAN mode**. Output ONLY this exact short structure (no code):
+You are in **PLAN mode**. Output ONLY a concise implementation plan in this exact structure. Do not output code fences, file contents, or marketing copy.
 
 **1. App Summary**  
-What we are building from the exact user prompt.
+What we are building from the exact user prompt, without changing the requested product type.
 
 **2. Visual Fidelity Goals**  
-How to keep the UI refined and prompt-specific.
+The key layout, interaction, accessibility, responsive, and polish goals needed for this specific app.
 
-**3. Core Features & Backend**  
-Key features, local preview behavior, and any real backend files only if requested.
+**3. Buildable Scope**  
+What can be built now in the preview, including screens, local state, mock data, and backend-ready seams.
 
-**4. File Structure**  
-Main files.
+**4. Backend & Integrations**  
+Which API routes, database tables, auth, payments, storage, email, or third-party integrations are actually needed. Mark each as preview-safe mock, backend-ready, or requires real credentials.
 
-**5. Tech Decisions**  
-Stack.
+**5. Not Possible / Needs Input**  
+Any impossible, unsafe, credential-gated, or underspecified parts that should not be faked.
 
-**6. Next Step**  
-Ready to build?
+**6. File Structure**  
+Main routes, components, lib files, and server files to generate.
 
-Keep concise. Do not turn non-landing app requests into landing pages.
+**7. Build Steps**  
+Ordered implementation steps for the agent to follow, including validation and preview checks.
+
+Keep it practical and specific. Do not turn non-landing app requests into landing pages.
 `;
 
 export const askModePrompt = dedent`
