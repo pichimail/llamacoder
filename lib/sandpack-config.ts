@@ -302,7 +302,7 @@ export function getSandpackConfig(
   // Inject virtual current route for robust switching (helps iframe + layout composition)
   sandpackFiles["/lib/__preview-route.ts"] = `export const currentRoute = "${currentRoute || '/'}";`;
 
-  if (!sandpackFiles["App.tsx"] && previewUserFiles.length > 0) {
+  if (!sandpackFiles["/App.tsx"] && previewUserFiles.length > 0) {
     const mainFile =
       previewUserFiles.find((f) => f.path === "app/page.tsx") ||
       previewUserFiles.find((f) => f.path === "pages/index.tsx") ||
@@ -370,7 +370,7 @@ export function getSandpackConfig(
         .map(p => `  "${p.route}": ${p.importName}`)
         .join(",\n");
 
-      sandpackFiles["App.tsx"] = `import React from 'react';
+      sandpackFiles["/App.tsx"] = `import React from 'react';
 import './app/globals.css';
 ${cssImports}
 import { ensureTwind } from '@/lib/twind';

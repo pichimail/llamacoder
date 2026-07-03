@@ -90,4 +90,22 @@ describe("sandpack config", () => {
       three: expect.any(String),
     });
   });
+
+  it("uses a single slash-normalized App.tsx preview entrypoint", () => {
+    const config = getSandpackConfig(
+      [
+        {
+          path: "app/page.tsx",
+          content: "export default function Page() { return <main>Generated page</main>; }",
+        },
+      ],
+      {},
+      { includeShadcn: false },
+    );
+
+    expect(config.files["/App.tsx"]).toContain("const routeComponents");
+    expect(config.files["/App.tsx"]).toContain("import HomePage from './app/page';");
+    expect(config.files["/app/page.tsx"]).toContain("Generated page");
+    expect(config.files["App.tsx"]).toBeUndefined();
+  });
 });
