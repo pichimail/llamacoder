@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { getPrisma } from "@/lib/prisma";
 import { isAdminEmail } from "@/lib/admin-config";
+import { resolveAuthSecret } from "@/lib/auth-secret";
 
 export function isGoogleConfigured() {
   return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
@@ -12,15 +13,8 @@ export function hasAuthSecret() {
   return !!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET);
 }
 
-let warnedMissingSecret = false;
-
 function getAuthSecret() {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production" && !warnedMissingSecret) {
-    warnedMissingSecret = true;
-    console.warn("AUTH_SECRET is missing in production. Falling back to a temporary secret. Set AUTH_SECRET in deployment environment.");
-  }
-  return secret || "chinna-coder-fallback-secret-change-me";
+  return resolveAuthSecret();
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({

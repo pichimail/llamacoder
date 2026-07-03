@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronDown, Download, ExternalLink, GitPullRequest, Home, KeyRound, Link, Lock, MoreHorizontal, Paintbrush, RefreshCw, Settings, Share2, Upload } from "lucide-react";
+import { BarChart3, Boxes, ChevronDown, Download, ExternalLink, GitBranch, GitPullRequest, Globe2, KeyRound, Link, Lock, MoreHorizontal, RefreshCw, Settings, Share2, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Tip } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
@@ -38,7 +38,7 @@ import { Label } from "@/components/ui/label";
 
 type WorkspaceState = {
   project: { id: string; name: string; description: string };
-  integrations: Array<{ id: string; type: string; connected: boolean }>;
+  integrations: Array<{ id: string; type: string; connected: boolean; config?: unknown }>;
   envVars: Array<{ id: string; key: string; value: string }>;
   deployments: Array<{ id: string; status: string; previewUrl: string; productionUrl: string; createdAt: string }>;
   shareLinks: Array<{ id: string; token: string; isPublic: boolean }>;
@@ -101,7 +101,9 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "model-generation" | "features" | "environment-variables" | "integrations" | "advanced">("general");
+  const [settingsTab, setSettingsTab] = useState<"vercel-project" | "integrations" | "environment-variables" | "github" | "template" | "domains" | "analytics" | "advanced">("vercel-project");
+  const [appName, setAppName] = useState(chatTitle);
+  const [appDescription, setAppDescription] = useState("");
   const [settingsModel, setSettingsModel] = useState("zai-org/GLM-5.1");
   const [settingsShadcn, setSettingsShadcn] = useState(true);
   const [settingsCanvas, setSettingsCanvas] = useState(false);
@@ -144,6 +146,21 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     refreshWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
+
+  useEffect(() => {
+    if (!workspace?.project) return;
+    setAppName(workspace.project.name || chatTitle);
+    setAppDescription(workspace.project.description || "");
+  }, [chatTitle, workspace?.project]);
+
+  useEffect(() => {
+    const openSettings = () => {
+      setSettingsTab("vercel-project");
+      setSettingsOpen(true);
+    };
+    window.addEventListener("open-artifact-settings", openSettings);
+    return () => window.removeEventListener("open-artifact-settings", openSettings);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -272,6 +289,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const shareUrl = activeMessageId
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/v2/${activeMessageId}`
     : "";
+  const hasVercelProject = !!workspace?.integrations.some((integration) => integration.type === "vercel-project");
 
   return (
     <div className="relative flex min-w-0 items-center justify-end gap-1">
@@ -289,8 +307,8 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
       />
 
       {/* Artifact Settings Dialog using sidebar-13 style - per app/artifact only, responsive, functional */}
-      <Dialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) setSettingsTab("general"); }}>
-        <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px] flex flex-col md:flex-row">
+      <Dialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) setSettingsTab("vercel-project"); }}>
+        <DialogContent className="overflow-hidden p-0 md:max-h-[580px] md:max-w-[780px] lg:max-w-[860px] flex flex-col md:flex-row">
           <DialogTitle className="sr-only">Artifact Settings for {chatTitle}</DialogTitle>
           <DialogDescription className="sr-only">
             Configure settings specific to this app, web app or artifact being built.
@@ -302,18 +320,20 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {[
-                        { name: "General", icon: Home },
-                        { name: "Model & Generation", icon: Settings },
-                        { name: "Features", icon: Paintbrush },
-                        { name: "Environment Variables", icon: KeyRound },
-                        { name: "Integrations", icon: Link },
-                        { name: "Advanced", icon: Lock },
+                        { name: "Vercel Project", value: "vercel-project", icon: ExternalLink },
+                        { name: "Integrations", value: "integrations", icon: Link },
+                        { name: "Environment Variables", value: "environment-variables", icon: KeyRound },
+                        { name: "GitHub", value: "github", icon: GitBranch },
+                        { name: "Template", value: "template", icon: Boxes },
+                        { name: "Domains", value: "domains", icon: Globe2 },
+                        { name: "Analytics", value: "analytics", icon: BarChart3 },
+                        { name: "Advanced", value: "advanced", icon: Lock },
                       ].map((item) => (
                         <SidebarMenuItem key={item.name}>
                           <SidebarMenuButton
                             asChild
-                            isActive={settingsTab === item.name.toLowerCase().replace(/ & | /g, "-")}
-                            onClick={() => setSettingsTab(item.name.toLowerCase().replace(/ & | /g, "-") as any)}
+                            isActive={settingsTab === item.value}
+                            onClick={() => setSettingsTab(item.value as any)}
                           >
                             <button className="w-full justify-start">
                               <item.icon />
@@ -339,11 +359,13 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                   title="Artifact settings section"
                   className="flex-1 p-2 border rounded text-sm"
                 >
-                  <option value="general">General</option>
-                  <option value="model-generation">Model & Generation</option>
-                  <option value="features">Features</option>
+                  <option value="vercel-project">Vercel Project</option>
                   <option value="environment-variables">Environment Variables</option>
                   <option value="integrations">Integrations</option>
+                  <option value="github">GitHub</option>
+                  <option value="template">Template</option>
+                  <option value="domains">Domains</option>
+                  <option value="analytics">Analytics</option>
                   <option value="advanced">Advanced</option>
                 </select>
               </div>
@@ -365,29 +387,38 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
               </header>
               <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
                 {/* Content based on tab - real functional integrations for current artifact */}
-                {settingsTab === "general" && (
+                {settingsTab === "vercel-project" && (
                   <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2">General</h4>
-                      <p className="text-sm text-muted-foreground mb-4">Settings for this specific artifact/app.</p>
-                      <div className="space-y-3">
+                    <div className="rounded-lg border border-border/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
                         <div>
-                          <Label className="text-xs" htmlFor="artifact-app-name">App Name</Label>
-                          <input id="artifact-app-name" type="text" defaultValue={chatTitle} className="w-full mt-1 p-2 border rounded text-sm" placeholder="My app" aria-label="App name" />
+                          <h4 className="font-medium">{hasVercelProject ? "Vercel project connected" : "No Vercel project connected"}</h4>
+                          <p className="mt-1 text-sm text-muted-foreground">{hasVercelProject ? "Project deployment metadata is tracked for this artifact." : "Create a tracked project record before external deployment is enabled."}</p>
                         </div>
-                        <div>
-                          <Label className="text-xs" htmlFor="artifact-app-description">Description</Label>
-                          <textarea id="artifact-app-description" defaultValue={workspace?.project?.description || ""} className="w-full mt-1 p-2 border rounded text-sm" rows={3} placeholder="Describe this app" aria-label="App description" />
-                        </div>
-                        <Button onClick={() => { refreshWorkspace(); toast({title: "General settings applied to artifact"}); }} size="sm">Save General</Button>
+                        <Button size="sm" onClick={async () => {
+                          await workspaceRequest("update-project", { name: appName || chatTitle, description: appDescription });
+                          await workspaceRequest("install-integration", { type: "vercel-project", config: { installed: true, projectName: appName || chatTitle } });
+                          toast({ title: hasVercelProject ? "Vercel project refreshed" : "Vercel project created" });
+                        }}>{hasVercelProject ? "Refresh" : "Create"}</Button>
                       </div>
+                    </div>
+                    <div className="space-y-3 rounded-lg border border-border/70 p-4">
+                      <Label className="text-xs" htmlFor="artifact-app-name">Project name</Label>
+                      <input id="artifact-app-name" type="text" value={appName} onChange={(event) => setAppName(event.target.value)} className="w-full rounded-md border border-border bg-background p-2 text-sm" placeholder="My app" aria-label="App name" />
+                      <Label className="text-xs" htmlFor="artifact-app-description">Description</Label>
+                      <textarea id="artifact-app-description" value={appDescription} onChange={(event) => setAppDescription(event.target.value)} className="w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} placeholder="Describe this app" aria-label="App description" />
+                      <Button onClick={async () => {
+                        await workspaceRequest("update-project", { name: appName, description: appDescription });
+                        toast({title: "Project settings saved"});
+                      }} size="sm">Save Project</Button>
                     </div>
                   </div>
                 )}
 
-                {settingsTab === "model-generation" && (
+                {settingsTab === "template" && (
                   <div className="space-y-4">
-                    <h4 className="font-medium">Model & Generation</h4>
+                    <h4 className="font-medium">Template</h4>
+                    <p className="text-sm text-muted-foreground">Build profile for this generated app.</p>
                     <div>
                       <Label>AI Model</Label>
                       <Select value={settingsModel} onValueChange={setSettingsModel}>
@@ -416,13 +447,14 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                         body: JSON.stringify({ model: settingsModel }),
                       }).catch(() => {});
                       toast({ title: "Model updated for this artifact" });
-                    }} size="sm">Apply to this build</Button>
+                    }} size="sm">Apply Template Settings</Button>
                   </div>
                 )}
 
-                {settingsTab === "features" && (
+                {settingsTab === "analytics" && (
                   <div className="space-y-4">
-                    <h4 className="font-medium">Features for this app</h4>
+                    <h4 className="font-medium">Analytics</h4>
+                    <p className="text-sm text-muted-foreground">Runtime analytics become available after the public share is published.</p>
                     <div className="flex items-center justify-between py-2 border-b">
                       <div>Enable shadcn/ui</div>
                       <Switch checked={settingsShadcn} onCheckedChange={setSettingsShadcn} />
@@ -461,11 +493,11 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
                 {settingsTab === "integrations" && (
                   <div className="space-y-4">
-                    <h4 className="font-medium">Easy Install Integrations</h4>
-                    <p className="text-xs text-muted-foreground">One-click install into this app/artifact. Saves integration record + env keys.</p>
+	                    <h4 className="font-medium">Integrations</h4>
+	                    <p className="text-xs text-muted-foreground">Install services into this project and persist the required encrypted keys.</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {EASY_INSTALL_INTEGRATIONS.map((integ) => {
-                        const isInstalled = !!workspace?.integrations?.some((i: any) => i.type === integ.type && i.config?.installed);
+	                        const isInstalled = !!workspace?.integrations?.some((i) => i.type === integ.type);
                         return (
                           <div key={integ.type} className="border rounded p-3 flex flex-col gap-2 text-sm">
                             <div>
@@ -481,7 +513,8 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                                 integ.requiredKeys.forEach(k => init[k] = "");
                                 setInstallKeys(init);
                               }}>Install</Button>
-                            )}
+	                )}
+
                             {pendingInstall === integ.type && (
                               <div className="mt-2 p-2 border rounded bg-muted/30 text-xs space-y-1.5">
                                 {integ.requiredKeys.map((key) => (
@@ -509,6 +542,22 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {settingsTab === "github" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">GitHub</h4>
+                    <p className="text-sm text-muted-foreground">{workspace?.hasGithub ? "GitHub is connected for pull request creation." : "Connect GitHub before creating pull requests."}</p>
+                    <Button onClick={handleConnectGithub} variant="outline" size="sm" disabled={isPending}>{workspace?.hasGithub ? "Reconnect GitHub" : "Connect GitHub"}</Button>
+                  </div>
+                )}
+
+                {settingsTab === "domains" && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Domains</h4>
+                    <p className="text-sm text-muted-foreground">Custom domains are reserved for external deployment targets. Public share uses the generated share URL.</p>
+                    <Button onClick={handlePublish} variant="outline" size="sm" disabled={!canAct || isPending}>Publish Share URL</Button>
                   </div>
                 )}
 
@@ -540,7 +589,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
       <Tip label="Upload asset"><button type="button" className={iconButton} onClick={() => uploadRef.current?.click()} aria-label="Upload asset"><Upload className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Export zip"><button type="button" className={iconButton} onClick={onDownload} disabled={!canAct} aria-label="Export generated files"><Download className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
-      <Tip label="Publish site"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish site"><ExternalLink className="size-3.5 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
+      <Tip label="Publish share"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish share"><ExternalLink className="size-3.5 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
       {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
       <Tip label="More project actions"><button ref={moreButtonRef} type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-controls={menuId} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
 

@@ -19,7 +19,7 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Code2, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Share2, Smartphone } from "lucide-react";
+import { Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Star, Trash2 } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
@@ -163,6 +163,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [mobileOptionsOpen, setMobileOptionsOpen] = useState(false);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const { user, authEnabled, isAuthenticated } = useHomeSidebarData();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [designDirty, setDesignDirty] = useState(false);
@@ -367,7 +368,6 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
 
   const syncWorkspaceFiles = useCallback(async (files: RawGeneratedFile[]) => {
     const normalizedFiles = files.map(normalizeFile).filter((file) => file.path && file.code);
-    if (normalizedFiles.length === 0) return;
     try {
       await workspaceRequest("sync", { files: normalizedFiles });
     } catch (error) {
@@ -728,6 +728,44 @@ Fix requirements:
     toast({ title: "Chat URL copied" });
   }, []);
 
+  const chatRequest = useCallback(async (method: "PATCH" | "POST" | "DELETE", payload?: Record<string, unknown>) => {
+    const response = await fetch(`/api/chats/${chat.id}`, {
+      method,
+      headers: payload ? { "Content-Type": "application/json" } : undefined,
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Chat action failed");
+    return data as any;
+  }, [chat.id]);
+
+  const handleRenameChat = useCallback(async () => {
+    const nextTitle = window.prompt("Rename project", chat.title)?.trim();
+    if (!nextTitle || nextTitle === chat.title) return;
+    await chatRequest("PATCH", { title: nextTitle });
+    toast({ title: "Project renamed" });
+    refreshPage();
+  }, [chat.title, chatRequest]);
+
+  const handleToggleFavorite = useCallback(async () => {
+    await chatRequest("PATCH", { isPinned: !chat.isPinned });
+    toast({ title: chat.isPinned ? "Removed from favorites" : "Added to favorites" });
+    refreshPage();
+  }, [chat.isPinned, chatRequest]);
+
+  const handleDuplicateChat = useCallback(async () => {
+    const result = await chatRequest("POST", { action: "duplicate" });
+    toast({ title: "Project duplicated" });
+    if (result.chat?.id) navigateTo(`/chats/${result.chat.id}`);
+  }, [chatRequest]);
+
+  const handleDeleteChat = useCallback(async () => {
+    if (!window.confirm(`Delete "${chat.title}"? This removes the chat and its messages.`)) return;
+    await chatRequest("DELETE");
+    toast({ title: "Project deleted" });
+    navigateTo("/chats");
+  }, [chat.title, chatRequest]);
+
   const handlePublishMobile = useCallback(async () => {
     if (!activeMessage?.id || artifactFiles.length === 0) return;
     try {
@@ -953,10 +991,35 @@ Fix requirements:
               <Tip label={chatCollapsed ? "Expand chat rail" : "Collapse chat rail"}>
                 <button type="button" onClick={() => setChatCollapsed((value) => !value)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={chatCollapsed ? "Expand chat panel" : "Collapse chat panel"}>{chatCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}</button>
               </Tip>
-              <div className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
-                <span className="font-mono">{activeVersion ? activeVersion.label : "—"}</span>
-                <span className="hidden sm:inline">•</span>
-                <span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span>
+              <div className="relative min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setProjectMenuOpen((value) => !value)}
+                  className="hs-version-pill flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground transition hover:border-foreground/20 hover:text-foreground"
+                  aria-haspopup="menu"
+                  aria-expanded={projectMenuOpen}
+                >
+                  <Star className={`size-3.5 shrink-0 ${chat.isPinned ? "fill-amber-400 text-amber-400" : ""}`} aria-hidden="true" />
+                  <span className="hidden max-w-[220px] truncate sm:inline">{chat.title}</span>
+                  <span className="font-mono">{activeVersion ? activeVersion.label : "v0"}</span>
+                  <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+                </button>
+                {projectMenuOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute left-0 top-9 z-50 w-64 overflow-hidden rounded-xl border border-border/70 bg-[#101010]/95 p-1.5 text-sm text-foreground shadow-2xl shadow-black/40 backdrop-blur"
+                  >
+                    <ProjectMenuItem icon={<PenLine className="size-4" />} label="Rename" onClick={() => { setProjectMenuOpen(false); void handleRenameChat(); }} />
+                    <ProjectMenuItem icon={<Star className="size-4" />} label={chat.isPinned ? "Remove from Favorites" : "Add to Favorites"} onClick={() => { setProjectMenuOpen(false); void handleToggleFavorite(); }} />
+                    <ProjectMenuItem icon={<Copy className="size-4" />} label="Duplicate..." onClick={() => { setProjectMenuOpen(false); void handleDuplicateChat(); }} />
+                    <div className="my-1 h-px bg-border/70" />
+                    <ProjectMenuItem icon={<Download className="size-4" />} label="Download ZIP" disabled={!canAct} onClick={() => { setProjectMenuOpen(false); handleDownloadZip(); }} />
+                    <ProjectMenuItem icon={<Settings className="size-4" />} label="Settings" onClick={() => { setProjectMenuOpen(false); window.dispatchEvent(new CustomEvent("open-artifact-settings")); }} />
+                    <ProjectMenuItem icon={<Archive className="size-4" />} label="Transfer..." onClick={() => { setProjectMenuOpen(false); toast({ title: "Transfer needs a team workspace", description: "Project ownership is protected until team transfer is configured." }); }} />
+                    <div className="my-1 h-px bg-border/70" />
+                    <ProjectMenuItem danger icon={<Trash2 className="size-4" />} label="Delete" onClick={() => { setProjectMenuOpen(false); void handleDeleteChat(); }} />
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1155,6 +1218,21 @@ function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { m
 function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
   const active = current === panel;
   return <button type="button" onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
+}
+
+function ProjectMenuItem({ icon, label, onClick, disabled, danger }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40 ${danger ? "text-red-400" : "text-foreground"}`}
+    >
+      <span className={danger ? "text-red-400" : "text-muted-foreground"}>{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
+  );
 }
 
 function SheetAction({ icon, label, onClick, disabled }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean }) {

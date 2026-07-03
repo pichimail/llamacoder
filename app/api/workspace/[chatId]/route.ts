@@ -13,13 +13,8 @@ import {
 } from "@/lib/authz";
 import { encryptEnvValue, decryptEnvValue, maskEnvValue } from "@/lib/env-encryption";
 import { logAudit } from "@/lib/audit";
-
-type ArtifactFileInput = {
-  path: string;
-  code?: string;
-  content?: string;
-  language?: string;
-};
+import { diffWorkspaceFiles, type WorkspaceFileInput } from "@/lib/workspace-files";
+import { buildShareToken } from "@/lib/share-links";
 
 type BuildSpecSummary = {
   templateId: string;
@@ -37,16 +32,6 @@ type ValidationSummary = {
   issues: Array<{ path: string; line: number; column: number; message: string }>;
   formatted: string;
 };
-
-function cleanFiles(files: ArtifactFileInput[] = []) {
-  return files
-    .map((file) => {
-      const path = (file.path || "").replace(/^\/+/, "").trim();
-      const content = typeof file.code === "string" ? file.code : file.content || "";
-      return { path, content };
-    })
-    .filter((file) => file.path && !file.path.endsWith(".gitkeep"));
-}
 
 function accessLevelForAction(action: string): AccessLevel {
   if (action === "validate") return "viewer";
@@ -140,7 +125,7 @@ async function serializeWorkspace(chatId: string) {
 
   return {
     project: { id: project.id, name: project.name, description: project.description || "" },
-    integrations: integrations.map((integration) => ({ id: integration.id, type: integration.type, connected: true })),
+    integrations: integrations.map((integration) => ({ id: integration.id, type: integration.type, connected: true, config: integration.config })),
     envVars: envVars.map((env) => ({ id: env.id, key: env.key, value: maskEnvValue(decryptEnvValue(env.value)) })),
     deployments: deployments.map((deployment) => ({
       id: deployment.id,
@@ -157,21 +142,32 @@ async function serializeWorkspace(chatId: string) {
   };
 }
 
-async function syncFiles(chatId: string, files: ArtifactFileInput[]) {
+async function syncFiles(chatId: string, files: WorkspaceFileInput[]) {
   const workspace = await ensureWorkspace(chatId);
   if (!workspace) return null;
-  const clean = cleanFiles(files);
-  await Promise.all(
-    clean.map((file) =>
+  const existingPaths = (await workspace.prisma.projectFile.findMany({
+    where: { projectId: workspace.project.id },
+    select: { path: true },
+  })).map((file) => file.path);
+  const { clean, deletedPaths } = diffWorkspaceFiles(existingPaths, files);
+  await workspace.prisma.$transaction([
+    ...(deletedPaths.length > 0
+      ? [
+          workspace.prisma.projectFile.deleteMany({
+            where: { projectId: workspace.project.id, path: { in: deletedPaths } },
+          }),
+        ]
+      : []),
+    ...clean.map((file) =>
       workspace.prisma.projectFile.upsert({
         where: { projectId_path: { projectId: workspace.project.id, path: file.path } },
         update: { content: file.content },
         create: { projectId: workspace.project.id, path: file.path, content: file.content },
       }),
     ),
-  );
+  ]);
   const validation = await summarizeValidation(clean);
-  return { workspace, count: clean.length, files: clean, validation };
+  return { workspace, count: clean.length, files: clean, deletedPaths, validation };
 }
 
 export async function GET(_: Request, context: { params: Promise<{ chatId: string }> }) {
@@ -229,6 +225,26 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
+  if (action === "update-project") {
+    const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
+    const description = typeof body.description === "string" ? body.description.trim().slice(0, 2000) : "";
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        ...(name ? { name } : {}),
+        description: description || null,
+      },
+    });
+    if (name) {
+      await prisma.chat.update({
+        where: { id: chat.id },
+        data: { title: name },
+      });
+    }
+    await logAudit({ userId: accessUser.id, action: "update-project", resource: "project", resourceId: project.id });
+    return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
+  }
+
   if (action === "install-integration") {
     const type = String(body.type || "").toLowerCase().trim();
     if (!type) {
@@ -279,7 +295,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   }
 
   if (action === "validate") {
-    const candidateFiles = cleanFiles(body.files || []);
+    const candidateFiles = diffWorkspaceFiles([], body.files || []).clean;
     const files =
       candidateFiles.length > 0
         ? candidateFiles
@@ -319,7 +335,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
         workspace: await serializeWorkspace(chatId),
       }, { status: 409 });
     }
-    const token = `${chatId}-${messageId}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+    const token = buildShareToken(chatId, messageId);
     await prisma.shareLink.upsert({
       where: { token },
       update: { isPublic: true },

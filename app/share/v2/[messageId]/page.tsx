@@ -2,6 +2,7 @@ import CodeRunner from "@/components/code-runner";
 import { getPrisma } from "@/lib/prisma";
 import { getOgDataForChat } from "@/lib/og-utils";
 import { extractAllCodeBlocks } from "@/lib/utils";
+import { buildShareToken } from "@/lib/share-links";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -59,8 +60,33 @@ export default async function SharePage({
   const { messageId } = await params;
 
   const prisma = getPrisma();
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: {
+      chat: {
+        select: {
+          projectId: true,
+        },
+      },
+    },
+  });
   if (!message) {
+    notFound();
+  }
+
+  const shareToken = buildShareToken(message.chatId, messageId);
+  const shareLink = await prisma.shareLink.findUnique({ where: { token: shareToken } });
+  const deploymentUrl = `/share/v2/${messageId}`;
+  const deployment = message.chat.projectId
+    ? await prisma.deployment.findFirst({
+        where: {
+          projectId: message.chat.projectId,
+          status: "published",
+          productionUrl: deploymentUrl,
+        },
+      })
+    : null;
+  if (!shareLink?.isPublic && !deployment) {
     notFound();
   }
 
@@ -111,6 +137,7 @@ const getMessage = cache(async (messageId: string) => {
     include: {
       chat: {
         include: {
+          project: true,
           messages: {
             where: { role: "user" },
             orderBy: { position: "asc" },

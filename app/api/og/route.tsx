@@ -16,12 +16,9 @@ export async function GET(request: Request) {
     searchParams.get("prompt") || "Built with Chinna-Coder",
     160,
   );
-  const directImage = searchParams.get("image");
   const messageId = searchParams.get("messageId");
 
-  const screenshotUrl =
-    directImage ||
-    (messageId ? getShareScreenshotUrl(messageId) : undefined);
+  const screenshotUrl = messageId ? getShareScreenshotUrl(messageId) : undefined;
 
   return new ImageResponse(
     (

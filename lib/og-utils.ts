@@ -47,7 +47,6 @@ export function getShareScreenshotUrl(messageId: string): string {
 export function buildOgImageUrl(params: {
   prompt: string;
   messageId?: string;
-  image?: string;
 }): string {
   return buildOgImagePath(params);
 }
@@ -72,10 +71,7 @@ export function getOgDataForChat(chat: ChatForOg, messageId?: string) {
   const resolvedMessageId =
     messageId ?? (targetMessage as { id?: string })?.id ?? undefined;
 
-  const image =
-    previewImage ||
-    attachmentImage ||
-    (resolvedMessageId ? getShareScreenshotUrl(resolvedMessageId) : undefined);
+  const image = previewImage || attachmentImage || (resolvedMessageId ? getShareScreenshotUrl(resolvedMessageId) : undefined);
 
   return {
     prompt,
@@ -84,7 +80,6 @@ export function getOgDataForChat(chat: ChatForOg, messageId?: string) {
     ogImageUrl: buildOgImageUrl({
       prompt,
       messageId: resolvedMessageId,
-      image: previewImage || attachmentImage,
     }),
   };
 }

@@ -71,31 +71,34 @@ export function ShareDialog({
           <div>
             <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
               <Link2 className="size-3.5" aria-hidden="true" />
-              Preview link
+              Public link
             </label>
-            <Snippet code={shareUrl} className="bg-muted/50 text-xs">
-              <SnippetInput
-                className="text-xs text-muted-foreground"
-                aria-label="Preview link"
-              />
-              <SnippetAddon align="inline-end">
-                <SnippetCopyButton
-                  disabled={!shareUrl}
-                  onCopy={() => toast({ title: "Link copied" })}
+            {(isPublished || duplicateProtected) && liveUrl ? (
+              <Snippet code={liveUrl} className="bg-muted/50 text-xs">
+                <SnippetInput
+                  className="text-xs text-muted-foreground"
+                  aria-label="Public link"
                 />
-                {shareUrl ? (
+                <SnippetAddon align="inline-end">
+                  <SnippetCopyButton
+                    onCopy={() => toast({ title: "Link copied" })}
+                  />
                   <a
-                    href={shareUrl}
+                    href={liveUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex size-8 items-center justify-center rounded-md text-foreground transition hover:bg-accent"
-                    aria-label="Open preview in new tab"
+                    aria-label="Open public link in new tab"
                   >
                     <ExternalLink className="size-4" aria-hidden="true" />
                   </a>
-                ) : null}
-              </SnippetAddon>
-            </Snippet>
+                </SnippetAddon>
+              </Snippet>
+            ) : (
+              <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                Publish this version to generate a public link.
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-border bg-muted/30 p-3">
@@ -103,12 +106,12 @@ export function ShareDialog({
               <div>
                 <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                   <Globe className="size-3.5" aria-hidden="true" />
-                  Public publish
+                  Public share
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {isPublished || duplicateProtected
-                    ? "This version is already published. Share the link below."
-                    : "Publish creates a stable public URL for this app version."}
+                    ? "This version is already public. Share the link below."
+                    : "Publishing creates a stable public URL for this app version."}
                 </p>
               </div>
               {onPublish && !isPublished && !duplicateProtected ? (
@@ -137,7 +140,7 @@ export function ShareDialog({
             ) : null}
           </div>
 
-          {tweetUrl ? (
+          {(isPublished || duplicateProtected) && tweetUrl ? (
             <a
               href={tweetUrl}
               target="_blank"

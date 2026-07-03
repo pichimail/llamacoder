@@ -227,8 +227,8 @@ export default function SettingsPageClient() {
 
             <Section icon={<UploadCloud className="size-4" />} title="Publishing and assets" description="Backend switches for uploads, preview sharing, and generated social images.">
               <div className="grid gap-4 md:grid-cols-2">
-                <NativeSelect label="Deploy target" value={settings.deployTarget} onChange={(value) => update("deployTarget", value as BuilderSettings["deployTarget"])}>
-                  <option value="vercel">Vercel</option><option value="none">No default deploy</option>
+                <NativeSelect label="Share target" value={settings.deployTarget} onChange={(value) => update("deployTarget", value as BuilderSettings["deployTarget"])}>
+                  <option value="vercel">Public share</option><option value="none">No default publish</option>
                 </NativeSelect>
               </div>
               <div className="mt-4">

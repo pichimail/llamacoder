@@ -125,10 +125,23 @@ export async function duplicateChat(chatId: string) {
   const originalChat = await ensureCanMutateChat(chatId)
   const prisma = getPrisma()
 
-  const messages = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { position: 'asc' },
-  })
+  const [messages, originalProject] = await Promise.all([
+    prisma.message.findMany({
+      where: { chatId },
+      orderBy: { position: 'asc' },
+    }),
+    originalChat.projectId
+      ? prisma.project.findUnique({
+          where: { id: originalChat.projectId },
+          include: {
+            files: true,
+            envVars: true,
+            integrations: true,
+            domains: true,
+          },
+        })
+      : null,
+  ])
 
   const duplicatedMessages: Prisma.MessageCreateWithoutChatInput[] = messages.map(
     (msg, index) => ({
@@ -139,6 +152,40 @@ export async function duplicateChat(chatId: string) {
     }),
   )
 
+  const duplicatedProject = originalProject
+    ? await prisma.project.create({
+        data: {
+          name: `${originalProject.name} (Copy)`,
+          description: originalProject.description,
+          userId: originalProject.userId,
+          files: {
+            create: originalProject.files.map((file) => ({
+              path: file.path,
+              content: file.content,
+            })),
+          },
+          envVars: {
+            create: originalProject.envVars.map((env) => ({
+              key: env.key,
+              value: env.value,
+            })),
+          },
+          integrations: {
+            create: originalProject.integrations.map((integration) => ({
+              type: integration.type,
+              config: integration.config as Prisma.InputJsonValue,
+            })),
+          },
+          domains: {
+            create: originalProject.domains.map((domain) => ({
+              domain: domain.domain,
+              verified: domain.verified,
+            })),
+          },
+        },
+      })
+    : null
+
   const newChat = await prisma.chat.create({
     data: {
       title: `${originalChat.title} (Copy)`,
@@ -147,7 +194,7 @@ export async function duplicateChat(chatId: string) {
       quality: originalChat.quality,
       shadcn: originalChat.shadcn,
       llamaCoderVersion: originalChat.llamaCoderVersion,
-      projectId: originalChat.projectId,
+      projectId: duplicatedProject?.id,
       messages: {
         create: duplicatedMessages,
       },
