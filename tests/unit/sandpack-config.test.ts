@@ -19,7 +19,26 @@ describe("sandpack config", () => {
     expect(config.files["/lib/next-navigation.ts"]).toContain("useRouter");
     expect(config.files["/lib/next-link.tsx"]).toContain("export default function Link");
     expect(config.files["/lib/next-image.tsx"]).toContain("export default function Image");
+    expect(config.files["/app/page.tsx"]).toContain('from "../lib/next-navigation"');
     expect(config.files["/components/ui/button.tsx"]).toBeUndefined();
+  });
+
+  it("rewrites local alias imports to relative imports for the Sandpack runtime", () => {
+    const config = getSandpackConfig(
+      [
+        {
+          path: "app/admin/page.tsx",
+          content:
+            'import { Button } from "@/components/ui/button"; import { cn } from "@/lib/utils"; export default function Page() { return <Button className={cn("px-4")}>Admin</Button>; }',
+        },
+      ],
+      {},
+      { includeShadcn: true },
+    );
+
+    const page = config.files["/app/admin/page.tsx"];
+    expect(page).toContain('from "../../components/ui/button"');
+    expect(page).toContain('from "../../lib/utils"');
   });
 
   it("strips root html and body tags from generated Next layouts for preview", () => {

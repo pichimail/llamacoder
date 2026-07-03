@@ -149,6 +149,14 @@ function isPreviewRuntimeFile(path: string, content: string) {
   return /\.(tsx|ts|jsx|js|css)$/.test(normalizedPath);
 }
 
+function relativeImportForSandbox(fromPath: string, targetPath: string) {
+  const fromParts = normalizePreviewPath(fromPath).split("/");
+  fromParts.pop();
+  const depth = fromParts.length;
+  const prefix = depth === 0 ? "." : Array.from({ length: depth }, () => "..").join("/");
+  return `${prefix}/${targetPath}`.replace(/\/+/g, "/");
+}
+
 function sanitizePreviewContent(content: string, normalizedPath = "") {
   let sanitized = content
     .replace(/^.*tailwindcss-animate.*$/gm, "")
@@ -159,6 +167,16 @@ function sanitizePreviewContent(content: string, normalizedPath = "") {
     .replace(/from\s+["']next\/navigation["']/g, 'from "@/lib/next-navigation"')
     .replace(/from\s+["']next\/link["']/g, 'from "@/lib/next-link"')
     .replace(/from\s+["']next\/image["']/g, 'from "@/lib/next-image"');
+
+  if (normalizedPath) {
+    sanitized = sanitized
+      .replace(/from\s+["']@\/([^"']+)["']/g, (_match, target: string) => {
+        return `from "${relativeImportForSandbox(normalizedPath, target)}"`;
+      })
+      .replace(/import\s*\(\s*["']@\/([^"']+)["']\s*\)/g, (_match, target: string) => {
+        return `import("${relativeImportForSandbox(normalizedPath, target)}")`;
+      });
+  }
 
   if (normalizedPath === "app/layout.tsx" || normalizedPath === "app/layout.ts") {
     // The preview mounts generated Next layouts inside a React wrapper. Root

@@ -28,8 +28,62 @@ function isValidatablePath(path: string) {
 }
 
 const ALLOWED_DEPS = new Set([
-  "react", "react-dom", "lucide-react", "framer-motion", "tailwindcss", "zod",
-  "@radix-ui/react-dialog", "@radix-ui/react-slot", "sonner", "next", "clsx", "tailwind-merge"
+  "@hookform/resolvers",
+  "@radix-ui/react-accordion",
+  "@radix-ui/react-alert-dialog",
+  "@radix-ui/react-aspect-ratio",
+  "@radix-ui/react-avatar",
+  "@radix-ui/react-checkbox",
+  "@radix-ui/react-collapsible",
+  "@radix-ui/react-dialog",
+  "@radix-ui/react-dropdown-menu",
+  "@radix-ui/react-hover-card",
+  "@radix-ui/react-label",
+  "@radix-ui/react-menubar",
+  "@radix-ui/react-navigation-menu",
+  "@radix-ui/react-popover",
+  "@radix-ui/react-progress",
+  "@radix-ui/react-radio-group",
+  "@radix-ui/react-scroll-area",
+  "@radix-ui/react-select",
+  "@radix-ui/react-separator",
+  "@radix-ui/react-slider",
+  "@radix-ui/react-slot",
+  "@radix-ui/react-switch",
+  "@radix-ui/react-tabs",
+  "@radix-ui/react-toast",
+  "@radix-ui/react-toggle",
+  "@radix-ui/react-toggle-group",
+  "@radix-ui/react-tooltip",
+  "@radix-ui/react-visually-hidden",
+  "@twind/core",
+  "@twind/preset-autoprefix",
+  "@twind/preset-tailwind",
+  "animejs",
+  "class-variance-authority",
+  "clsx",
+  "cmdk",
+  "date-fns",
+  "embla-carousel-react",
+  "framer-motion",
+  "gsap",
+  "lucide-react",
+  "next",
+  "next-themes",
+  "react",
+  "react-day-picker",
+  "react-dom",
+  "react-hook-form",
+  "react-resizable-panels",
+  "react-router-dom",
+  "recharts",
+  "sonner",
+  "tailwind-merge",
+  "tailwindcss",
+  "three",
+  "vaul",
+  "zod",
+  "zustand",
 ]);
 
 const KNOWN_SANDBOX_FILES = new Set([
@@ -156,8 +210,8 @@ function detectPlaceholderCode(code: string): string | null {
 export async function validateGeneratedCodeFiles(
   files: Array<{ path: string; code?: string; content?: string }>,
 ): Promise<GeneratedCodeIssue[]> {
-  const ts = await import("typescript");
   const issues: GeneratedCodeIssue[] = [];
+  let tsModule: typeof TypeScript | null = null;
   const availablePaths = new Set(
     files
       .filter((file) => typeof file.path === "string")
@@ -195,6 +249,8 @@ export async function validateGeneratedCodeFiles(
       });
     }
 
+    tsModule ??= await import("typescript");
+    const ts = tsModule;
     const scriptKind = getScriptKind(ts, file.path);
     const sourceFile = ts.createSourceFile(file.path, code, ts.ScriptTarget.Latest, true, scriptKind);
     const diagnostics = ts.transpileModule(code, {

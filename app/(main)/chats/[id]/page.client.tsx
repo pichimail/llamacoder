@@ -689,6 +689,13 @@ Fix requirements:
               const validationIssues = await validateGeneratedCodeFiles(mergedFiles);
               if (validationIssues.length > 0) {
                 const validationError = `Generated code validation failed before preview commit.\n\n${formatGeneratedCodeIssues(validationIssues)}`;
+                const blockedMessage = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);
+                void syncWorkspaceFiles(mergedFiles);
+                setActiveMessage(blockedMessage);
+                setActiveTab("code");
+                setBuilderMode("code");
+                setMobilePanel("code");
+                setChatCollapsed(false);
                 isHandlingStreamRef.current = false;
                 abortControllerRef.current = null;
                 streamPromiseRef.current = undefined;
@@ -696,6 +703,16 @@ Fix requirements:
                 setStreamText("");
                 setStreamPromise(undefined);
                 setStreamReasoningEnabled(false);
+                if (!autoFixEnabled) {
+                  setBuilderStatus("failed");
+                  toast({
+                    title: "Generated code needs a fix",
+                    description: "Files were saved instead of erased. Enable self-correcting or send a fix prompt to continue.",
+                    variant: "destructive",
+                  });
+                  refreshPage();
+                  return;
+                }
                 await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
                 return;
               }
