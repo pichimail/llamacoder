@@ -28,6 +28,8 @@ function isValidatablePath(path: string) {
 }
 
 const ALLOWED_DEPS = new Set([
+  "@react-three/drei",
+  "@react-three/fiber",
   "@hookform/resolvers",
   "@radix-ui/react-accordion",
   "@radix-ui/react-alert-dialog",
@@ -70,6 +72,7 @@ const ALLOWED_DEPS = new Set([
   "lucide-react",
   "next",
   "next-themes",
+  "postprocessing",
   "react",
   "react-day-picker",
   "react-dom",
@@ -85,6 +88,12 @@ const ALLOWED_DEPS = new Set([
   "zod",
   "zustand",
 ]);
+
+function getPackageName(spec: string) {
+  if (!spec.startsWith("@")) return spec.split("/")[0];
+  const [scope, name] = spec.split("/");
+  return scope && name ? `${scope}/${name}` : spec;
+}
 
 const KNOWN_SANDBOX_FILES = new Set([
   "lib/utils.ts",
@@ -104,7 +113,7 @@ function detectBadImports(code: string): string[] {
   while ((m = importRe.exec(code))) {
     const spec = m[1];
     if (spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("@/")) continue;
-    const pkg = spec.split("/")[0];
+    const pkg = getPackageName(spec);
     if (!ALLOWED_DEPS.has(pkg) && !pkg.startsWith("node:")) {
       bad.push(spec);
     }

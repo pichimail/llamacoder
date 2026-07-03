@@ -56,4 +56,26 @@ describe("generated code validation", () => {
 
     expect(issues).toHaveLength(0);
   }, VALIDATION_TIMEOUT_MS);
+
+  it("allows scoped shadcn/Radix dependencies", async () => {
+    const issues = await validateGeneratedCodeFiles([
+      {
+        path: "app/page.tsx",
+        code: 'import * as Dialog from "@radix-ui/react-dialog"; export default function Page() { return <Dialog.Root><Dialog.Trigger>Open</Dialog.Trigger><Dialog.Content>Ready</Dialog.Content></Dialog.Root>; }',
+      },
+    ]);
+
+    expect(issues).toHaveLength(0);
+  }, VALIDATION_TIMEOUT_MS);
+
+  it("allows premium 3D and animation dependencies", async () => {
+    const issues = await validateGeneratedCodeFiles([
+      {
+        path: "app/page.tsx",
+        code: 'import { Canvas } from "@react-three/fiber"; import { Float } from "@react-three/drei"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; import { EffectComposer } from "postprocessing"; import * as THREE from "three"; export default function Page() { gsap.registerPlugin(ScrollTrigger); return <main><Canvas><Float><mesh><boxGeometry /><meshStandardMaterial color="cyan" /></mesh></Float></Canvas><span>{THREE.BackSide}{EffectComposer.name}</span></main>; }',
+      },
+    ]);
+
+    expect(issues).toHaveLength(0);
+  }, VALIDATION_TIMEOUT_MS);
 });

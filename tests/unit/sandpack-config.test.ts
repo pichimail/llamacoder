@@ -68,4 +68,26 @@ describe("sandpack config", () => {
     expect(layout).not.toContain("<body");
     expect(layout).toContain('<div className="min-h-screen bg-black text-white">');
   });
+
+  it("installs premium 3D and cinematic animation dependencies in preview", () => {
+    const config = getSandpackConfig(
+      [
+        {
+          path: "app/page.tsx",
+          content:
+            'import { Canvas } from "@react-three/fiber"; import { Float } from "@react-three/drei"; import gsap from "gsap"; import * as THREE from "three"; export default function Page() { return <Canvas><Float><mesh><boxGeometry /><meshBasicMaterial color={new THREE.Color("#38bdf8")} /></mesh></Float></Canvas>; }',
+        },
+      ],
+      {},
+      { includeShadcn: false },
+    );
+
+    expect(config.customSetup.dependencies).toMatchObject({
+      "@react-three/fiber": expect.any(String),
+      "@react-three/drei": expect.any(String),
+      gsap: expect.any(String),
+      postprocessing: expect.any(String),
+      three: expect.any(String),
+    });
+  });
 });
