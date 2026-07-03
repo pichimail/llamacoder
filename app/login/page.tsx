@@ -3,6 +3,7 @@ import { ArrowLeft, GalleryVerticalEnd, LogIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { continueWithGoogle } from "@/app/login/actions";
 
 export default async function LoginPage() {
   return (
@@ -28,12 +29,12 @@ export default async function LoginPage() {
             <CardDescription>Continue with your Google account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button asChild className="w-full">
-              <a href="/api/auth/signin/google?callbackUrl=%2F">
+            <form action={continueWithGoogle}>
+              <Button type="submit" className="w-full">
                 <LogIn className="size-4" />
                 Continue with Google
-              </a>
-            </Button>
+              </Button>
+            </form>
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
                 <ArrowLeft className="size-4" />

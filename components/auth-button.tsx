@@ -61,16 +61,15 @@ export default function AuthButton() {
       .catch(() => {});
   }, []);
 
-  if (!enabled) return null;
-
-  if (!user) {
+  if (!enabled || !user) {
     return (
       <Link
         href="/login"
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/50 px-3 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/10 px-3 text-xs font-semibold text-slate-950 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+        title={enabled ? "Sign in" : "Get started"}
       >
         <LogIn className="size-3.5" aria-hidden="true" />
-        Sign in with Google
+        <span className="hidden sm:inline">{enabled ? "Sign in" : "Get started"}</span>
       </Link>
     );
   }

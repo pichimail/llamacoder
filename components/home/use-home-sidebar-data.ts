@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react"
 
-import { getChatsList } from "@/app/actions/chat"
-
 export type HomeSidebarChat = {
   id: string
   title: string
@@ -23,6 +21,11 @@ type HomeSidebarData = {
   authEnabled: boolean
   isAuthenticated: boolean
   loading: boolean
+}
+
+type ChatsListResponse = {
+  pinned?: HomeSidebarChat[]
+  recent?: HomeSidebarChat[]
 }
 
 const guestUser: HomeSidebarUser = {
@@ -67,16 +70,17 @@ export function useHomeSidebarData(): HomeSidebarData {
           sessionUser = session?.user ?? null
         }
 
-        const chatsResult = sessionUser || !authOn ? await getChatsList() : { pinned: [], recent: [] }
+        const chatsResult: ChatsListResponse =
+          sessionUser || !authOn ? (await fetchJsonWithTimeout("/api/chats")) ?? { pinned: [], recent: [] } : { pinned: [], recent: [] }
 
         if (cancelled) return
 
-        const pinned = chatsResult.pinned.map((chat) => ({
+        const pinned = (chatsResult.pinned ?? []).map((chat) => ({
           id: chat.id,
           title: chat.title,
           isPinned: chat.isPinned,
         }))
-        const recent = chatsResult.recent
+        const recent = (chatsResult.recent ?? [])
           .filter((chat) => !pinned.some((item) => item.id === chat.id))
           .map((chat) => ({
             id: chat.id,
