@@ -13,6 +13,14 @@ function resolveDatabaseUrl() {
   if (!/^postgres(?:ql)?:\/\//.test(url)) {
     throw new Error("DATABASE_URL must be a PostgreSQL connection string");
   }
+
+  const parsed = new URL(url);
+  const sslMode = parsed.searchParams.get("sslmode");
+  if (sslMode && ["prefer", "require", "verify-ca"].includes(sslMode)) {
+    parsed.searchParams.set("sslmode", "verify-full");
+    return parsed.toString();
+  }
+
   return url;
 }
 
