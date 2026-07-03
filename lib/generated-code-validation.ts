@@ -32,6 +32,13 @@ const ALLOWED_DEPS = new Set([
   "@radix-ui/react-dialog", "@radix-ui/react-slot", "sonner", "next", "clsx", "tailwind-merge"
 ]);
 
+const KNOWN_SANDBOX_FILES = new Set([
+  "lib/utils.ts",
+  "lib/next-navigation.ts",
+  "lib/next-link.tsx",
+  "lib/next-image.tsx",
+]);
+
 function hasPathTraversal(p: string): boolean {
   return p.includes("..") || p.startsWith("/") || p.includes("://") || /\0/.test(p);
 }
@@ -42,13 +49,88 @@ function detectBadImports(code: string): string[] {
   let m;
   while ((m = importRe.exec(code))) {
     const spec = m[1];
-    if (spec.startsWith(".") || spec.startsWith("/")) continue;
+    if (spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("@/")) continue;
     const pkg = spec.split("/")[0];
-    if (!ALLOWED_DEPS.has(pkg) && !pkg.startsWith("@/") && !pkg.startsWith("node:")) {
+    if (!ALLOWED_DEPS.has(pkg) && !pkg.startsWith("node:")) {
       bad.push(spec);
     }
   }
   return bad;
+}
+
+function normalizeArtifactPath(path: string) {
+  return path.replace(/^\/+/, "").replace(/^src\//, "");
+}
+
+function dirname(path: string) {
+  const normalized = normalizeArtifactPath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+function joinPath(base: string, spec: string) {
+  const parts = `${base ? `${base}/` : ""}${spec}`.split("/");
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      out.pop();
+      continue;
+    }
+    out.push(part);
+  }
+  return out.join("/");
+}
+
+function extractImportSpecifiers(code: string) {
+  const imports = new Set<string>();
+  const importExportRe = /\b(?:import|export)\s+(?:type\s+)?(?:[^"';]*?\s+from\s+)?["']([^"']+)["']/g;
+  const dynamicImportRe = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = importExportRe.exec(code))) imports.add(match[1]);
+  while ((match = dynamicImportRe.exec(code))) imports.add(match[1]);
+  return Array.from(imports);
+}
+
+function possibleModulePaths(base: string) {
+  const withoutExtension = base.replace(/\.(tsx|ts|jsx|js|css|json|mjs|cjs)$/i, "");
+  return [
+    base,
+    `${withoutExtension}.tsx`,
+    `${withoutExtension}.ts`,
+    `${withoutExtension}.jsx`,
+    `${withoutExtension}.js`,
+    `${withoutExtension}.css`,
+    `${withoutExtension}.json`,
+    `${withoutExtension}/index.tsx`,
+    `${withoutExtension}/index.ts`,
+    `${withoutExtension}/index.jsx`,
+    `${withoutExtension}/index.js`,
+  ];
+}
+
+function detectUnresolvedLocalImports(
+  path: string,
+  code: string,
+  availablePaths: Set<string>,
+): string[] {
+  const unresolved: string[] = [];
+
+  for (const spec of extractImportSpecifiers(code)) {
+    if (!spec.startsWith(".") && !spec.startsWith("@/")) continue;
+    const candidateBase = spec.startsWith("@/")
+      ? spec.slice(2)
+      : joinPath(dirname(path), spec);
+
+    const resolved = possibleModulePaths(candidateBase).some((candidate) => {
+      const normalized = normalizeArtifactPath(candidate);
+      return availablePaths.has(normalized) || KNOWN_SANDBOX_FILES.has(normalized);
+    });
+
+    if (!resolved) unresolved.push(spec);
+  }
+
+  return unresolved;
 }
 
 function detectPlaceholderCode(code: string): string | null {
@@ -76,6 +158,11 @@ export async function validateGeneratedCodeFiles(
 ): Promise<GeneratedCodeIssue[]> {
   const ts = await import("typescript");
   const issues: GeneratedCodeIssue[] = [];
+  const availablePaths = new Set(
+    files
+      .filter((file) => typeof file.path === "string")
+      .map((file) => normalizeArtifactPath(file.path)),
+  );
 
   for (const file of files) {
     const code = file.code ?? file.content ?? "";
@@ -95,6 +182,17 @@ export async function validateGeneratedCodeFiles(
     const bad = detectBadImports(code);
     for (const b of bad) {
       issues.push({ path: file.path, line: 1, column: 1, message: `Unapproved external dependency: ${b}`, excerpt: b });
+    }
+
+    const unresolved = detectUnresolvedLocalImports(file.path, code, availablePaths);
+    for (const spec of unresolved) {
+      issues.push({
+        path: file.path,
+        line: 1,
+        column: 1,
+        message: `Unresolved local import: ${spec}. Generate the imported file or remove the import before preview.`,
+        excerpt: spec,
+      });
     }
 
     const scriptKind = getScriptKind(ts, file.path);

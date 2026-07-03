@@ -10,6 +10,8 @@ export async function GET() {
     googleAuth: s.googleAuth === "on" && googleReady,
     authRequired: s.saasMode === "on" && s.googleAuth === "on" && googleReady,
     gallery: s.gallery !== "off",
-    autoFixDefault: s.autoFixDefault === "on",
+    // Keep auto-fix opt-in. Silent automatic repair loops can burn API credits
+    // when a generated artifact repeatedly fails in the preview sandbox.
+    autoFixDefault: false,
   });
 }

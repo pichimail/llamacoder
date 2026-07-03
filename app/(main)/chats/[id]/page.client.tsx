@@ -64,7 +64,7 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database" | "canvas" | "plan";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
-const MAX_AUTO_FIX_ATTEMPTS = 3;
+const MAX_AUTO_FIX_ATTEMPTS = 1;
 const FIX_CONTEXT_FILE_LIMIT = 18;
 const FIX_CONTEXT_CHAR_BUDGET = 70000;
 
@@ -175,7 +175,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [designSaving, setDesignSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
-  const [autoFixEnabled, setAutoFixEnabled] = useState(true);
+  const [autoFixEnabled, setAutoFixEnabled] = useState(false);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
   const [builderStatus, setBuilderStatus] = useState<BuilderStatus>(context.streamPromise ? "generating" : "ready");

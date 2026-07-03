@@ -202,10 +202,8 @@ export function getSandpackConfig(
     }));
 
   const sandpackFiles: Record<string, string> = includeShadcn
-    ? { ...shadcnFiles }
-    : {
-        "/lib/utils.ts": shadcnComponents.utils,
-      };
+    ? { ...baseSandboxFiles, ...shadcnFiles }
+    : { ...baseSandboxFiles };
   const previewUserFiles: Array<{ path: string; content: string }> = [];
 
   if (!sandpackFiles["/app/globals.css"]) {
@@ -594,60 +592,6 @@ export function ensureTwind() {
 `;
 
 const shadcnFiles = {
-  "/lib/utils.ts": shadcnComponents.utils,
-  "/lib/next-navigation.ts": `
-  export function useRouter() {
-    return {
-      push: (url: string) => {
-        if (typeof window !== "undefined") {
-          window.history.pushState({}, "", url);
-          // Notify our multi-page App wrapper so it actually switches pages
-          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
-        }
-      },
-      replace: (url: string) => {
-        if (typeof window !== "undefined") {
-          window.history.replaceState({}, "", url);
-          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
-        }
-      },
-      back: () => {
-        if (typeof window !== "undefined") window.history.back();
-      },
-      refresh: () => {}
-    }
-  }
-
-  export function usePathname() {
-    return typeof window === "undefined" ? "/" : window.location.pathname;
-  }
-
-  export function useSearchParams() {
-    return new URLSearchParams(
-      typeof window === "undefined" ? "" : window.location.search
-    );
-  }
-  `,
-  "/lib/next-link.tsx": `
-  import * as React from "react"
-
-  export default function Link({
-    href,
-    children,
-    ...props
-  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
-    return <a href={href} {...props}>{children}</a>
-  }
-  `,
-  "/lib/next-image.tsx": `
-  import * as React from "react"
-
-  export default function Image(
-    props: React.ImgHTMLAttributes<HTMLImageElement>
-  ) {
-    return <img {...props} />
-  }
-  `,
   "/components/ui/accordion.tsx": shadcnComponents.accordian,
   "/components/ui/alert-dialog.tsx": shadcnComponents.alertDialog,
   "/components/ui/alert.tsx": shadcnComponents.alert,
@@ -701,6 +645,63 @@ const shadcnFiles = {
   export * from "./scroll-area"
   export * from "./separator"
   export * from "./tabs"
+  `,
+};
+
+const baseSandboxFiles = {
+  "/lib/utils.ts": shadcnComponents.utils,
+  "/lib/next-navigation.ts": `
+  export function useRouter() {
+    return {
+      push: (url: string) => {
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", url);
+          // Notify our multi-page App wrapper so it actually switches pages
+          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
+        }
+      },
+      replace: (url: string) => {
+        if (typeof window !== "undefined") {
+          window.history.replaceState({}, "", url);
+          window.dispatchEvent(new CustomEvent('preview-route-change', { detail: { path: url } }));
+        }
+      },
+      back: () => {
+        if (typeof window !== "undefined") window.history.back();
+      },
+      refresh: () => {}
+    }
+  }
+
+  export function usePathname() {
+    return typeof window === "undefined" ? "/" : window.location.pathname;
+  }
+
+  export function useSearchParams() {
+    return new URLSearchParams(
+      typeof window === "undefined" ? "" : window.location.search
+    );
+  }
+  `,
+  "/lib/next-link.tsx": `
+  import * as React from "react"
+
+  export default function Link({
+    href,
+    children,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+    return <a href={href} {...props}>{children}</a>
+  }
+  `,
+  "/lib/next-image.tsx": `
+  import * as React from "react"
+
+  export default function Image(
+    props: React.ImgHTMLAttributes<HTMLImageElement>
+  ) {
+    return <img {...props} />
+  }
   `,
   "/public/index.html": `<!DOCTYPE html>
   <html lang="en">

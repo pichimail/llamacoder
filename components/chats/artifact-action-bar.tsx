@@ -105,9 +105,9 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [appName, setAppName] = useState(chatTitle);
   const [appDescription, setAppDescription] = useState("");
   const [settingsModel, setSettingsModel] = useState("zai-org/GLM-5.1");
-  const [settingsShadcn, setSettingsShadcn] = useState(true);
+  const [settingsShadcn, setSettingsShadcn] = useState(false);
   const [settingsCanvas, setSettingsCanvas] = useState(false);
-  const [settingsAutoFix, setSettingsAutoFix] = useState(true);
+  const [settingsAutoFix, setSettingsAutoFix] = useState(false);
   const [pendingInstall, setPendingInstall] = useState<string | null>(null);
   const [installKeys, setInstallKeys] = useState<Record<string, string>>({});
   const uploadRef = useRef<HTMLInputElement>(null);

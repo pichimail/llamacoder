@@ -21,4 +21,26 @@ describe("generated code validation", () => {
 
     expect(issues).toHaveLength(0);
   });
+
+  it("rejects unresolved local alias imports before preview", async () => {
+    const issues = await validateGeneratedCodeFiles([
+      {
+        path: "app/page.tsx",
+        code: 'import { useAuth } from "@/lib/auth-context"; export default function Page() { return <main />; }',
+      },
+    ]);
+
+    expect(issues.some((issue) => issue.message.includes("Unresolved local import"))).toBe(true);
+  });
+
+  it("allows sandbox-provided Next compatibility shims", async () => {
+    const issues = await validateGeneratedCodeFiles([
+      {
+        path: "app/page.tsx",
+        code: 'import { useRouter } from "@/lib/next-navigation"; export default function Page() { const router = useRouter(); return <button onClick={() => router.push("/signin")}>Go</button>; }',
+      },
+    ]);
+
+    expect(issues).toHaveLength(0);
+  });
 });
