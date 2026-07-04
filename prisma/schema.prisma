@@ -206,6 +206,7 @@ model User {
   projects      Project[]
   projectMembers ProjectMember[]
   fileUploads   FileUpload[]
+  promptLibraryItems PromptLibraryItem[]
   auditLogs     AuditLog[]
   createdAt     DateTime  @default(now())
 }
@@ -313,5 +314,27 @@ model DesignCheckpoint {
   @@index([chatId])
   @@index([projectId])
   @@index([userId])
+  @@index([createdAt])
+}
+
+model PromptLibraryItem {
+  id          String   @id @default(nanoid(12))
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  category    String   @default("General")
+  tone        String   @default("Balanced")
+  tags        Json?
+  variables   Json?
+  visibility  String   @default("private")
+  shareToken  String?  @unique
+  useCount    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([visibility])
   @@index([createdAt])
 }

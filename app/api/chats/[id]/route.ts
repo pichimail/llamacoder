@@ -6,11 +6,13 @@ import {
   requireChatAccess,
 } from "@/lib/authz";
 import { archiveChat, deleteChat, duplicateChat, pinChat, renameChat } from "@/app/actions/chat";
+import { moveChatToProject } from "@/app/actions/projects";
 
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   isPinned: z.boolean().optional(),
   isArchived: z.boolean().optional(),
+  projectId: z.string().min(1).nullable().optional(),
 });
 
 export async function PATCH(
@@ -35,6 +37,9 @@ export async function PATCH(
     }
     if (parsed.data.isArchived !== undefined) {
       result = await archiveChat(id, parsed.data.isArchived);
+    }
+    if (parsed.data.projectId !== undefined) {
+      result = await moveChatToProject(id, parsed.data.projectId);
     }
 
     return NextResponse.json({ ok: true, chat: result });

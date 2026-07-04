@@ -17,8 +17,16 @@ export async function GET() {
       select: {
         id: true,
         title: true,
+        prompt: true,
         isPinned: true,
         isArchived: true,
+        projectId: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         createdAt: true,
       },
     });
@@ -28,8 +36,11 @@ export async function GET() {
     const serialize = (chat: (typeof chats)[number]) => ({
       id: chat.id,
       title: chat.title,
+      prompt: chat.prompt,
       isPinned: chat.isPinned,
       isArchived: chat.isArchived,
+      projectId: chat.projectId,
+      projectName: chat.project?.name ?? null,
       createdAt: chat.createdAt.toISOString(),
     });
 
