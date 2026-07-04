@@ -2,7 +2,7 @@
 
 import { HomeShell } from "@/components/home/home-shell";
 import { use, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { ArrowUp, Bot, Brain, Check, Github, Image as ImageIcon, ListChecks, Loader2, MessageSquare, Palette, Plus, Search as SearchIcon, Upload } from "lucide-react";
+import { ArrowUp, Bot, Brain, Check, ChevronDown, Github, Image as ImageIcon, ListChecks, Loader2, MessageSquare, Palette, Plus, Search as SearchIcon, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -51,19 +51,19 @@ const HERO_WORDS = [
   {
     label: "Build.",
     className:
-      "headline-gradient-word bg-gradient-to-r from-fuchsia-500 via-pink-400 to-rose-500 drop-shadow-[0_0_22px_rgba(236,72,153,0.42)]",
+      "headline-gradient-word bg-gradient-to-r from-orange-500 via-rose-400 to-fuchsia-500 drop-shadow-[0_0_22px_rgba(251,146,60,0.42)]",
     animationDuration: "3.2s",
   },
   {
     label: "Preview.",
     className:
-      "headline-gradient-word bg-gradient-to-r from-violet-500 via-sky-400 to-indigo-500 drop-shadow-[0_0_22px_rgba(96,165,250,0.38)]",
+      "headline-gradient-word bg-gradient-to-r from-fuchsia-500 via-violet-500 to-amber-400 drop-shadow-[0_0_22px_rgba(217,70,239,0.38)]",
     animationDuration: "3.8s",
   },
   {
     label: "Ship.",
     className:
-      "headline-gradient-word bg-gradient-to-r from-lime-300 via-emerald-300 to-cyan-300 drop-shadow-[0_0_22px_rgba(163,230,53,0.38)]",
+      "headline-gradient-word bg-gradient-to-r from-amber-300 via-lime-300 to-yellow-200 drop-shadow-[0_0_22px_rgba(251,191,36,0.40)]",
     animationDuration: "3.4s",
   },
 ] as const;
@@ -74,9 +74,53 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
     <div className="w-full"><div className="rounded-[28px] border border-white/10 bg-[#1f1f22] text-white shadow-[0_28px_80px_rgba(15,23,42,0.30)] backdrop-blur-2xl">
       <textarea value={value} onChange={(event) => onValueChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!disabled && hasValue) onSend(value); } }} placeholder="Describe what to build" aria-label="Describe what to build" disabled={disabled} rows={3} className="min-h-[104px] w-full resize-none rounded-t-[28px] bg-transparent px-6 pb-4 pt-6 text-[17px] leading-relaxed text-white outline-none placeholder:text-zinc-400 disabled:opacity-60" />
       {attachmentReady ? <div className="mx-5 mb-3 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">Attachment ready</div> : null}
-      <div className="flex min-h-[58px] items-center justify-between gap-3 border-t border-white/[0.06] px-3 py-2">
-        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" disabled={disabled} className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50" aria-label="Open prompt actions"><Plus className="size-5" /></button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-[min(86vw,360px)] rounded-[22px] border-white/10 bg-[#1f1f22] p-2 text-white shadow-[0_24px_80px_rgba(0,0,0,0.38)]"><DropdownMenuLabel className="text-xs text-zinc-400">Actions</DropdownMenuLabel><DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem><DropdownMenuItem onClick={onImportGithub} className="gap-3"><Github className="size-4" />Import from GitHub</DropdownMenuItem><DropdownMenuSeparator className="bg-white/10" /><DropdownMenuLabel className="text-xs text-zinc-400">Mode</DropdownMenuLabel><ModeItem mode="agent" current={buildMode} label="Agent" description="Build the app, write files, validate preview, then self-correct once if needed." icon={<Bot className="size-4" />} onSelect={onBuildModeChange} /><ModeItem mode="plan" current={buildMode} label="Plan" description="Create a buildability plan only: possible, not possible, backend, files, and steps." icon={<ListChecks className="size-4" />} onSelect={onBuildModeChange} /><ModeItem mode="ask" current={buildMode} label="Ask" description="Answer questions without writing a full artifact." icon={<MessageSquare className="size-4" />} onSelect={onBuildModeChange} /><DropdownMenuSeparator className="bg-white/10" /><DropdownMenuLabel className="text-xs text-zinc-400">Builder</DropdownMenuLabel><ToggleItem label="shadcn UI" icon={<Palette className="size-4" />} checked={shadcnEnabled} onChange={onShadcnChange} /><DropdownMenuSeparator className="bg-white/10" /><ToggleItem label="Web search" icon={<SearchIcon className="size-4" />} checked={webSearchEnabled} onChange={onWebSearchChange} /><ToggleItem label="Deep thinking" icon={<Brain className="size-4" />} checked={deepThinkingEnabled} onChange={onDeepThinkingChange} /><ToggleItem label="Canvas" icon={<ImageIcon className="size-4" />} checked={canvasEnabled} onChange={onCanvasChange} /></DropdownMenuContent></DropdownMenu>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3"><label className="sr-only" htmlFor="home-model-select">Model</label><select id="home-model-select" value={model} onChange={(event) => onModelChange(event.target.value)} disabled={disabled} className="h-10 max-w-[46vw] rounded-full border border-white/10 bg-white/[0.055] px-4 text-sm text-white outline-none transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 md:min-w-[210px]">{models.map((m: any) => <option key={m.value} value={m.value}>{m.label}</option>)}</select><SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-white/10 bg-white/[0.055] text-zinc-300 hover:bg-white/10 hover:text-white" aria-label="Dictate prompt" /><button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-40" aria-label="Start build">{isLoading ? <span className="text-[10px]">...</span> : <ArrowUp className="size-5" />}</button></div>
+      <div className="flex min-h-[58px] items-center justify-between gap-3 px-3 py-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={disabled}
+              className="group inline-flex size-11 items-center justify-center rounded-full bg-transparent text-zinc-500 transition-colors hover:text-zinc-400 focus-visible:outline-none focus-visible:text-zinc-200 disabled:opacity-40"
+              aria-label="Open prompt actions"
+            >
+              <Plus className="size-5 transition duration-200 group-hover:scale-[1.04]" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[min(86vw,360px)] rounded-[22px] border-white/10 bg-[#1f1f22] p-2 text-white shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
+            <DropdownMenuLabel className="text-xs text-zinc-400">Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportGithub} className="gap-3"><Github className="size-4" />Import from GitHub</DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuLabel className="text-xs text-zinc-400">Mode</DropdownMenuLabel>
+            <ModeItem mode="agent" current={buildMode} label="Agent" description="Build the app, write files, validate preview, then self-correct once if needed." icon={<Bot className="size-4" />} onSelect={onBuildModeChange} />
+            <ModeItem mode="plan" current={buildMode} label="Plan" description="Create a buildability plan only: possible, not possible, backend, files, and steps." icon={<ListChecks className="size-4" />} onSelect={onBuildModeChange} />
+            <ModeItem mode="ask" current={buildMode} label="Ask" description="Answer questions without writing a full artifact." icon={<MessageSquare className="size-4" />} onSelect={onBuildModeChange} />
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuLabel className="text-xs text-zinc-400">Builder</DropdownMenuLabel>
+            <ToggleItem label="shadcn UI" icon={<Palette className="size-4" />} checked={shadcnEnabled} onChange={onShadcnChange} />
+            <DropdownMenuSeparator className="bg-white/10" />
+            <ToggleItem label="Web search" icon={<SearchIcon className="size-4" />} checked={webSearchEnabled} onChange={onWebSearchChange} />
+            <ToggleItem label="Deep thinking" icon={<Brain className="size-4" />} checked={deepThinkingEnabled} onChange={onDeepThinkingChange} />
+            <ToggleItem label="Canvas" icon={<ImageIcon className="size-4" />} checked={canvasEnabled} onChange={onCanvasChange} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+          <label className="sr-only" htmlFor="home-model-select">Model</label>
+          <div className="group relative inline-flex max-w-[46vw] md:min-w-[210px]">
+            <select
+              id="home-model-select"
+              value={model}
+              onChange={(event) => onModelChange(event.target.value)}
+              disabled={disabled}
+              className="peer h-10 w-full appearance-none rounded-full border-0 bg-transparent py-0 pl-0 pr-7 text-sm text-zinc-400 outline-none transition-colors placeholder:text-zinc-500 hover:text-zinc-200 focus:text-zinc-100 disabled:opacity-50"
+            >
+              {models.map((m: any) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-zinc-500 transition-colors group-hover:text-zinc-400 peer-focus:text-zinc-300" aria-hidden="true" />
+          </div>
+          <SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-0 bg-transparent text-zinc-500 transition-colors hover:bg-transparent hover:text-zinc-400" aria-label="Dictate prompt" />
+          <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="group inline-flex size-10 items-center justify-center rounded-full border border-white/55 bg-white/90 text-zinc-500 shadow-[0_0_0_1px_rgba(255,255,255,0.14)] transition-all hover:border-white hover:bg-white hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-40" aria-label="Start build">{isLoading ? <span className="text-[10px]">...</span> : <ArrowUp className="size-5 transition-colors group-hover:text-zinc-700" />}</button>
+        </div>
       </div>
     </div></div>
   );
