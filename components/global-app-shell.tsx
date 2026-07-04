@@ -114,7 +114,7 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
           <SidebarLink collapsed={collapsed} href="/" icon={Plus} label="New build" onClick={onNavigate} />
           <SidebarLink collapsed={collapsed} href="/chats" icon={Search} label="Search chats" active={pathname === "/chats"} onClick={onNavigate} />
           <SidebarLink collapsed={collapsed} href="/gallery" icon={Images} label="Library" active={pathname.startsWith("/gallery")} onClick={onNavigate} />
-          <SidebarLink collapsed={collapsed} href="/chats" icon={Folder} label="Projects" active={pathname.startsWith("/chats")} onClick={onNavigate} />
+          <SidebarLink collapsed={collapsed} href="/projects" icon={Folder} label="Projects" active={pathname.startsWith("/projects")} onClick={onNavigate} />
           <SidebarLink collapsed={collapsed} href="/settings" icon={Settings} label="Settings" active={pathname.startsWith("/settings")} onClick={onNavigate} />
           {!collapsed ? (
             <>
@@ -165,9 +165,10 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(true);
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
+  const isCustomWorkspaceRoute = pathname === "/projects";
 
-  if (isAdminRoute) {
-    // For admin routes, render children directly (admin layout provides its own sidebar)
+  if (isAdminRoute || isCustomWorkspaceRoute) {
+    // These routes provide their own app chrome.
     return <>{children}</>;
   }
 

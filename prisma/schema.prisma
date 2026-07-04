@@ -66,6 +66,7 @@ model Project {
   description     String?
   userId          String
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isFavorite      Boolean      @default(false)
   chats           Chat[]
   deployments     Deployment[]
   integrations    Integration[]

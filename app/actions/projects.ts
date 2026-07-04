@@ -9,9 +9,11 @@ import { getPrisma } from '@/lib/prisma'
 const projectSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(600).optional().nullable(),
+  isFavorite: z.boolean().optional(),
 })
 
 function touchProjectPaths(projectId?: string) {
+  revalidatePath('/projects')
   revalidatePath('/chats')
   if (projectId) revalidatePath(`/projects/${projectId}`)
 }
@@ -60,6 +62,7 @@ export async function getProjectOverview() {
     id: project.id,
     name: project.name,
     description: project.description ?? '',
+    isFavorite: project.isFavorite,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     counts: project._count,
@@ -98,6 +101,7 @@ export async function updateProject(projectId: string, input: Partial<z.infer<ty
     data: {
       ...(data.name !== undefined ? { name: data.name } : {}),
       ...(data.description !== undefined ? { description: data.description || null } : {}),
+      ...(data.isFavorite !== undefined ? { isFavorite: data.isFavorite } : {}),
     },
   })
 
