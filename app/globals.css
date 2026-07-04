@@ -115,6 +115,18 @@
   }
 }
 
+@keyframes headlineGradientPan {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -124,7 +136,20 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .headline-gradient-word {
+    animation: none !important;
+  }
+}
+
 @layer components {
+  .headline-gradient-word {
+    @apply inline-block bg-[length:240%_240%] bg-clip-text text-transparent;
+    animation-name: headlineGradientPan;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
   .typography {
     @apply text-foreground;
   }
@@ -717,4 +742,3 @@ a:hover {
 .to-gradient-3-end {
   --tw-gradient-to: #00f0ff;
 }
-
