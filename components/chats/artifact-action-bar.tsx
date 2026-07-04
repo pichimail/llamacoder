@@ -91,6 +91,28 @@ const EASY_INSTALL_INTEGRATIONS = [
   { type: "clerk-auth", label: "Clerk Auth", description: "User auth", requiredKeys: ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] },
 ];
 
+function validationDescription(result: any, fallback: string) {
+  const formatted = typeof result?.validation?.formatted === "string"
+    ? result.validation.formatted.trim()
+    : "";
+  if (formatted) return formatted.slice(0, 900);
+
+  const issues = Array.isArray(result?.validation?.issues)
+    ? result.validation.issues
+    : [];
+  if (issues.length > 0) {
+    return issues
+      .slice(0, 3)
+      .map((issue: any) => {
+        const path = issue?.path ? `${issue.path}: ` : "";
+        return `${path}${issue?.message || "Validation issue"}`;
+      })
+      .join("\n");
+  }
+
+  return result?.reason || fallback;
+}
+
 export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVersionLabel, versions, files, onSwitchVersion, onDownload, onOpenSettings }: ArtifactActionBarProps) {
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
   const [open, setOpen] = useState(false);
@@ -214,7 +236,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     if (result.ok === false) {
       toast({
         title: "Publish blocked",
-        description: result.reason || "Fix validation errors before publishing.",
+        description: validationDescription(result, "Fix validation errors before publishing."),
         variant: "destructive",
       });
       return result;

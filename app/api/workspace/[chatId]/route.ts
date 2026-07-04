@@ -15,6 +15,7 @@ import { encryptEnvValue, decryptEnvValue, maskEnvValue } from "@/lib/env-encryp
 import { logAudit } from "@/lib/audit";
 import { diffWorkspaceFiles, type WorkspaceFileInput } from "@/lib/workspace-files";
 import { buildShareToken } from "@/lib/share-links";
+import { repairMissingLocalComponentFiles } from "@/lib/artifact-auto-repair";
 
 type BuildSpecSummary = {
   templateId: string;
@@ -145,11 +146,26 @@ async function serializeWorkspace(chatId: string) {
 async function syncFiles(chatId: string, files: WorkspaceFileInput[]) {
   const workspace = await ensureWorkspace(chatId);
   if (!workspace) return null;
+  const repairedFiles = repairMissingLocalComponentFiles(
+    files.map((file) => ({
+      path: file.path,
+      content: file.content,
+      language: file.path.split(".").pop() || "tsx",
+    })),
+  ).map((file) => ({
+    path: file.path,
+    content:
+      typeof file.content === "string"
+        ? file.content
+        : "code" in file && typeof file.code === "string"
+          ? file.code
+          : "",
+  }));
   const existingPaths = (await workspace.prisma.projectFile.findMany({
     where: { projectId: workspace.project.id },
     select: { path: true },
   })).map((file) => file.path);
-  const { clean, deletedPaths } = diffWorkspaceFiles(existingPaths, files);
+  const { clean, deletedPaths } = diffWorkspaceFiles(existingPaths, repairedFiles);
   await workspace.prisma.$transaction([
     ...(deletedPaths.length > 0
       ? [
@@ -334,6 +350,18 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
         validation: syncResult.validation,
         workspace: await serializeWorkspace(chatId),
       }, { status: 409 });
+    }
+    if (syncResult?.files?.length) {
+      await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          files: syncResult.files.map((file) => ({
+            path: file.path,
+            code: file.content,
+            language: file.path.split(".").pop() || "tsx",
+          })),
+        },
+      });
     }
     const token = buildShareToken(chatId, messageId);
     await prisma.shareLink.upsert({

@@ -4,6 +4,7 @@ import { createMessage } from "@/app/(main)/actions";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { mergeArtifactFiles } from "@/lib/code-patch";
+import { repairMissingLocalComponentFiles } from "@/lib/artifact-auto-repair";
 import { formatGeneratedCodeIssues, validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
@@ -85,6 +86,28 @@ function isPlanModeConversation(messages: Message[]) {
       message.role === "system" &&
       /PLAN mode|Buildable Scope|Not Possible \/ Needs Input/i.test(message.content || ""),
   );
+}
+
+function validationDescription(result: any, fallback: string) {
+  const formatted = typeof result?.validation?.formatted === "string"
+    ? result.validation.formatted.trim()
+    : "";
+  if (formatted) return formatted.slice(0, 900);
+
+  const issues = Array.isArray(result?.validation?.issues)
+    ? result.validation.issues
+    : [];
+  if (issues.length > 0) {
+    return issues
+      .slice(0, 3)
+      .map((issue: any) => {
+        const path = issue?.path ? `${issue.path}: ` : "";
+        return `${path}${issue?.message || "Validation issue"}`;
+      })
+      .join("\n");
+  }
+
+  return result?.reason || fallback;
 }
 
 
@@ -662,7 +685,9 @@ Fix requirements:
               // + whatever the new response provides. This prevents accidental loss of files across turns.
               const baseFiles = activeMessage ? getMessageFiles(activeMessage) : [];
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
-              const mergedFiles = mergeArtifactFiles(baseFiles, currentFiles);
+              const mergedFiles = repairMissingLocalComponentFiles(
+                mergeArtifactFiles(baseFiles, currentFiles),
+              ) as RawGeneratedFile[];
               if (mergedFiles.length === 0) {
                 if (isPlanConversation) {
                   await createMessage(chat.id, resolvedText, "assistant", []);
@@ -707,7 +732,7 @@ Fix requirements:
                   setBuilderStatus("failed");
                   toast({
                     title: "Generated code needs a fix",
-                    description: "Files were saved instead of erased. Enable self-correcting or send a fix prompt to continue.",
+                    description: formatGeneratedCodeIssues(validationIssues).slice(0, 900),
                     variant: "destructive",
                   });
                   refreshPage();
@@ -870,7 +895,7 @@ Fix requirements:
       if (result.ok === false) {
         toast({
           title: "Publish blocked",
-          description: result.reason || "Fix validation errors before publishing.",
+          description: validationDescription(result, "Fix validation errors before publishing."),
           variant: "destructive",
         });
         return;
