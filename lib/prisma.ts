@@ -5,10 +5,10 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
-function resolveDatabaseUrl() {
+function resolveDatabaseUrl(): string | null {
   const url = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL;
   if (!url || typeof url !== "string") {
-    throw new Error("DATABASE_URL or POSTGRES_PRISMA_URL is required");
+    return null;
   }
   if (!/^postgres(?:ql)?:\/\//.test(url)) {
     throw new Error("DATABASE_URL must be a PostgreSQL connection string");
@@ -24,9 +24,13 @@ function resolveDatabaseUrl() {
   return url;
 }
 
-export function getPrisma() {
+export function getPrisma(): PrismaClient | null {
   if (!globalForPrisma.prisma) {
-    const adapter = new PrismaPg({ connectionString: resolveDatabaseUrl() });
+    const url = resolveDatabaseUrl();
+    if (!url) {
+      return null;
+    }
+    const adapter = new PrismaPg({ connectionString: url });
     globalForPrisma.prisma = new PrismaClient({ adapter });
   }
 

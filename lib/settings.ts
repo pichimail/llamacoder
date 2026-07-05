@@ -23,6 +23,9 @@ const DEFAULTS: Record<string, string> = {
 
 export async function getSettings(): Promise<Record<string, string>> {
   const prisma = getPrisma();
+  if (!prisma) {
+    return { ...DEFAULTS };
+  }
   try {
     const rows = await prisma.setting.findMany();
     const map: Record<string, string> = { ...DEFAULTS };
@@ -35,6 +38,9 @@ export async function getSettings(): Promise<Record<string, string>> {
 
 export async function setSetting(key: string, value: string) {
   const prisma = getPrisma();
+  if (!prisma) {
+    return null;
+  }
   return prisma.setting.upsert({
     where: { key },
     create: { key, value },
