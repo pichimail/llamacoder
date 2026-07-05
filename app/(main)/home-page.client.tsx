@@ -859,7 +859,7 @@ export default function HomePageClient() {
               <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
                 <motion.div {...heroWordAnimation} transition={{ duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}>
                   <Badge variant="outline" className="mb-6 rounded-full border-white/15 bg-white/[0.05] px-4 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur-sm">
-                    <Sparkles className="mr-1.5 size-3.5 text-indigo-300" /> Now with 5 premium output styles & Three.js
+                    Now with 5 premium output styles & Three.js
                   </Badge>
                 </motion.div>
                 <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-foreground sm:text-[44px] md:text-[80px] lg:text-[92px]">
