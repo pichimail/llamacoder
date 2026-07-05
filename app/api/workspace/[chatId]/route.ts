@@ -13,6 +13,7 @@ import {
 } from "@/lib/authz";
 import { encryptEnvValue, decryptEnvValue, maskEnvValue } from "@/lib/env-encryption";
 import { logAudit } from "@/lib/audit";
+import { assertFeatureAllowed, PlanLimitError, planErrorResponseBody } from "@/lib/plan";
 import { diffWorkspaceFiles, type WorkspaceFileInput } from "@/lib/workspace-files";
 import { buildShareToken } from "@/lib/share-links";
 import { repairMissingLocalComponentFiles } from "@/lib/artifact-auto-repair";
@@ -36,7 +37,7 @@ type ValidationSummary = {
 
 function accessLevelForAction(action: string): AccessLevel {
   if (action === "validate") return "viewer";
-  if (action === "save-env" || action === "connect-github" || action === "create-pr") return "owner";
+  if (action === "save-env" || action === "connect-github" || action === "create-pr" || action === "save-domain") return "owner";
   return "editor";
 }
 
@@ -112,12 +113,14 @@ async function serializeWorkspace(chatId: string) {
   const workspace = await ensureWorkspace(chatId);
   if (!workspace) return null;
   const { prisma, project } = workspace;
-  const [integrations, envVars, deployments, shareLinks, projectFiles] = await Promise.all([
+  const [integrations, envVars, deployments, shareLinks, projectFiles, domains, checkpoints] = await Promise.all([
     prisma.integration.findMany({ where: { projectId: project.id }, orderBy: { updatedAt: "desc" } }),
     prisma.environmentVariable.findMany({ where: { projectId: project.id }, orderBy: { key: "asc" } }),
     prisma.deployment.findMany({ where: { projectId: project.id }, orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.shareLink.findMany({ where: { projectId: project.id }, orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.projectFile.findMany({ where: { projectId: project.id }, orderBy: { path: "asc" } }),
+    prisma.domain.findMany({ where: { projectId: project.id }, orderBy: { createdAt: "desc" } }),
+    prisma.designCheckpoint.findMany({ where: { chatId }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true, name: true, createdAt: true } }),
   ]);
   const validation = await summarizeValidation(
     projectFiles.map((file) => ({ path: file.path, content: file.content })),
@@ -136,6 +139,8 @@ async function serializeWorkspace(chatId: string) {
       createdAt: deployment.createdAt.toISOString(),
     })),
     shareLinks: shareLinks.map((link) => ({ id: link.id, token: link.token, isPublic: link.isPublic })),
+    domains: domains.map((d) => ({ id: d.id, domain: d.domain, verified: d.verified, createdAt: d.createdAt.toISOString() })),
+    checkpoints: checkpoints.map((c) => ({ id: c.id, name: c.name, createdAt: c.createdAt.toISOString() })),
     fileCount: projectFiles.length,
     hasGithub: integrations.some((integration) => integration.type === "github"),
     buildSpec,
@@ -238,6 +243,37 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       create: { projectId: project.id, key, value: encrypted },
     });
     await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } });
+    return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
+  }
+
+  if (action === "save-domain") {
+    try {
+      await assertFeatureAllowed(accessUser.id, "customDomains");
+    } catch (error) {
+      if (error instanceof PlanLimitError) {
+        return NextResponse.json(planErrorResponseBody(error), { status: error.status });
+      }
+      throw error;
+    }
+    const domain = String(body.domain || "").trim().toLowerCase();
+    const domainPattern = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+$/;
+    if (!domain || !domainPattern.test(domain)) {
+      return NextResponse.json({ error: "Enter a valid domain, e.g. app.example.com" }, { status: 400 });
+    }
+    const record = await prisma.domain.upsert({
+      where: { projectId_domain: { projectId: project.id, domain } },
+      update: {},
+      create: { projectId: project.id, domain },
+    });
+    await logAudit({ userId: accessUser.id, action: "save-domain", resource: "project", resourceId: project.id, metadata: { domain } });
+    return NextResponse.json({ ok: true, domain: record, workspace: await serializeWorkspace(chatId) });
+  }
+
+  if (action === "remove-domain") {
+    const domainId = String(body.domainId || "");
+    if (!domainId) return NextResponse.json({ error: "domainId is required" }, { status: 400 });
+    await prisma.domain.deleteMany({ where: { id: domainId, projectId: project.id } });
+    await logAudit({ userId: accessUser.id, action: "remove-domain", resource: "project", resourceId: project.id, metadata: { domainId } });
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 

@@ -6,6 +6,7 @@ const schema = z.object({
   shadcn: z.boolean().optional(),
   model: z.string().min(1).optional(),
   quality: z.enum(["low", "high"]).optional(),
+  backendMode: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -32,8 +33,9 @@ export async function PATCH(
       ...(parsed.data.shadcn !== undefined ? { shadcn: parsed.data.shadcn } : {}),
       ...(parsed.data.model !== undefined ? { model: parsed.data.model } : {}),
       ...(parsed.data.quality !== undefined ? { quality: parsed.data.quality } : {}),
+      ...(parsed.data.backendMode !== undefined ? { backendMode: parsed.data.backendMode } : {}),
     },
-    select: { id: true, shadcn: true, model: true, quality: true },
+    select: { id: true, shadcn: true, model: true, quality: true, backendMode: true },
   });
 
   return NextResponse.json(updated);

@@ -42,7 +42,7 @@ export default function ChatBox({
   chat: Chat;
   onNewStreamPromise: (
     v: Promise<ReadableStream>,
-    options?: { reasoning: boolean },
+    options?: { reasoning: boolean; messageId?: string; model?: string },
   ) => void;
   onAbortController?: (c: AbortController | null) => void;
   isStreaming: boolean;
@@ -119,13 +119,13 @@ export default function ChatBox({
         icon: <Shield className="size-3.5" aria-hidden="true" />,
       },
       {
-        label: "Add OpenAI assistant",
-        value: "Integrate an OpenAI assistant feature with an optional OPENAI_API_KEY environment variable placeholder, local preview fallback, and required UI states.",
+        label: "Add ChinnaLLM assistant",
+        value: "Integrate a ChinnaLLM assistant feature with platform credits or BYOK, local preview fallback, and required UI states.",
         icon: <Brain className="size-3.5" aria-hidden="true" />,
       },
       {
-        label: "Add Gemini analysis",
-        value: "Integrate a Gemini analysis panel with an optional GEMINI_API_KEY environment variable placeholder, local preview fallback, and required UI states.",
+        label: "Add AI analysis",
+        value: "Integrate a ChinnaLLM analysis panel with platform credits or BYOK, local preview fallback, and required UI states.",
         icon: <Brain className="size-3.5" aria-hidden="true" />,
       },
     ],
@@ -319,7 +319,7 @@ export default function ChatBox({
           throw err;
         });
 
-      onNewStreamPromise(streamPromise, { reasoning: false });
+      onNewStreamPromise(streamPromise, { reasoning: false, messageId: message.id, model });
       startTransition(() => {
         setPrompt("");
         setScreenshotUrl(undefined);

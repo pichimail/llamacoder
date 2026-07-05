@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Monitor, RefreshCw, Smartphone, Tablet, Zoom
 
 import type { ArtifactFile } from '@/lib/artifact-analysis'
 import type { SandpackBuildOptions } from '@/lib/sandpack-config'
+import type { InspectorTreeNode } from '@/lib/design-inspector'
 import { DesignInspectorBridge } from './design-inspector-bridge'
 import { ModeDesign } from './mode-design'
 import type { PreviewMode } from '@/components/code-runner-react'
@@ -21,6 +22,7 @@ type SavedDesignMessage = Parameters<NonNullable<ComponentProps<typeof ModeDesig
 
 interface DesignWorkspaceProps {
   chatId: string
+  chatModel?: string
   files: ArtifactFile[]
   isStreaming: boolean
   onRequestFix: (error: string) => void
@@ -35,6 +37,7 @@ interface DesignWorkspaceProps {
 
 export function DesignWorkspace({
   chatId,
+  chatModel,
   files,
   isStreaming,
   onRequestFix,
@@ -53,9 +56,11 @@ export function DesignWorkspace({
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const [zoom, setZoom] = useState(1)
   const [selectedElementId, setSelectedElementId] = useState('')
-  const [, setHoverElementId] = useState<string | null>(null)
   const [, setInspectorSelection] = useState<InspectorSelection | null>(null)
   const [checkpoints, setCheckpoints] = useState<any[]>([])
+  const [tree, setTree] = useState<InspectorTreeNode[]>([])
+  const [leftView, setLeftView] = useState<'layers' | 'history'>('layers')
+  const [hoverElementId, setHoverElementId] = useState<string | null>(null)
   const previewContainerRef = useRef<HTMLDivElement | null>(null)
   const filesKey = files.map((f) => `${f.path}:${f.code.length}`).join('|')
 
@@ -150,6 +155,7 @@ export function DesignWorkspace({
             selectedElementId={selectedElementId}
             onSelectElement={handleInspectorSelect}
             onHoverElement={setHoverElementId}
+            onTreeUpdate={setTree}
             containerRef={previewContainerRef as any}
           />
           {liveFiles.length > 0 ? (
@@ -179,30 +185,66 @@ export function DesignWorkspace({
   )
 
   const leftRail = (
-    <div className={cn("flex h-full shrink-0 flex-col border-r border-border/60 bg-background/95", leftOpen ? "w-52" : "w-10")}>
-      <div className="flex h-9 items-center border-b px-2 text-xs">
-        <button onClick={() => setLeftOpen(!leftOpen)} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+    <div className={cn("flex h-full shrink-0 flex-col border-r border-border/60 bg-background/95", leftOpen ? "w-56" : "w-10")}>
+      <div className="flex h-9 items-center justify-between border-b px-2 text-xs">
+        <Button variant="ghost" size="sm" className="h-6 gap-1 px-1 text-muted-foreground hover:text-foreground" onClick={() => setLeftOpen(!leftOpen)}>
           {leftOpen ? <ChevronLeft className="size-3" /> : <ChevronRight className="size-3" />}
-          <span className="text-[10px] uppercase tracking-widest">History</span>
-        </button>
+        </Button>
+        {leftOpen && (
+          <div className="flex items-center gap-0.5 rounded bg-muted/40 p-0.5">
+            <Button variant={leftView === 'layers' ? 'secondary' : 'ghost'} size="sm" className="h-6 px-2 text-[10px]" onClick={() => setLeftView('layers')}>Layers</Button>
+            <Button variant={leftView === 'history' ? 'secondary' : 'ghost'} size="sm" className="h-6 px-2 text-[10px]" onClick={() => setLeftView('history')}>History</Button>
+          </div>
+        )}
       </div>
-      {leftOpen && (
+      {leftOpen && leftView === 'layers' && (
+        <div className="flex-1 overflow-auto p-1.5 text-xs">
+          {tree.length === 0 && (
+            <div className="p-2 text-muted-foreground">
+              {liveFiles.length === 0 ? 'Generate an app to see its layer tree.' : 'Loading layers…'}
+            </div>
+          )}
+          {tree.map((node) => (
+            <button
+              key={node.id}
+              data-layer-id={node.id}
+              onClick={() => setSelectedElementId(node.id)}
+              onMouseEnter={() => setHoverElementId(node.id)}
+              onMouseLeave={() => setHoverElementId((current) => (current === node.id ? null : current))}
+              className={cn(
+                "flex w-full items-center gap-1.5 truncate rounded px-1.5 py-1 text-left font-mono text-[11px] transition-colors",
+                selectedElementId === node.id
+                  ? "bg-primary/15 text-primary"
+                  : hoverElementId === node.id
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              )}
+              style={{ paddingLeft: `${6 + node.depth * 12}px` }}
+              title={node.text || node.className}
+            >
+              <span className="shrink-0 opacity-60">{node.tag}</span>
+              {node.text && <span className="truncate opacity-50">{node.text}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {leftOpen && leftView === 'history' && (
         <div className="flex-1 overflow-auto p-2 text-xs">
           <div className="mb-2 font-mono text-[10px] text-muted-foreground">CHECKPOINTS</div>
           {checkpoints.length === 0 && <div className="text-muted-foreground">No checkpoints yet. Use Save in inspector.</div>}
           {checkpoints.map((cp) => (
-            <button key={cp.id} className="mb-1 block w-full truncate rounded border border-border/50 px-2 py-1 text-left hover:bg-accent" onClick={async () => {
+            <Button key={cp.id} variant="outline" size="sm" className="mb-1 h-auto w-full justify-start truncate px-2 py-1 text-left text-xs font-normal" onClick={async () => {
               await fetch(`/api/design/${chatId}/restore`, { method: 'POST', body: JSON.stringify({ checkpointId: cp.id }) })
               window.location.reload()
             }}>
               {cp.name} · {new Date(cp.createdAt).toLocaleTimeString()}
-            </button>
+            </Button>
           ))}
-          <button className="mt-2 w-full rounded border px-2 py-1 text-left hover:bg-accent" onClick={async () => {
+          <Button variant="outline" size="sm" className="mt-2 h-auto w-full justify-start px-2 py-1 text-left text-xs font-normal" onClick={async () => {
             const res = await fetch(`/api/design/${chatId}/checkpoint`, { method: 'POST', body: JSON.stringify({ name: 'manual' }) })
             const j = await res.json()
             setCheckpoints([j, ...checkpoints])
-          }}>Create checkpoint</button>
+          }}>Create checkpoint</Button>
         </div>
       )}
     </div>
@@ -212,7 +254,9 @@ export function DesignWorkspace({
     <aside className={cn("flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-border/60 bg-background/95", !rightOpen && "hidden xl:block")}>
       <ModeDesign
         chatId={chatId}
+        chatModel={chatModel}
         files={files}
+        tree={tree}
         onDirtyChange={onDirtyChange}
         onPreviewFiles={handlePreviewFiles}
         onSaved={handleSaved}

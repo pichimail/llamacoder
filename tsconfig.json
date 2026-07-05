@@ -39,6 +39,9 @@
   "exclude": [
     "node_modules",
     "playwright.config.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "hooks/limeplay",
+    "components/limeplay",
+    "components/video-player"
   ]
 }

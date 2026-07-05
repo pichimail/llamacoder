@@ -4,11 +4,16 @@ import {
   DESIGN_INSPECTOR_RUNTIME_PATH,
   DESIGN_INSPECTOR_RUNTIME_SOURCE,
 } from "@/lib/design-inspector-runtime";
-import { SANDBOX_GLOBALS_CSS, type SandboxTheme } from "@/lib/sandbox-theme";
+import {
+  getThemeCSS,
+  type SandboxTheme,
+} from "@/lib/sandbox-theme";
 
 export type SandpackBuildOptions = {
   includeShadcn?: boolean;
   theme?: SandboxTheme;
+  /** Style preset id ("modern-saas" | "editorial-dark" | "warm-neutral" | "vibrant-accent" | "glassmorphism"). Defaults to "modern-saas". */
+  styleId?: string;
   designInspector?: boolean;
 };
 
@@ -89,7 +94,44 @@ function stripCssAtRuleBlock(css: string, atRule: string) {
   return output;
 }
 
+/** Extracts custom-property declarations (--x: value;) from the body of a
+ * `:root { ... }` or `.dark { ... }` block found inside `source`. Returns
+ * declarations joined by newlines, or "" when none exist. Brace-aware so
+ * nested blocks inside @theme don't confuse the extraction. */
+function extractCustomPropertyBlock(source: string, selector: string): string {
+  const selectorPattern = new RegExp(
+    `${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{`,
+    "g",
+  );
+  const declarations: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = selectorPattern.exec(source)) !== null) {
+    let depth = 1;
+    let i = match.index + match[0].length;
+    let body = "";
+    while (i < source.length && depth > 0) {
+      const ch = source[i];
+      if (ch === "{") depth += 1;
+      else if (ch === "}") depth -= 1;
+      if (depth > 0) body += ch;
+      i += 1;
+    }
+    const propMatches = body.match(/--[A-Za-z0-9-]+\s*:\s*[^;{}]+;/g);
+    if (propMatches) declarations.push(...propMatches.map((d) => `  ${d.trim()}`));
+  }
+  return declarations.join("\n");
+}
+
 function sanitizePreviewCssContent(content: string) {
+  /* Phase 1 (B2): instead of discarding model-authored theme tokens, extract
+   * :root/.dark custom-property overrides (including those living inside
+   * @theme blocks) and re-emit them AFTER the injected preset CSS so the
+   * model can override specific tokens. Only directives that crash
+   * Sandpack's PostCSS (@import, @tailwind, @config, @plugin, @source,
+   * @custom-variant, @apply, @theme wrapper itself) are stripped. */
+  const rootOverrides = extractCustomPropertyBlock(content, ":root");
+  const darkOverrides = extractCustomPropertyBlock(content, ".dark");
+
   let css = content
     .replace(/^@import\s+["'][^"']*tailwindcss[^"']*["'];?\s*$/gm, "")
     .replace(/^@import\s+["'][^"']+["'];?\s*$/gm, "")
@@ -100,7 +142,19 @@ function sanitizePreviewCssContent(content: string) {
 
   css = stripCssAtRuleBlock(css, "@theme");
 
-  return css.trim();
+  const mergedOverrides = [
+    rootOverrides ? `:root {\n${rootOverrides}\n}` : "",
+    darkOverrides ? `.dark {\n${darkOverrides}\n}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  /* Emit overrides last so they win the cascade over injected preset tokens.
+   * If the sanitized CSS already contains identical :root/.dark blocks the
+   * duplication is harmless (last declaration wins). Canvas-related rules
+   * (position/width/height on canvas) pass through untouched — nothing here
+   * strips property declarations, only Tailwind build directives. */
+  return [css.trim(), mergedOverrides].filter(Boolean).join("\n\n").trim();
 }
 
 function isGeneratedConfigFile(path: string, content: string) {
@@ -217,6 +271,7 @@ export function getSandpackConfig(
 ) {
   const includeShadcn = options.includeShadcn !== false;
   const theme = options.theme ?? "light";
+  const themeGlobalsCss = getThemeCSS(options.styleId);
   const designInspector = options.designInspector === true;
 
   const files: Array<{ path: string; content: string }> = (inputFiles || [])
@@ -237,7 +292,7 @@ export function getSandpackConfig(
   const previewUserFiles: Array<{ path: string; content: string }> = [];
 
   if (!sandpackFiles["/app/globals.css"]) {
-    sandpackFiles["/app/globals.css"] = SANDBOX_GLOBALS_CSS;
+    sandpackFiles["/app/globals.css"] = themeGlobalsCss;
   }
   sandpackFiles["/lib/twind.ts"] = twindSetupFile;
 
@@ -278,7 +333,7 @@ export function getSandpackConfig(
     const sandpackPath = toSandpackPath(normalizedPath);
     sandpackFiles[sandpackPath] =
       normalizedPath === "app/globals.css"
-        ? `${SANDBOX_GLOBALS_CSS}\n${previewContent}`.trim()
+        ? `${themeGlobalsCss}\n${previewContent}`.trim()
         : previewContent;
     previewUserFiles.push({ path: normalizedPath, content: previewContent });
   }

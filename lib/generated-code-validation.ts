@@ -1,4 +1,9 @@
 import type * as TypeScript from "typescript";
+import {
+  DEFAULT_STYLE_ID,
+  getPresetSurfaceTones,
+  type PresetSurfaceTones,
+} from "@/lib/sandbox-theme";
 
 export type GeneratedCodeIssue = {
   path: string;
@@ -196,6 +201,63 @@ function detectUnresolvedLocalImports(
   return unresolved;
 }
 
+/**
+ * Structural fallback for detecting a file that was cut off mid-generation
+ * (e.g. the provider hit its token limit) even when the streaming layer's
+ * finish_reason signal is missing or unreliable for a given provider. This is
+ * intentionally conservative — cheap bracket/string/tag balance checks, not a
+ * full parser — because it only needs to catch the cases the TypeScript
+ * compiler's error recovery might silently paper over.
+ */
+function detectTruncatedFile(code: string): string | null {
+  const trimmed = code.trimEnd();
+  if (!trimmed) return null;
+
+  // An unterminated fenced code block inside the file content itself (rare,
+  // but happens when a file legitimately contains markdown/code-fence text).
+  const fenceMatches = trimmed.match(/```/g);
+  if (fenceMatches && fenceMatches.length % 2 !== 0) {
+    return "File ends with an unterminated code fence — the response was likely cut off before completion";
+  }
+
+  // Bracket/paren/brace balance. Ignore braces/parens inside string or
+  // template literals as best-effort by stripping simple string contents first.
+  const withoutStrings = trimmed
+    .replace(/`(?:[^`\\]|\\.)*`/g, "``")
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+
+  const pairs: Array<[string, string]> = [
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"],
+  ];
+  for (const [open, close] of pairs) {
+    const openCount = (withoutStrings.match(new RegExp(`\\${open}`, "g")) || []).length;
+    const closeCount = (withoutStrings.match(new RegExp(`\\${close}`, "g")) || []).length;
+    if (openCount !== closeCount) {
+      return `Unbalanced '${open}${close}' pair (${openCount} open vs ${closeCount} close) — the file appears to be cut off mid-statement`;
+    }
+  }
+
+  // Unterminated string/template literal: an odd number of un-escaped quote
+  // characters on the very last non-empty line is a strong truncation signal.
+  const lastLine = trimmed.split("\n").filter(Boolean).pop() ?? "";
+  for (const quote of ['"', "'", "`"]) {
+    const count = (lastLine.match(new RegExp(`(?<!\\\\)${quote}`, "g")) || []).length;
+    if (count % 2 !== 0) {
+      return "The last line ends with an unterminated string or template literal — the file appears to be cut off mid-statement";
+    }
+  }
+
+  // A JSX/TSX file whose last non-empty line opens a tag that never closes.
+  if (/<[A-Za-z][\w.]*(?:\s[^>]*)?$/.test(lastLine) && !lastLine.trim().endsWith(">")) {
+    return "The file ends mid-way through an open JSX tag — the response was likely cut off before completion";
+  }
+
+  return null;
+}
+
 function detectPlaceholderCode(code: string): string | null {
   const compact = code.trim().replace(/\s+/g, " ");
   if (!compact) return null;
@@ -216,9 +278,198 @@ function detectPlaceholderCode(code: string): string | null {
   return null;
 }
 
+/* ============================================================
+ * PHASE 1 AUDIT — POST-GENERATION VISUAL VALIDATOR.
+ * Extends (does not replace) the code validator with theme-token checks:
+ *   1. Hardcoded hex + text/bg-black/white outside theme-preset files.
+ *   2. Arbitrary multi-layer shadow stacks (3+ chained / colored-glow).
+ *   3. Low-contrast pairs (dark text + dark bg, or light + light) on one
+ *      element, cross-referenced against the ACTIVE preset's real token tones.
+ *   4. Explicit literal light/dark color with no dark: variant (fails in one
+ *      of the preset's two modes).
+ * Unambiguous violations are auto-rewritten to semantic tokens
+ * (rewriteUnambiguousVisualTokens); the rest surface as issues that feed the
+ * existing autofix pipeline.
+ * ============================================================ */
+
+/** A file that legitimately holds raw colors — theme presets, globals, tailwind
+ * config. Visual-token checks are skipped for these. */
+function isThemePresetFile(path: string): boolean {
+  const p = normalizeArtifactPath(path).toLowerCase();
+  return (
+    /(^|\/)globals?\.css$/.test(p) ||
+    /(^|\/)(theme|themes|tokens|design-tokens|colors?)\.[jt]sx?$/.test(p) ||
+    /sandbox-theme\.[jt]s$/.test(p) ||
+    /tailwind\.config\.[jt]s$/.test(p) ||
+    /(^|\/)theme-preset/.test(p)
+  );
+}
+
+/** Unambiguous class-token rewrites: literal → semantic token. Applied whole-token. */
+const UNAMBIGUOUS_CLASS_REWRITES: Array<[RegExp, string]> = [
+  [/\bbg-white\b/g, "bg-background"],
+  [/\btext-black\b/g, "text-foreground"],
+  [/\bborder-white\b/g, "border-border"],
+  [/\bborder-black\b/g, "border-border"],
+];
+
+/**
+ * Auto-rewrite the unambiguous visual-token violations in a set of files.
+ * Returns the (possibly) rewritten files plus a human-readable list of what was
+ * changed. Theme-preset files are left untouched. This is intentionally
+ * conservative — only mappings with a single correct target are applied; every
+ * ambiguous case is left for the validator/autofix pipeline instead.
+ */
+export function rewriteUnambiguousVisualTokens<
+  T extends { path: string; code?: string; content?: string },
+>(files: T[]): { files: T[]; rewrites: string[] } {
+  const rewrites: string[] = [];
+  const out = files.map((file) => {
+    if (!isValidatablePath(file.path) || isThemePresetFile(file.path)) return file;
+    const original = file.code ?? file.content ?? "";
+    if (!original) return file;
+    let updated = original;
+    for (const [re, replacement] of UNAMBIGUOUS_CLASS_REWRITES) {
+      const before = updated;
+      updated = updated.replace(re, replacement);
+      if (updated !== before) {
+        const count = (before.match(re) || []).length;
+        rewrites.push(`${file.path}: ${re.source.replace(/\\b/g, "")} → ${replacement} (${count})`);
+      }
+    }
+    if (updated === original) return file;
+    return typeof file.code === "string"
+      ? ({ ...file, code: updated } as T)
+      : ({ ...file, content: updated } as T);
+  });
+  return { files: out, rewrites };
+}
+
+function posToLineCol(source: string, index: number): { line: number; column: number } {
+  const upto = source.slice(0, index);
+  const line = (upto.match(/\n/g) || []).length + 1;
+  const column = index - upto.lastIndexOf("\n");
+  return { line, column };
+}
+
+/** All className / class attribute string values with their start offsets. */
+function extractClassAttributeChunks(code: string): Array<{ value: string; index: number }> {
+  const chunks: Array<{ value: string; index: number }> = [];
+  // className="..." | class="..." | className={"..."} | className={`...`}
+  const re = /\b(?:className|class)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)\s*\})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const value = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5] ?? "";
+    chunks.push({ value, index: m.index });
+  }
+  return chunks;
+}
+
+const LIGHT_SCALE = new Set(["50", "100", "200"]);
+const DARK_SCALE = new Set(["700", "800", "900", "950"]);
+const NEUTRAL_FAMILIES = "(?:gray|slate|zinc|neutral|stone)";
+
+/** Classify a single class token's tone as light/dark/mid for contrast checks. */
+function classTone(token: string): "light" | "dark" | "mid" | null {
+  if (/^(?:bg|text|border)-white$/.test(token)) return "light";
+  if (/^(?:bg|text|border)-black$/.test(token)) return "dark";
+  const scaleMatch = token.match(new RegExp(`^(?:bg|text|border)-${NEUTRAL_FAMILIES}-(\\d{2,3})$`));
+  if (scaleMatch) {
+    const step = scaleMatch[1];
+    if (LIGHT_SCALE.has(step)) return "light";
+    if (DARK_SCALE.has(step)) return "dark";
+    return "mid";
+  }
+  return null;
+}
+
+function tokensOfKind(tokens: string[], kind: "bg" | "text"): string[] {
+  return tokens.filter((t) => t.startsWith(`${kind}-`));
+}
+
+/** Detects visual-token violations. `tones` is the active preset's real token
+ * lightness values, so the dark-on-dark / light-on-light reasoning is grounded
+ * in the actual theme, not a guess. */
+function detectVisualTokenIssues(
+  path: string,
+  code: string,
+  tones: PresetSurfaceTones,
+): GeneratedCodeIssue[] {
+  const issues: GeneratedCodeIssue[] = [];
+  if (!isValidatablePath(path) || isThemePresetFile(path)) return issues;
+
+  const push = (index: number, message: string, excerptSource: string) => {
+    const { line, column } = posToLineCol(code, index);
+    issues.push({ path, line, column, message, excerpt: excerptSource.trim().slice(0, 200) });
+  };
+
+  // 1a. Hardcoded hex colors used as Tailwind arbitrary color values.
+  const hexArbitraryRe = /\b(?:bg|text|border|from|via|to|ring|fill|stroke|decoration|outline|shadow)-\[#[0-9a-fA-F]{3,8}\]/g;
+  let hm: RegExpExecArray | null;
+  while ((hm = hexArbitraryRe.exec(code))) {
+    push(hm.index, `Hardcoded hex color in a utility class ("${hm[0]}"). Use a semantic token (bg-background, text-foreground, bg-primary, border-border, ...).`, hm[0]);
+  }
+
+  const chunks = extractClassAttributeChunks(code);
+  for (const chunk of chunks) {
+    const tokens = chunk.value.split(/\s+/).filter(Boolean);
+    const hasDarkVariant = tokens.some((t) => t.startsWith("dark:"));
+    const bare = tokens.filter((t) => !t.includes(":")); // ignore variant-prefixed for base analysis
+
+    // 1b. text/bg-black|white literals (outside theme-preset files).
+    for (const t of bare) {
+      if (/^(?:text|bg)-(?:black|white)$/.test(t)) {
+        const idx = code.indexOf(t, chunk.index);
+        push(idx === -1 ? chunk.index : idx, `Literal "${t}" bypasses the theme. Use a semantic token (${t.startsWith("bg-") ? "bg-background / bg-card / bg-primary" : "text-foreground / text-muted-foreground / text-primary-foreground"}).`, chunk.value);
+      }
+    }
+
+    // 2. Multi-layer shadow stacks: 3+ chained shadow-* utilities, or a colored
+    //    0_0_ glow, or an arbitrary multi-layer box-shadow.
+    const shadowTokens = bare.filter((t) => /^shadow(?:-|$)/.test(t) && t !== "shadow-none");
+    if (shadowTokens.length >= 3) {
+      push(chunk.index, `Multi-layer shadow stack (${shadowTokens.length} chained shadow utilities). Use a single shadow-sm / shadow / shadow-md from the scale.`, chunk.value);
+    }
+    for (const t of bare) {
+      if (/^shadow-\[.*(?:0_0_|,).*\]$/.test(t)) {
+        const idx = code.indexOf(t, chunk.index);
+        push(idx === -1 ? chunk.index : idx, `Arbitrary colored-glow / multi-layer shadow ("${t}"). Use a single scale shadow token instead.`, chunk.value);
+      }
+    }
+
+    // 3. Low-contrast pair on one element: bg + text literals on the same tone side.
+    const bgTones = tokensOfKind(bare, "bg").map(classTone).filter(Boolean) as Array<"light" | "dark" | "mid">;
+    const textTones = tokensOfKind(bare, "text").map(classTone).filter(Boolean) as Array<"light" | "dark" | "mid">;
+    const bgTone = bgTones.find((x) => x === "light" || x === "dark");
+    const textTone = textTones.find((x) => x === "light" || x === "dark");
+    if (bgTone && textTone && bgTone === textTone) {
+      push(chunk.index, `Low-contrast pair: ${textTone} text on a ${bgTone} background on the same element. This fails WCAG contrast. Use foreground/background token pairs (e.g. bg-card + text-card-foreground).`, chunk.value);
+    }
+
+    // 4. Explicit literal color with NO dark: variant → fails in one of the
+    //    preset's two runtime modes. Cross-referenced against real token tones.
+    if (!hasDarkVariant) {
+      const litText = tokensOfKind(bare, "text").find((t) => classTone(t) === "light" || classTone(t) === "dark");
+      const litBgAlso = tokensOfKind(bare, "bg").some((t) => classTone(t) !== null);
+      if (litText && !litBgAlso) {
+        const tone = classTone(litText);
+        if (tone === "light") {
+          push(chunk.index, `"${litText}" has no background and no dark: variant. Against this preset's light surface (background lightness ${tones.light.background}%) it renders light-on-light. Use text-foreground or add a dark: variant.`, chunk.value);
+        } else if (tone === "dark") {
+          push(chunk.index, `"${litText}" has no background and no dark: variant. Against this preset's dark surface (background lightness ${tones.dark.background}%) it renders dark-on-dark. Use text-foreground or add a dark: variant.`, chunk.value);
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 export async function validateGeneratedCodeFiles(
   files: Array<{ path: string; code?: string; content?: string }>,
+  styleId: string = DEFAULT_STYLE_ID,
 ): Promise<GeneratedCodeIssue[]> {
+  const presetTones = getPresetSurfaceTones(styleId);
   const issues: GeneratedCodeIssue[] = [];
   let tsModule: typeof TypeScript | null = null;
   const availablePaths = new Set(
@@ -242,6 +493,21 @@ export async function validateGeneratedCodeFiles(
       continue;
     }
 
+    // Fallback safety net: catches truncation even if the streaming layer's
+    // finish_reason signal was missing or the provider misreported it.
+    const truncationIssue = detectTruncatedFile(code);
+    if (truncationIssue) {
+      const lines = code.split("\n");
+      issues.push({
+        path: file.path,
+        line: lines.length,
+        column: 1,
+        message: `[TRUNCATED_RESPONSE] ${truncationIssue}`,
+        excerpt: getExcerpt(code, lines.length - 1),
+      });
+      continue;
+    }
+
     const bad = detectBadImports(code);
     for (const b of bad) {
       issues.push({ path: file.path, line: 1, column: 1, message: `Unapproved external dependency: ${b}`, excerpt: b });
@@ -256,6 +522,14 @@ export async function validateGeneratedCodeFiles(
         message: `Unresolved local import: ${spec}. Generate the imported file or remove the import before preview.`,
         excerpt: spec,
       });
+    }
+
+    // Phase 1 audit: post-generation visual-token validation. Grounded in the
+    // active preset's real token tones. Unambiguous fixes are applied upstream
+    // by rewriteUnambiguousVisualTokens; whatever remains surfaces here and
+    // feeds the existing autofix pipeline.
+    for (const visualIssue of detectVisualTokenIssues(file.path, code, presetTones)) {
+      issues.push(visualIssue);
     }
 
     tsModule ??= await import("typescript");

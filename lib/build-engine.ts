@@ -23,6 +23,8 @@ export type BuildSpec = {
   routes: string[];
   previewRoute: string;
   artifactFiles: ArtifactFile[];
+  backendMode: boolean;
+  backendPlan?: { provider: "neon"; optionalSupabase: boolean; resources: string[]; envVars: string[] };
   systemContext: string;
 };
 
@@ -30,6 +32,7 @@ type BuildInput = {
   prompt: string;
   mode: BuildMode;
   shadcn: boolean;
+  backendMode?: boolean;
 };
 
 function slugify(input: string) {
@@ -93,9 +96,9 @@ function isExplicitAiBuilder(prompt: string) {
   return /\b(ai builder|vibe coding|prompt to app|prompt-to-app|code generator|assistant workspace|chat builder)\b/.test(text);
 }
 
-function isExplicitFullStack(prompt: string) {
+function isExplicitFullStack(prompt: string, backendMode = false) {
   const text = prompt.toLowerCase();
-  return /\b(full stack|full-stack|backend|api route|database|prisma|supabase|neon|server action|server actions)\b/.test(text);
+  return backendMode || /\b(full stack|full-stack|backend|api route|database|prisma|supabase|neon|server action|server actions|crud|cms|crm|inventory|booking|orders|database)\b/.test(text);
 }
 
 function selectTemplate(input: BuildInput): BuildTemplateId {
@@ -119,6 +122,12 @@ function dependenciesFor(input: BuildInput, templateId: BuildTemplateId) {
   if (/\b(chart|charts|graph|analytics|metrics|dashboard)\b/.test(text)) deps.add("local chart-ready data helpers");
   if (/\b(upload|file|image|attachment)\b/.test(text)) deps.add("file input handling");
   if (/\b(export|download|pdf|csv|zip)\b/.test(text)) deps.add("export helpers");
+  if (isExplicitFullStack(input.prompt, input.backendMode)) {
+    deps.add("@prisma/client");
+    deps.add("prisma");
+    deps.add("@neondatabase/serverless");
+    deps.add("optional @supabase/supabase-js");
+  }
 
   return Array.from(deps);
 }
@@ -127,13 +136,18 @@ function envHintsFor(input: BuildInput) {
   const hints = new Set<string>();
   const text = input.prompt.toLowerCase();
 
-  if (isExplicitFullStack(input.prompt)) hints.add("DATABASE_URL");
+  if (isExplicitFullStack(input.prompt, input.backendMode)) {
+    hints.add("DATABASE_URL");
+    hints.add("DIRECT_URL");
+    hints.add("SUPABASE_URL");
+    hints.add("SUPABASE_ANON_KEY");
+  }
   if (/\b(auth|login|sign in|signin|oauth|google)\b/.test(text)) {
     hints.add("NEXTAUTH_SECRET");
     hints.add("NEXTAUTH_URL");
   }
   if (/\b(payment|stripe|checkout|subscription|billing)\b/.test(text)) hints.add("STRIPE_SECRET_KEY");
-  if (/\b(ai|llm|openrouter|together|gemini|claude|gpt)\b/.test(text)) hints.add("MODEL_PROVIDER_API_KEY");
+  if (/\b(ai|llm|assistant|chatbot|smart|summarize|classify|translate)\b/.test(text)) hints.add("CHINNALLM_ENABLED");
 
   return Array.from(hints);
 }
@@ -142,7 +156,7 @@ function routesFor(input: BuildInput, templateId: BuildTemplateId) {
   const routes = new Set<string>(["/"]);
   const text = input.prompt.toLowerCase();
 
-  if (isExplicitFullStack(input.prompt)) routes.add("/api/health");
+  if (isExplicitFullStack(input.prompt, input.backendMode)) routes.add("/api/health");
   if (/\b(admin|dashboard)\b/.test(text)) routes.add("/dashboard");
   if (/\b(settings)\b/.test(text)) routes.add("/settings");
   if (/\b(profile|account)\b/.test(text)) routes.add("/profile");
@@ -187,13 +201,116 @@ function contextFor(input: BuildInput, templateId: BuildTemplateId) {
     "Build premium UI by default, but keep the visual language specific to the requested product category.",
     uiLibraryRule,
     "No placeholder TODOs, fake metrics, fake testimonials, dead buttons, or static decorative-only UI.",
+    ...(input.backendMode ? [getBackendSystemContext(input.prompt)] : []),
   ].join("\n");
+}
+
+
+function inferBackendResources(prompt: string): string[] {
+  const text = prompt.toLowerCase();
+  if (/\b(crm|lead|deal|pipeline|contact)\b/.test(text)) return ["contacts", "deals", "activities"];
+  if (/\b(ecommerce|e-commerce|store|shop|product|cart|order)\b/.test(text)) return ["products", "orders", "customers"];
+  if (/\b(booking|appointment|calendar|reservation)\b/.test(text)) return ["services", "bookings", "customers"];
+  if (/\b(task|project|kanban|todo|timeline)\b/.test(text)) return ["projects", "tasks", "comments"];
+  if (/\b(content|cms|blog|article|post)\b/.test(text)) return ["posts", "authors", "comments"];
+  return ["items", "profiles", "events"];
+}
+
+function modelName(resource: string) {
+  const singular = resource.endsWith("ies") ? `${resource.slice(0, -3)}y` : resource.endsWith("s") ? resource.slice(0, -1) : resource;
+  return singular
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join("") || "Item";
+}
+
+function getBackendSystemContext(prompt: string) {
+  const resources = inferBackendResources(prompt);
+  return [
+    "BACKEND MODE ENABLED.",
+    "Generate a real full-stack artifact structure while keeping the preview client safe.",
+    "Use Neon-compatible PostgreSQL as the primary database and Prisma schema as the source of truth.",
+    "Generated backend-only files must live behind app/api/*, lib/db/*, prisma/*, or server-only modules and must not be imported by client components.",
+    "Include .env.example with REQUIRED/OPTIONAL labels for every backend variable.",
+    `Domain resources inferred for this prompt: ${resources.join(", ")}.`,
+  ].join("\n");
+}
+
+function generatePrismaSchema(resources: string[]) {
+  const models = resources.map((resource) => {
+    const name = modelName(resource);
+    if (resource === "contacts") {
+      return `model Contact {\n  id        String   @id @default(cuid())\n  name      String\n  email     String?\n  phone     String?\n  company   String?\n  notes     String?\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}`;
+    }
+    if (resource === "deals") {
+      return `model Deal {\n  id        String   @id @default(cuid())\n  title     String\n  value     Int      @default(0)\n  stage     String   @default("new")\n  owner     String?\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}`;
+    }
+    if (resource === "bookings") {
+      return `model Booking {\n  id        String   @id @default(cuid())\n  customer  String\n  service   String\n  startsAt  DateTime\n  status    String   @default("pending")\n  notes     String?\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}`;
+    }
+    if (resource === "products") {
+      return `model Product {\n  id          String   @id @default(cuid())\n  name        String\n  description String?\n  price       Int      @default(0)\n  imageUrl    String?\n  active      Boolean  @default(true)\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n}`;
+    }
+    if (resource === "orders") {
+      return `model Order {\n  id        String   @id @default(cuid())\n  customer  String\n  total     Int      @default(0)\n  status    String   @default("new")\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}`;
+    }
+    return `model ${name} {\n  id        String   @id @default(cuid())\n  title     String\n  summary   String?\n  status    String   @default("active")\n  metadata  Json?\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}`;
+  });
+  return [`generator client {`, `  provider = "prisma-client-js"`, `}`, ``, `datasource db {`, `  provider = "postgresql"`, `  url      = env("DATABASE_URL")`, `}`, ``, ...models].join("\n");
+}
+
+function generateResourceRoute(resource: string) {
+  const name = modelName(resource);
+  const prismaDelegate = name[0].toLowerCase() + name.slice(1);
+  return `import { NextRequest, NextResponse } from "next/server";\nimport { z } from "zod";\nimport { prisma } from "@/lib/db/neon";\n\nconst createSchema = z.object({\n  title: z.string().min(1).max(160).optional(),\n  name: z.string().min(1).max(160).optional(),\n  summary: z.string().max(1000).optional(),\n  status: z.string().max(40).optional(),\n  metadata: z.record(z.unknown()).optional(),\n});\n\nexport async function GET() {\n  const records = await prisma.${prismaDelegate}.findMany({ orderBy: { createdAt: "desc" }, take: 100 });\n  return NextResponse.json({ records });\n}\n\nexport async function POST(request: NextRequest) {\n  const parsed = createSchema.safeParse(await request.json().catch(() => null));\n  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request" }, { status: 400 });\n  const title = parsed.data.title || parsed.data.name || "Untitled";\n  const record = await prisma.${prismaDelegate}.create({ data: { ...parsed.data, title } as any });\n  return NextResponse.json({ record }, { status: 201 });\n}\n`;
+}
+
+function generateBackendArtifactFiles(prompt: string): { files: ArtifactFile[]; plan: BuildSpec["backendPlan"] } {
+  const resources = inferBackendResources(prompt);
+  const envVars = ["DATABASE_URL", "DIRECT_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY"];
+  const files: ArtifactFile[] = [
+    {
+      path: "lib/db/neon.ts",
+      language: "ts",
+      code: `import { PrismaClient } from "@prisma/client";\n\ndeclare global {\n  // eslint-disable-next-line no-var\n  var __appPrisma: PrismaClient | undefined;\n}\n\nexport const prisma = globalThis.__appPrisma ?? new PrismaClient({\n  log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],\n});\n\nif (process.env.NODE_ENV !== "production") globalThis.__appPrisma = prisma;\n`,
+    },
+    {
+      path: "lib/db/supabase.ts",
+      language: "ts",
+      code: `type SupabaseConfig = { url: string; anonKey: string };\n\nexport function getSupabaseConfig(): SupabaseConfig | null {\n  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;\n  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;\n  if (!url || !anonKey) return null;\n  return { url, anonKey };\n}\n\nexport async function createSupabaseClient() {\n  const config = getSupabaseConfig();\n  if (!config) return null;\n  const mod = await import("@supabase/supabase-js");\n  return mod.createClient(config.url, config.anonKey);\n}\n`,
+    },
+    {
+      path: "prisma/schema.prisma",
+      language: "prisma",
+      code: generatePrismaSchema(resources),
+    },
+    {
+      path: ".env.example",
+      language: "bash",
+      code: `# REQUIRED: Neon/Postgres connection string for Prisma runtime\nDATABASE_URL=\"postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require\"\n\n# REQUIRED for Prisma migrations when using pooled DATABASE_URL\nDIRECT_URL=\"postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require\"\n\n# OPTIONAL: Supabase client support if configured\nSUPABASE_URL=\"\"\nSUPABASE_ANON_KEY=\"\"\nNEXT_PUBLIC_SUPABASE_URL=\"\"\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\"\"\n`,
+    },
+  ];
+
+  for (const resource of resources) {
+    files.push({ path: `app/api/${resource}/route.ts`, language: "ts", code: generateResourceRoute(resource) });
+  }
+
+  files.push({
+    path: "BACKEND_SETUP.md",
+    language: "md",
+    code: `# Backend setup\n\nThis generated app is backend-enabled.\n\n## Required variables\n\n| Variable | Required | Purpose |\n|---|---|---|\n| DATABASE_URL | Yes | Neon/Postgres runtime connection for Prisma Client |\n| DIRECT_URL | Yes | Direct connection for Prisma migrations |\n| SUPABASE_URL | Optional | Enables optional Supabase client |\n| SUPABASE_ANON_KEY | Optional | Enables optional Supabase client |\n\n## Commands\n\n\`\`\`bash\npnpm install\npnpm prisma generate\npnpm prisma migrate dev\npnpm dev\n\`\`\`\n`,
+  });
+
+  return { files, plan: { provider: "neon", optionalSupabase: true, resources, envVars } };
 }
 
 export function buildPhaseOneSpec(input: BuildInput): BuildSpec {
   const templateId = selectTemplate(input);
   const title = deriveTitle(input.prompt);
   const promptKeywords = Array.from(new Set(words(input.prompt).filter((word) => word.length > 3))).slice(0, 12);
+  const backendEnabled = Boolean(input.backendMode) || isExplicitFullStack(input.prompt, false);
+  const backend = backendEnabled ? generateBackendArtifactFiles(input.prompt) : null;
 
   return {
     id: `${slugify(input.prompt)}-${templateId}`,
@@ -207,8 +324,10 @@ export function buildPhaseOneSpec(input: BuildInput): BuildSpec {
     envHints: envHintsFor(input),
     routes: routesFor(input, templateId),
     previewRoute: "/",
-    artifactFiles: [],
-    systemContext: contextFor(input, templateId),
+    artifactFiles: backend?.files ?? [],
+    backendMode: backendEnabled,
+    backendPlan: backend?.plan,
+    systemContext: contextFor({ ...input, backendMode: backendEnabled }, templateId),
   };
 }
 
@@ -222,7 +341,10 @@ export function buildPhaseOneSpecMessage(input: BuildInput) {
     `Dependencies: ${spec.dependencies.join(", ") || "none"}`,
     `Env hints: ${spec.envHints.join(", ") || "none"}`,
     `Preview route: ${spec.previewRoute}`,
-    "Artifact files: none seeded; model must generate prompt-specific files from scratch.",
+    spec.backendMode
+      ? `Backend mode: enabled (${spec.backendPlan?.resources.join(", ") || "resources inferred"})`
+      : "Backend mode: off",
+    `Artifact files: ${spec.artifactFiles.length ? spec.artifactFiles.map((file) => file.path).join(", ") : "none seeded; model must generate prompt-specific files from scratch."}`,
   ].join("\n");
 }
 

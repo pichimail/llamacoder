@@ -2,7 +2,8 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
+import { DotFlow } from "@/components/ui/dot-flow";
 import { useAvailableModels } from "@/lib/use-available-models";
 import { getVisibleModels, MODELS } from "@/lib/constants";
 import { Context } from "../../providers";
@@ -131,7 +132,7 @@ export default function NewChatPageClient({
         </div>
         {!availableModels ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
+            <DotFlow size={5} label="Checking available models" />
             Checking available models
           </div>
         ) : error ? (
@@ -140,7 +141,7 @@ export default function NewChatPageClient({
           </p>
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
+            <DotFlow size={5} label="Redirecting" />
             Redirecting to the chat page
           </div>
         )}

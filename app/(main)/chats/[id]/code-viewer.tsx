@@ -1,5 +1,6 @@
 "use client";
 
+import { DotFlow } from "@/components/ui/dot-flow";
 import {
   Boxes,
   CheckCircle2,
@@ -638,6 +639,11 @@ export default function CodeViewer({
 
           <div className="flex items-center gap-1">
             <AutoFixStatusBadge status={autoFixStatus} attempt={autoFixAttempt} />
+            {autoFixEnabled && autoFixStatus === "fixing" ? (
+              <span className="hidden text-[11px] text-muted-foreground md:inline" aria-live="polite">
+                Fixing error automatically...
+              </span>
+            ) : null}
             <Tip label="Auto-fix preview errors">
               <span className="inline-flex items-center gap-1.5 px-1.5">
                 <Wand2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
@@ -837,7 +843,7 @@ export default function CodeViewer({
 function EmptyState({ isStreaming }: { isStreaming: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-      {isStreaming ? <><Loader2 className="size-5 animate-spin" aria-hidden="true" /><p aria-live="polite">Generating your app…</p></> : <p>No files yet. Send a prompt to generate an app.</p>}
+      {isStreaming ? <><DotFlow size={7} label="Generating your app" /><p aria-live="polite">Generating your app…</p></> : <p>No files yet. Send a prompt to generate an app.</p>}
     </div>
   );
 }

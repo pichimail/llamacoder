@@ -1,276 +1,197 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+/** Admin dashboard home (Phase 4): real DB stats, charts, recent activity. */
+
+import { useEffect, useState } from "react";
+import { Activity, CreditCard, Rocket, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, 
-  FolderOpen, 
-  MessageSquare, 
-  BarChart3, 
-  Download, 
-  Play 
-} from "lucide-react";
-import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface ActivityItem {
-  id: number;
-  title: string;
-  user: string;
-  status: string;
-  time: string;
-}
+type DashboardData = {
+  stats: { totalUsers: number; appsToday: number; activeToday: number; creditsToday: number };
+  appsPerDay: Array<{ date: string; count: number }>;
+  creditsByTier: Array<{ tier: string; credits: number }>;
+  callsByModel: Array<{ model: string; calls: number }>;
+  recentActivity: Array<{ id: string; title: string; promptPreview: string; model: string; user: string; status: string; createdAt: string }>;
+};
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    builds: 2847,
-    users: 341,
-    projects: 192,
-    successRate: 97.8,
-  });
+export default function AdminDashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  const [activity, setActivity] = useState<ActivityItem[]>([
-    { id: 1, title: "Dashboard SaaS", user: "pichi", status: "Completed", time: "2m ago" },
-    { id: 2, title: "Marketing Site", user: "demo", status: "Completed", time: "14m ago" },
-    { id: 3, title: "Admin Panel v2", user: "test", status: "In Progress", time: "31m ago" },
-  ]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/dashboard", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((json) => { if (!cancelled) setData(json); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
-
-  const filteredActivity = activity.filter(item =>
-    item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.user.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const simulateNewBuild = () => {
-    const newBuild: ActivityItem = {
-      id: Date.now(),
-      title: `New Build #${Math.floor(Math.random() * 1000)}`,
-      user: ["pichi", "demo", "alex", "jane"][Math.floor(Math.random() * 4)],
-      status: Math.random() > 0.2 ? "Completed" : "In Progress",
-      time: "just now",
-    };
-
-    setActivity([newBuild, ...activity.slice(0, 4)]);
-
-    setStats(prev => ({
-      builds: prev.builds + 1,
-      users: prev.users,
-      projects: prev.projects + (Math.random() > 0.7 ? 1 : 0),
-      successRate: Math.min(99.9, prev.successRate + (Math.random() - 0.5) * 0.3),
-    }));
-  };
-
-  const exportLogs = () => {
-    const csv = activity.map(a => `${a.title},${a.user},${a.status},${a.time}`).join("\n");
-    const blob = new Blob([`Title,User,Status,Time\n${csv}`], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "admin-activity.csv";
-    a.click();
-  };
-
-  const clearActivity = () => {
-    setActivity([]);
-  };
-
-  const topModels = [
-    { name: "claude-3-5-sonnet", percent: 64 },
-    { name: "gpt-4o", percent: 22 },
-    { name: "gemini-pro", percent: 14 },
+  const statCards = [
+    { label: "Total Users", value: data?.stats.totalUsers, icon: Users },
+    { label: "Apps Built Today", value: data?.stats.appsToday, icon: Rocket },
+    { label: "Active Sessions", value: data?.stats.activeToday, icon: Activity },
+    { label: "Credits Consumed Today", value: data?.stats.creditsToday, icon: CreditCard },
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Monitor and manage your Chinna-Coder platform.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={simulateNewBuild} variant="default" className="gap-2">
-            <Play className="h-4 w-4" /> Simulate New Build
-          </Button>
-          <Button onClick={exportLogs} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" /> Export Logs
-          </Button>
-          <Button onClick={clearActivity} variant="outline">Clear Feed</Button>
-        </div>
+    <div className="space-y-6 p-4 md:p-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Platform overview — live data from the database.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="activity">Live Activity</TabsTrigger>
-        </TabsList>
+      {failed ? (
+        <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Could not load dashboard data. Check admin access and database connectivity.</CardContent></Card>
+      ) : null}
 
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          {/* Dynamic Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="transition-all hover:shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Total Builds
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold tabular-nums">{stats.builds.toLocaleString()}</div>
-                <p className="text-xs text-green-500">+18% this week • Live</p>
-              </CardContent>
-            </Card>
+      {/* Stats row */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat) => (
+          <Card key={stat.label}>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2 text-xs">
+                <stat.icon className="size-3.5" /> {stat.label}
+              </CardDescription>
+              {data ? (
+                <CardTitle className="text-3xl tabular-nums">{(stat.value ?? 0).toLocaleString()}</CardTitle>
+              ) : (
+                <Skeleton className="h-9 w-20" />
+              )}
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" /> Active Users
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold tabular-nums">{stats.users}</div>
-              </CardContent>
-            </Card>
+      {/* Charts */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Apps built per day</CardTitle>
+            <CardDescription className="text-xs">Last 30 days</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64">
+            {data ? (
+              <div className="flex h-full items-end gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
+                {data.appsPerDay.map((row) => {
+                  const max = Math.max(...data.appsPerDay.map((item) => item.count), 1);
+                  const height = Math.max(6, Math.round((row.count / max) * 100));
+                  return (
+                    <div key={row.date} className="group flex min-w-0 flex-1 flex-col items-center gap-1">
+                      <div title={`${row.date}: ${row.count}`} className="w-full rounded-t-sm bg-primary/70 transition-colors group-hover:bg-primary" style={{ height: `${height}%` }} />
+                      <span className="hidden text-[9px] text-muted-foreground sm:block">{row.date.slice(5)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <Skeleton className="h-full w-full" />
+            )}
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4" /> Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold tabular-nums">{stats.projects}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" /> Success Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold tabular-nums">{stats.successRate.toFixed(1)}%</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Live Activity Preview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Recent Activity
-                  <Badge variant="outline" className="text-xs">Live</Badge>
-                </CardTitle>
-                <CardDescription>Real-time build updates</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {filteredActivity.length > 0 ? (
-                  filteredActivity.slice(0, 5).map((item) => (
-                    <div key={item.id} className="flex justify-between items-center border-b pb-2 last:border-0">
-                      <div>
-                        <div>{item.title}</div>
-                        <div className="text-xs text-muted-foreground">by {item.user}</div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Credit usage by tier</CardTitle>
+            <CardDescription className="text-xs">Last 30 days</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64">
+            {data ? (
+              data.creditsByTier.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-sm text-muted-foreground">No AI usage yet</p>
+              ) : (
+                <div className="flex h-full flex-col justify-center gap-3">
+                  {data.creditsByTier.map((entry) => {
+                    const max = Math.max(...data.creditsByTier.map((item) => item.credits), 1);
+                    const width = Math.max(4, Math.round((entry.credits / max) * 100));
+                    return (
+                      <div key={entry.tier} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs"><span className="capitalize">{entry.tier}</span><span className="tabular-nums text-muted-foreground">{entry.credits}</span></div>
+                        <div className="h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} /></div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={item.status === "Completed" ? "default" : "outline"}>
-                          {item.status}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">{item.time}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground text-center py-4">No activity yet. Click "Simulate New Build".</p>
-                )}
-              </CardContent>
-            </Card>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              <Skeleton className="h-full w-full rounded-full" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-            {/* Top Models with Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Models</CardTitle>
-                <CardDescription>Usage distribution (click to filter in future)</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {topModels.map((model, index) => (
-                  <div key={index}>
-                    <div className="flex justify-between text-sm mb-1.5">
-                      <span>{model.name}</span>
-                      <span className="font-mono text-muted-foreground">{model.percent}%</span>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">AI model usage distribution</CardTitle>
+          <CardDescription className="text-xs">Calls per model, last 30 days</CardDescription>
+        </CardHeader>
+        <CardContent className="h-56">
+          {data ? (
+            data.callsByModel.length === 0 ? (
+              <p className="flex h-full items-center justify-center text-sm text-muted-foreground">No AI usage yet</p>
+            ) : (
+              <div className="flex h-full flex-col justify-center gap-3">
+                {data.callsByModel.map((row) => {
+                  const max = Math.max(...data.callsByModel.map((item) => item.calls), 1);
+                  const width = Math.max(4, Math.round((row.calls / max) * 100));
+                  return (
+                    <div key={row.model} className="grid grid-cols-[minmax(90px,180px)_1fr_44px] items-center gap-3 text-xs">
+                      <span className="truncate text-muted-foreground">{row.model}</span>
+                      <div className="h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} /></div>
+                      <span className="text-right tabular-nums">{row.calls}</span>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all" 
-                        style={{ width: `${model.percent}%` }} 
-                      />
-                    </div>
-                  </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            <Skeleton className="h-full w-full" />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent activity */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Recent activity</CardTitle>
+          <CardDescription className="text-xs">Last 20 generations</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {data === null ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}</div>
+          ) : data.recentActivity.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No generations yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Prompt</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.recentActivity.map((row) => (
+                  <TableRow key={row.id} className="transition-colors hover:bg-muted/40">
+                    <TableCell className="max-w-[140px] truncate text-sm">{row.user}</TableCell>
+                    <TableCell className="max-w-[280px] truncate text-sm text-muted-foreground">{row.promptPreview || row.title}</TableCell>
+                    <TableCell className="max-w-[150px] truncate text-xs text-muted-foreground">{row.model}</TableCell>
+                    <TableCell>
+                      <Badge variant={row.status === "ready" ? "secondary" : "outline"} className="rounded-full text-[10px]">{row.status}</Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</TableCell>
+                  </TableRow>
                 ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="users" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Quick view - full controls in Users page</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between py-2 border-b">
-                  <span>pichi (admin)</span> 
-                  <Badge>Online</Badge>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>demo@example.com</span> 
-                  <Button size="sm" variant="outline">Promote</Button>
-                </div>
-                <Link href="/admin/users" className="block pt-2 text-primary hover:underline">View all users →</Link>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Live Activity Feed</CardTitle>
-                  <CardDescription>Search and monitor all builds</CardDescription>
-                </div>
-                <Input 
-                  placeholder="Search activity..." 
-                  className="max-w-xs" 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {filteredActivity.length > 0 ? filteredActivity.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-md">
-                    <div>
-                      <div className="font-medium">{item.title}</div>
-                      <div className="text-xs text-muted-foreground">by {item.user} • {item.time}</div>
-                    </div>
-                    <Badge>{item.status}</Badge>
-                  </div>
-                )) : <p>No matching activity.</p>}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

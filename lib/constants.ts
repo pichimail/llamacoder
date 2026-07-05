@@ -9,7 +9,17 @@ export type ModelConfig = {
   recommended?: boolean;
   status?: "ready" | "fallback" | "experimental" | "needs_key";
   description?: string;
+  /** Maximum completion tokens this model can safely be asked for in one call.
+   * Falls back to DEFAULT_MAX_OUTPUT_TOKENS when not set. Verify against the
+   * provider's current docs before raising further — requesting more than a
+   * model actually supports causes the provider to reject the call outright. */
+  maxOutputTokens?: number;
 };
+
+/** Conservative default output ceiling used for any model without an explicit
+ * override below. Generation code should never hardcode a token number itself;
+ * always resolve it through getMaxOutputTokensForModel(). */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 
 export const WORKING_FALLBACK_MODEL = "zai-org/GLM-5.1";
 
@@ -136,6 +146,16 @@ export const MODELS: ModelConfig[] = [
 
 export function resolveModel(model: string): string {
   return MODEL_ALIASES[model] ?? model;
+}
+
+/** Resolves the safe max-completion-tokens ceiling for a given model value.
+ * Always route generation calls through this instead of a hardcoded number,
+ * so raising limits for one model can never silently overshoot another's
+ * real capacity. */
+export function getMaxOutputTokensForModel(modelValue: string): number {
+  const resolved = resolveModel(modelValue);
+  const config = MODELS.find((m) => m.value === resolved || m.value === modelValue);
+  return config?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 }
 
 export function getModelConfig(model: string): ModelConfig {

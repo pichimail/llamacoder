@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { getPrisma } from "@/lib/prisma";
 import { isAdminEmail } from "@/lib/admin-config";
 import { resolveAuthSecret } from "@/lib/auth-secret";
+import { ensureUserCredits } from "@/lib/chinnallm/credits";
 
 export function isGoogleConfigured() {
   return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
@@ -33,6 +34,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
         }),
       ]
     : [],
+  events: {
+    async createUser({ user }) {
+      if (user.id) {
+        await ensureUserCredits(user.id).catch((error) => console.warn("Could not grant initial ChinnaLLM credits", error));
+      }
+    },
+  },
   callbacks: {
     session({ session, user }) {
       if (session.user) {

@@ -24,11 +24,17 @@ model Chat {
   title             String
   llamaCoderVersion String        @default("v2")
   shadcn            Boolean
+  aiIntegration     String?       // "chinnallm" | "byok" | "skip" | null
+  backendMode       Boolean       @default(false)
   messages          Message[]
   projectId         String?
   project           Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   isPinned          Boolean       @default(false)
   isArchived        Boolean       @default(false)
+  isHidden          Boolean       @default(false) // admin moderation: hidden from public surfaces
+  moderationNote    String?       // admin reason for hide/removal
+  moderatedById     String?       // admin user id who last moderated
+  moderatedAt       DateTime?
   historySummary    String?
   historySummaryKey String?
   historySummaryAt  DateTime?
@@ -41,6 +47,7 @@ model Chat {
   @@index([projectId])
   @@index([isPinned, createdAt])
   @@index([isArchived])
+  @@index([isHidden])
 }
 
 model Message {
@@ -193,6 +200,26 @@ model Setting {
 }
 
 // ===== Auth.js (NextAuth) models for SaaS mode =====
+/** A user-saved custom design system, created via the "Start with your
+ * design" flow (pasted/uploaded DESIGN.md, GitHub repo, or website scan).
+ * Distinct from the 12 built-in SandboxStyleId presets in lib/sandbox-theme.ts
+ * — this stores a user's own design language so it can be reused across
+ * future builds without re-uploading it every time. */
+model DesignPreset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  source      String   // "paste" | "upload" | "github" | "website"
+  sourceRef   String?  // repo URL or website URL, if applicable
+  content     String   @db.Text // the DESIGN.md content or extracted description
+  instructions String? @db.Text // "Additional instructions" free text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -208,6 +235,9 @@ model User {
   fileUploads   FileUpload[]
   promptLibraryItems PromptLibraryItem[]
   auditLogs     AuditLog[]
+  credits       UserCredits?
+  apiKeys       ApiKeyStore[]
+  designPresets DesignPreset[]
   createdAt     DateTime  @default(now())
 }
 
@@ -337,4 +367,94 @@ model PromptLibraryItem {
   @@index([category])
   @@index([visibility])
   @@index([createdAt])
+}
+
+// ============ ChinnaLLM (Phase 2) ============
+
+model ChinnaLLMModel {
+  id             String   @id @default(cuid())
+  displayName    String   @unique // "ChinnaLLM Flagship" — user-visible
+  openRouterId   String   // admin-only, never exposed to users
+  tier           String   // budget|coding|flagship|reasoning|vision|image|video|music|code|free|auto
+  costPerKTokens Int      @default(1) // credits per 1k tokens
+  enabled        Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  description    String?
+  capabilities   String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  usageRecords   ChinnaLLMUsage[]
+
+  @@index([tier, enabled, sortOrder])
+}
+
+model UserCredits {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planTier       String   @default("free") // free|pro|enterprise
+  totalGranted   Int      @default(100)
+  totalUsed      Int      @default(0)
+  monthlyResetAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  transactions   CreditTransaction[]
+}
+
+model CreditTransaction {
+  id            String      @id @default(cuid())
+  userId        String
+  userCredits   UserCredits @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  amount        Int         // positive = grant, negative = deduct
+  type          String      // grant|deduct|topup|refund|monthly_reset
+  reason        String?
+  relatedChatId String?
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ChinnaLLMUsage {
+  id           String         @id @default(cuid())
+  userId       String
+  chatId       String?
+  modelId      String
+  model        ChinnaLLMModel @relation(fields: [modelId], references: [id])
+  inputTokens  Int            @default(0)
+  outputTokens Int            @default(0)
+  creditsUsed  Int            @default(0)
+  isByok       Boolean        @default(false)
+  latencyMs    Int?
+  error        String?
+  createdAt    DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@index([modelId, createdAt])
+}
+
+model ApiKeyStore {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String   @default("openrouter") // openrouter|openai|anthropic
+  encryptedKey String   // AES-256-GCM encrypted
+  iv           String   // initialization vector
+  label        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, provider])
+}
+
+// ============ Feature Flags (Phase 4) ============
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g. "style-picker", "ai-chooser"
+  label       String
+  description String?
+  category    String   @default("general") // builder|ai|chat|platform
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }

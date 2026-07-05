@@ -6,6 +6,7 @@ import {
   INSPECTOR_MESSAGE_SOURCE,
   type InspectorInboundMessage,
   type InspectorOutboundMessage,
+  type InspectorTreeNode,
 } from '@/lib/design-inspector'
 
 interface DesignInspectorBridgeProps {
@@ -13,6 +14,7 @@ interface DesignInspectorBridgeProps {
   selectedElementId: string
   onSelectElement: (id: string) => void
   onHoverElement: (id: string | null) => void
+  onTreeUpdate?: (nodes: InspectorTreeNode[]) => void
   containerRef: React.RefObject<HTMLElement | null>
 }
 
@@ -50,6 +52,7 @@ export function DesignInspectorBridge({
   selectedElementId,
   onSelectElement,
   onHoverElement,
+  onTreeUpdate,
   containerRef,
 }: DesignInspectorBridgeProps) {
   const lastHoverRef = useRef<string | null>(null)
@@ -63,6 +66,15 @@ export function DesignInspectorBridge({
 
   useEffect(() => {
     postToPreview({ source: INSPECTOR_MESSAGE_SOURCE, type: 'set-enabled', enabled })
+    if (enabled) {
+      // Ask the preview for a fresh tree as soon as the inspector turns on —
+      // covers the case where the iframe already finished mounting before
+      // we started listening.
+      const timer = setTimeout(() => {
+        postToPreview({ source: INSPECTOR_MESSAGE_SOURCE, type: 'request-tree' })
+      }, 150)
+      return () => clearTimeout(timer)
+    }
   }, [enabled, postToPreview])
 
   useEffect(() => {
@@ -97,11 +109,15 @@ export function DesignInspectorBridge({
       if (data.type === 'select' && data.id) {
         onSelectElement(data.id)
       }
+
+      if (data.type === 'tree') {
+        onTreeUpdate?.(data.nodes)
+      }
     }
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [onHoverElement, onSelectElement])
+  }, [onHoverElement, onSelectElement, onTreeUpdate])
 
   return null
 }
