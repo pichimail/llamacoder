@@ -93,6 +93,26 @@ function Overlay({
   );
 }
 
+function buildTree() {
+  const nodes = Array.from(document.querySelectorAll('[data-llama-id]')) as HTMLElement[];
+  const tree = nodes.map((node) => {
+    let depth = 0;
+    let parent = node.parentElement;
+    while (parent) {
+      if (parent instanceof HTMLElement && parent.dataset.llamaId) depth += 1;
+      parent = parent.parentElement;
+    }
+    return {
+      id: node.dataset.llamaId || '',
+      tag: node.tagName.toLowerCase(),
+      depth,
+      className: typeof node.className === 'string' ? node.className : '',
+      text: (node.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60),
+    };
+  });
+  post('tree', { nodes: tree });
+}
+
 export function InspectorProvider({ children }: { children: React.ReactNode }) {
   const [enabled, setEnabled] = React.useState(true);
   const [hoverRect, setHoverRect] = React.useState<Rect | null>(null);
@@ -127,11 +147,30 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
       }
       if (event.data.type === 'highlight') highlightById(event.data.id);
       if (event.data.type === 'clear-highlight') highlightById(null);
+      if (event.data.type === 'request-tree') buildTree();
     };
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, [highlightById]);
+
+  React.useEffect(() => {
+    // Post the tree once on mount, then again whenever the DOM structure
+    // changes (debounced), so the layers panel stays in sync with
+    // conditional renders, mapped lists, etc. — not just the initial paint.
+    const timer = setTimeout(buildTree, 50);
+    let debounceHandle: ReturnType<typeof setTimeout> | null = null;
+    const observer = new MutationObserver(() => {
+      if (debounceHandle) clearTimeout(debounceHandle);
+      debounceHandle = setTimeout(buildTree, 200);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    return () => {
+      clearTimeout(timer);
+      if (debounceHandle) clearTimeout(debounceHandle);
+      observer.disconnect();
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!enabled) return;

@@ -7,7 +7,6 @@ import { authErrorResponse } from '@/lib/authz'
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(600).optional().nullable(),
-  isFavorite: z.boolean().optional(),
 })
 
 export async function PATCH(

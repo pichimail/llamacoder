@@ -10,6 +10,7 @@ import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { buildPhaseOneSpec } from "@/lib/build-engine";
 import { seedBuildArtifacts } from "@/lib/build-workspace";
 import { requireCurrentUser } from "@/lib/authz";
+import { assertCanCreateProject, assertFeatureAllowed, PlanLimitError, planErrorResponseBody } from "@/lib/plan";
 import { logAudit } from "@/lib/audit";
 
 const createChatSchema = z.object({
@@ -29,7 +30,12 @@ const createChatSchema = z.object({
     )
     .optional()
     .default([]),
-  shadcn: z.boolean().optional().default(false),
+  shadcn: z.boolean().optional().default(true),
+  styleId: z.string().trim().max(64).optional().default("modern-saas"),
+  designPresetId: z.string().trim().max(64).optional(),
+  aiIntegration: z.enum(["chinnallm", "byok", "skip"]).optional().nullable().default(null),
+  aiCapabilities: z.array(z.string().max(24)).max(10).optional().default([]),
+  backendMode: z.boolean().optional().default(false),
 });
 
 function attachmentContext(attachments: {
@@ -61,7 +67,17 @@ export async function POST(request: NextRequest) {
 
     const user = await requireCurrentUser();
 
-    const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn } = parsed.data;
+    const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn, styleId, designPresetId, aiIntegration, aiCapabilities, backendMode } = parsed.data;
+
+    let customDesign: { content: string; instructions?: string } | null = null;
+    if (designPresetId) {
+      const preset = await getPrisma().designPreset.findFirst({
+        where: { id: designPresetId, userId: user.id },
+        select: { content: true, instructions: true },
+      });
+      if (preset) customDesign = { content: preset.content, instructions: preset.instructions ?? undefined };
+    }
+
     let resolvedModel: string;
     try {
       resolvedModel = assertValidModel(model);
@@ -69,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid model" }, { status: 400 });
     }
     if (!anyProviderConfigured()) {
-      return NextResponse.json({ error: "Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY" }, { status: 500 });
+      return NextResponse.json({ error: "Server misconfiguration: configure the platform generation provider key" }, { status: 500 });
     }
 
     const prisma = getPrisma();
@@ -99,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     const promptWithAttachments = `${prompt}${attachmentContext(attachments)}`;
-    const buildSpec = buildPhaseOneSpec({ prompt: promptWithAttachments, mode, shadcn });
+    const buildSpec = buildPhaseOneSpec({ prompt: promptWithAttachments, mode, shadcn, backendMode });
 
     if (!process.env.POSTGRES_PRISMA_URL && !process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Server misconfiguration: missing database URL" }, { status: 500 });
@@ -109,6 +125,18 @@ export async function POST(request: NextRequest) {
       await rateLimitOrThrow(`create-chat:${user.id}`, { limit: 18, windowSeconds: 60 });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Rate limited" }, { status: 429 });
+    }
+
+    // Priority 2: plan enforcement. Cap projects per plan and gate backend mode
+    // before any rows are written.
+    try {
+      await assertCanCreateProject(user.id);
+      if (buildSpec.backendMode) await assertFeatureAllowed(user.id, "backendMode");
+    } catch (error) {
+      if (error instanceof PlanLimitError) {
+        return NextResponse.json(planErrorResponseBody(error), { status: error.status });
+      }
+      throw error;
     }
 
     const project = await prisma.project.create({
@@ -126,7 +154,9 @@ export async function POST(request: NextRequest) {
         prompt,
         title: buildSpec.title,
         shadcn,
-        projectId: project.id,
+        project: { connect: { id: project.id } },
+        aiIntegration: aiIntegration ?? null,
+        backendMode: buildSpec.backendMode,
       },
     });
 
@@ -149,6 +179,10 @@ export async function POST(request: NextRequest) {
                   false,
                   promptWithAttachments,
                   shadcn,
+                  styleId,
+                  aiIntegration,
+                  aiCapabilities,
+                  customDesign,
                 )}`,
               position: 0,
             },
@@ -193,7 +227,7 @@ export async function POST(request: NextRequest) {
       model: resolvedModel,
       input: { prompt, hasScreenshot: !!screenshotUrl, quality, mode, userId: user.id },
       output: userMessage,
-      metadata: { type: "initial_generation", title: buildSpec.title, template: buildSpec.templateId },
+      metadata: { type: "initial_generation", title: buildSpec.title, template: buildSpec.templateId, backendMode: buildSpec.backendMode },
     });
 
     return NextResponse.json({

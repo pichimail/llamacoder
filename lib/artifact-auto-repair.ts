@@ -42,49 +42,61 @@ function titleFromComponent(name: string) {
   return name.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
+/**
+ * Token-only fallback body for a missing local component.
+ *
+ * IMPORTANT: this is a repair stub, not a design. It intentionally uses ONLY
+ * shadcn/Tailwind semantic tokens (bg-background, bg-card, text-foreground,
+ * text-muted-foreground, border-border, bg-primary, text-primary-foreground)
+ * so the injected theme preset — and its light/dark variants — drive every
+ * color. It must never introduce neon/cyan/glow/glass slop, hardcoded hex,
+ * black/white/gray-* literals, or invented marketing copy. Those were removed
+ * in the Phase 1 audit; do not reintroduce them here.
+ */
 function componentBody(name: string) {
   const title = titleFromComponent(name);
   const lower = title.toLowerCase();
 
-  if (lower.includes("energy") || lower.includes("path")) {
+  // Contact / CTA-shaped section: neutral card + a single primary action.
+  if (lower.includes("contact") || lower.includes("cta")) {
     return `export default function ${name}() {
-  const paths = ["M0 80 C 180 10, 360 150, 540 70", "M40 140 C 220 40, 420 180, 620 100", "M120 40 C 280 120, 420 0, 700 90"];
-
   return (
-    <section className="relative isolate overflow-hidden border-y border-cyan-400/10 bg-slate-950/80 px-6 py-24 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.16),transparent_55%)]" />
-      <div className="relative mx-auto max-w-6xl">
-        <p className="text-xs uppercase tracking-[0.5em] text-cyan-300/80">Infrastructure Flow</p>
-        <h2 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">Energy paths connect every future district.</h2>
-        <svg className="mt-12 h-56 w-full overflow-visible" viewBox="0 0 720 220" fill="none" aria-hidden="true">
-          {paths.map((path, index) => (
-            <path key={path} d={path} stroke={index === 1 ? "#38bdf8" : "#1d4ed8"} strokeWidth={index === 1 ? 3 : 1.5} strokeLinecap="round" className="animate-pulse drop-shadow-[0_0_16px_rgba(56,189,248,0.75)]" />
-          ))}
-        </svg>
+    <section className="w-full border-y border-border bg-background px-6 py-16 text-foreground">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 rounded-xl border border-border bg-card p-8 text-card-foreground md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">${title}</p>
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Get in touch</h2>
+          <p className="max-w-xl text-sm leading-6 text-muted-foreground">This section was generated to keep the build compiling. Replace it with your real ${title.toLowerCase()} content.</p>
+        </div>
+        <a
+          href="#"
+          className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Continue
+        </a>
       </div>
     </section>
   );
 }`;
   }
 
-  if (lower.includes("value")) {
+  // Multi-item / values / features-shaped section: neutral card grid, no fake data.
+  if (lower.includes("value") || lower.includes("feature") || lower.includes("grid") || lower.includes("list")) {
     return `export default function ${name}() {
-  const values = [
-    ["Vision", "Cities designed as adaptive digital ecosystems."],
-    ["Trust", "Enterprise-grade planning with transparent development intelligence."],
-    ["Momentum", "Future-ready infrastructure that compounds in value."],
-  ];
+  const items = [1, 2, 3];
 
   return (
-    <section className="bg-black px-6 py-24 text-white">
-      <div className="mx-auto max-w-6xl">
-        <p className="text-xs uppercase tracking-[0.5em] text-blue-300/80">Values</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-tight md:text-6xl">Built for the next era of real estate.</h2>
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {values.map(([label, body]) => (
-            <article key={label} className="rounded-3xl border border-cyan-300/15 bg-white/[0.04] p-7 shadow-[0_0_60px_rgba(14,165,233,0.08)]">
-              <h3 className="text-2xl font-semibold text-cyan-100">{label}</h3>
-              <p className="mt-4 text-sm leading-7 text-slate-300">{body}</p>
+    <section className="w-full bg-background px-6 py-16 text-foreground">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <header className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">${title}</p>
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">${title}</h2>
+        </header>
+        <div className="grid gap-4 md:grid-cols-3">
+          {items.map((item) => (
+            <article key={item} className="rounded-xl border border-border bg-card p-6 text-card-foreground">
+              <h3 className="text-base font-medium">Item {item}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Placeholder content generated to keep the build compiling. Replace with real ${title.toLowerCase()} content.</p>
             </article>
           ))}
         </div>
@@ -94,31 +106,14 @@ function componentBody(name: string) {
 }`;
   }
 
-  if (lower.includes("contact")) {
-    return `export default function ${name}() {
-  return (
-    <section className="relative overflow-hidden bg-slate-950 px-6 py-24 text-white">
-      <div className="absolute inset-x-20 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 rounded-[2rem] border border-cyan-300/15 bg-cyan-300/[0.04] p-8 shadow-[0_0_80px_rgba(56,189,248,0.14)] md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.5em] text-cyan-300/80">Contact</p>
-          <h2 className="mt-4 text-4xl font-semibold tracking-tight md:text-5xl">Enter the Nexus.</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">Start a private walkthrough of the future real-estate intelligence platform.</p>
-        </div>
-        <a href="mailto:hello@nexus.example" className="rounded-full border border-cyan-300/30 bg-cyan-300 px-6 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_30px_rgba(56,189,248,0.45)] transition hover:bg-white">Request access</a>
-      </div>
-    </section>
-  );
-}`;
-  }
-
+  // Generic default: a single neutral, token-only section.
   return `export default function ${name}() {
   return (
-    <section className="bg-slate-950 px-6 py-20 text-white">
-      <div className="mx-auto max-w-5xl rounded-3xl border border-cyan-300/15 bg-white/[0.04] p-8">
-        <p className="text-xs uppercase tracking-[0.4em] text-cyan-300/80">${title}</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-tight">${title}</h2>
-        <p className="mt-4 text-sm leading-7 text-slate-300">Generated support section for this artifact.</p>
+    <section className="w-full bg-background px-6 py-16 text-foreground">
+      <div className="mx-auto max-w-5xl rounded-xl border border-border bg-card p-8 text-card-foreground">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">${title}</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">${title}</h2>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">Generated support section for this artifact. Replace with real content.</p>
       </div>
     </section>
   );

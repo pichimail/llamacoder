@@ -6,6 +6,23 @@ import { logAudit } from "@/lib/audit";
 
 const schema = z.object({ name: z.string().max(100).optional() });
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ chatId: string }> }) {
+  const { chatId } = await params;
+  try {
+    await requireChatAccess(chatId, "viewer");
+  } catch (e: any) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const prisma = getPrisma();
+  const checkpoints = await prisma.designCheckpoint.findMany({
+    where: { chatId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, createdAt: true },
+    take: 20,
+  });
+  return NextResponse.json({ checkpoints });
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
   let access;

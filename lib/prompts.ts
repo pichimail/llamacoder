@@ -62,6 +62,7 @@ Your job is to build exactly what the latest user prompt asks for. Do not force 
 - shadcn-style components are preferred for dashboards, forms, buttons, dialogs, sheets, tabs, selects, accordions, menus, settings, and tables.
 - shadcn-style components are optional for simple consumer apps; do not force them where custom Tailwind is cleaner.
 - lucide-react icons are available and should be used directly when helpful.
+- For shadcn-style apps, prefer animated icons (e.g. lucide-animated-style components) for interactive affordances like loading, success, menu-toggle, and hover states; fall back to static lucide-react icons when an animated variant isn't warranted. Keep animations subtle and respect prefers-reduced-motion.
 - ReactBits-style motion/visual ideas are allowed only as lightweight local components or with supported motion/graphics libraries.
 - If a component package is uncertain, inline the component locally instead of importing a missing dependency.
 
@@ -231,12 +232,199 @@ function isExplicitProductAppPrompt(prompt: string) {
   return /\b(dashboard|admin|analytics|crm|management|workspace|tracker|editor|booking|marketplace|kanban|calendar|invoice|expense|habit|workout|game|tool|app|portal|studio)\b/i.test(prompt);
 }
 
+/* ============================================================
+ * PHASE 1 (B3): STYLE DIRECTION BLOCKS — ADDITIVE ONLY.
+ * Appended AFTER all existing rules. Never modifies ABSOLUTE
+ * PROMPT OBEDIENCE, routing, or file-structure sections.
+ * ============================================================ */
+const STYLE_DIRECTION_BLOCKS: Record<string, string> = {
+  "modern-saas": dedent`
+    ## STYLE DIRECTION: Modern SaaS
+    Use indigo-500 as the primary accent (hsl(var(--primary)) already maps to it — prefer token classes like bg-primary, text-primary, ring-primary over hardcoded indigo).
+    Cards: rounded-xl border shadow-sm, not rounded-lg. Spacing: generous (p-6, gap-6).
+    Typography: tight tracking headings (tracking-tight font-semibold/bold), muted secondary text (text-muted-foreground).
+    Buttons: rounded-lg; primary actions filled, secondary actions ghost/outline.
+    Forms: clean labels above inputs, focus-visible ring states.
+    Tables: clean rows, subtle hover highlight, no heavy borders.
+    Charts: recharts with indigo/slate palette (use --chart-1..5 tokens).
+    Dark mode: true dark near-black (not gray-900), OLED-friendly.
+    Anti-patterns: no stacked nested cards, no glow blobs, no fake testimonials, no generic feature grids.`,
+  "editorial-dark": dedent`
+    ## STYLE DIRECTION: Editorial Dark
+    Amber accent (hsl(var(--primary))) on warm near-black backgrounds. Magazine-grade hierarchy: large serif-feel or high-contrast sans headlines, generous line-height body text, clear rhythm between sections.
+    Cards: rounded-lg with hairline borders (border-border), minimal shadows.
+    Emphasis via typography and whitespace, not boxes. Pull-quotes, bylines, reading-time chips where the domain fits.
+    Buttons: understated — outline/ghost dominant, amber filled reserved for the single primary action per view.
+    Anti-patterns: no neon gradients, no glassmorphism, no dense dashboard chrome, no more than one accent color.`,
+  "warm-neutral": dedent`
+    ## STYLE DIRECTION: Warm Neutral
+    Orange accent on soft cream neutrals (tokens already configured). Friendly, approachable product feel.
+    Cards: rounded-xl on subtly tinted surfaces (bg-card), soft shadow-sm.
+    Typography: medium-weight headings, relaxed spacing, warm gray secondary text via text-muted-foreground.
+    Buttons: rounded-full or rounded-xl pill feel acceptable; orange filled primary, neutral outline secondary.
+    Anti-patterns: no stark pure-white panels, no cold blue-grays, no harsh black borders, no aggressive neon.`,
+  "vibrant-accent": dedent`
+    ## STYLE DIRECTION: Vibrant Accent
+    Violet primary (hsl(var(--primary))) with energetic but disciplined use: accent appears in primary buttons, active states, focus rings, key data highlights — not full-bleed backgrounds.
+    Cards: rounded-xl, border + shadow-sm; hover lift (hover:shadow-md transition) welcome.
+    Micro-interactions encouraged: subtle scale/opacity transitions on interactive elements.
+    Charts: violet-led palette from --chart tokens.
+    Anti-patterns: no rainbow gradients, no multiple competing accents, no animated backgrounds.`,
+  glassmorphism: dedent`
+    ## STYLE DIRECTION: Glassmorphism
+    Cyan accent with translucent blurred surfaces. Card-like surfaces should use translucent backgrounds with backdrop blur — e.g. bg-card/60 backdrop-blur-xl (the injected theme also applies blur to card surfaces automatically).
+    Layer over a soft gradient or tinted page background so the blur reads. Hairline borders (border-white/20 in dark, border-border in light).
+    Keep text high-contrast: solid foreground colors on glass, never translucent text.
+    Anti-patterns: no blur on text containers with busy imagery behind, no fully opaque flat cards, no heavy drop shadows fighting the glass look.`,
+  brutalist: dedent`
+    ## STYLE DIRECTION: Brutalist
+    Zero border radius everywhere (rounded-none) — the injected theme already forces --radius: 0 and adds hard offset shadows to cards/buttons via CSS.
+    High-contrast black-on-white (light) / white-on-black (dark). Thick 2px borders on every interactive surface and card.
+    Typography: bold, oversized, condensed where possible. Raw, unpolished feel — no soft gradients, no subtle shadows.
+    Buttons: solid fill, hard rectangular, visible thick border, no hover-glow — a hard offset-shadow shift on active/hover is correct.
+    Anti-patterns: no rounded corners anywhere, no soft drop shadows, no pastel colors, no gradients.`,
+  "oled-dark": dedent`
+    ## STYLE DIRECTION: OLED Dark
+    Dark mode uses TRUE black (#000000) backgrounds, not dark gray — the injected theme forces this. High-contrast cyan accent for primary actions and key highlights only.
+    Cards sit on near-black (--card) surfaces just barely lighter than pure black, creating depth through minimal contrast steps rather than shadows.
+    Typography: crisp white/near-white text, generous contrast, avoid mid-gray body text that would wash out on true black.
+    Anti-patterns: no gray-900/gray-950 substituting for true black, no low-contrast borders, no colored glows outside the single cyan accent.`,
+  "liquid-metal": dedent`
+    ## STYLE DIRECTION: Liquid Metal
+    Cool steel/chrome neutrals — the injected theme applies a subtle brushed-metal gradient sheen to card surfaces automatically. Muted blue-gray accent, never a saturated color.
+    Cards: soft gradient sheen (already applied via CSS), medium rounded corners (0.9rem), understated borders.
+    Typography: clean, technical, precise — engineering/product feel rather than playful.
+    Anti-patterns: no saturated rainbow colors, no neon, no playful rounded-full pill shapes — keep edges crisp and refined.`,
+  "neon-tokyo": dedent`
+    ## STYLE DIRECTION: Neon Tokyo
+    Magenta primary + cyan accent on near-black backgrounds. The injected theme applies a subtle glow to primary-filled buttons in dark mode only — do not add additional glow yourself.
+    High energy but disciplined: neon colors appear in accents, active states, and key CTAs — never as full-bleed backgrounds or on body text.
+    Typography: bold display headings, clean readable body text in a neutral tone (not neon-colored body copy).
+    Anti-patterns: no neon-colored paragraph text (contrast fails), no rainbow gradients, no glow on every element — reserve it for primary actions.`,
+  "terra-earth": dedent`
+    ## STYLE DIRECTION: Terra
+    Earthy sage-green primary, warm clay/terracotta accent, cream-toned neutrals. Natural, grounded, sustainable-product feel.
+    Cards: soft rounded corners (0.9rem), warm subtle borders, no harsh contrast.
+    Typography: warm, humanist, relaxed line-height.
+    Anti-patterns: no cold blue-grays, no stark pure white, no neon or saturated synthetic colors.`,
+  "minimal-mono": dedent`
+    ## STYLE DIRECTION: Minimal Mono
+    Zero color accent — everything is grayscale (the injected theme's --primary and --accent are both pure grayscale, not a hue). All visual hierarchy comes from typography weight/size, spacing, and grayscale contrast alone.
+    Cards: subtle borders, minimal shadow, small border radius (0.375rem).
+    Typography carries the entire design — confident type scale, generous whitespace, no decorative elements.
+    Anti-patterns: no color accents of any kind (not even a subtle tint), no gradients, no icons-as-decoration — icons only where functionally necessary.`,
+  "shadcn-default": dedent`
+    ## STYLE DIRECTION: shadcn/ui Default
+    Use the stock, unmodified shadcn/ui zinc palette exactly as shipped by shadcn init — near-black primary in light mode, near-white primary in dark mode, standard zinc grays for muted/secondary surfaces.
+    This is intentionally the plain, un-opinionated shadcn look — do not add extra color, gradients, or custom flourishes on top of it. Follow shadcn's own component examples and spacing conventions precisely.
+    Anti-patterns: do not introduce any accent hue not present in stock shadcn tokens, no custom shadows beyond the shadcn defaults.`,
+};
+
+const THREEJS_SUPPORT_RULE = dedent`
+  ## 3D / WEBGL SUPPORT
+  When the user requests 3D, WebGL, or interactive scenes, use Three.js with @react-three/fiber and @react-three/drei.
+  Ensure the Canvas component is wrapped in a div with explicit width/height (e.g. className="h-[500px] w-full" or h-screen).
+  Always add OrbitControls (from @react-three/drei) for interactivity.
+  Use requestAnimationFrame/renderer cleanup in useEffect where raw Three.js is used; with react-three-fiber, prefer useFrame and let the Canvas manage the loop.
+  The sandbox supports three, @react-three/fiber, and @react-three/drei — import directly, do not stub.`;
+
+/* ============================================================
+ * PHASE 1 AUDIT: SEMANTIC-TOKEN + ANTI-SLOP ENFORCEMENT — ADDITIVE ONLY.
+ * Appended AFTER the active style direction block so it reinforces (never
+ * overrides) it. Never modifies ABSOLUTE PROMPT OBEDIENCE, routing, or
+ * file-structure sections. The post-generation validator
+ * (lib/generated-code-validation.ts) enforces the same rules at build time;
+ * this block is the prompt-level half of that contract.
+ * ============================================================ */
+const ANTI_SLOP_TOKEN_RULES = dedent`
+  ## SEMANTIC TOKEN CONTRACT (STRICT — ENFORCED AT BUILD TIME)
+  Color, surface, and elevation must come from the theme's semantic tokens so the injected
+  preset and its light/dark variants stay in control. A post-generation validator rejects or
+  auto-rewrites violations, so following this now avoids a rebuild round-trip.
+
+  - Use semantic token classes ONLY for color: bg-background, text-foreground, bg-card,
+    text-card-foreground, bg-muted, text-muted-foreground, bg-primary, text-primary-foreground,
+    bg-secondary, text-secondary-foreground, bg-accent, text-accent-foreground,
+    bg-destructive, text-destructive-foreground, and border-border / ring-ring.
+  - BANNED (unless the file is an explicit theme-preset/globals file): hardcoded hex colors
+    (#fff, #0ea5e9, etc.), the literals text-black / text-white / bg-black / bg-white, and raw
+    Tailwind color-scale utilities used as surfaces or body text (bg-gray-*, text-gray-*,
+    bg-slate-*, bg-zinc-*, text-neutral-*, etc.). Map them to the nearest token:
+    bg-white/bg-gray-50 → bg-background or bg-card; text-black/text-gray-900 → text-foreground;
+    text-gray-500 → text-muted-foreground; bg-gray-100 → bg-muted; border-gray-200 → border-border.
+  - BANNED: arbitrary multi-layer shadow stacks (three or more chained shadow-* utilities, or
+    arbitrary box-shadow values with multiple layers / colored glows). Use a single shadow-sm /
+    shadow / shadow-md from the scale. No 0_0_Npx colored-glow shadows.
+  - Every element that sets an explicit background or text color must remain readable in BOTH
+    light and dark. Prefer tokens (which handle this automatically); if you must use a literal,
+    pair it with a dark: variant. Never ship dark-on-dark or light-on-light combinations.
+
+  ## ANTI-SLOP LAYOUT BANS (reinforces DEFAULT VISUAL DIRECTION)
+  - No double-layered / nested panels (a card inside a card inside a card with competing borders
+    and shadows). One surface layer per region.
+  - No glow blobs, radial "aurora" gradient orbs, or neon halos behind hero/section content.
+  - No glassmorphism / backdrop-blur translucent surfaces UNLESS the active STYLE DIRECTION block
+    above is the Glassmorphism preset. Outside that preset, keep surfaces solid.
+  - No dark-on-dark or low-contrast text. Body text must clear WCAG AA against its surface.
+  - Buttons/inputs/cards/tables use the shadcn primitives named below, not bespoke divs styled
+    to look like them.
+
+  ## MANDATORY SHADCN PRIMITIVES (when COMPONENT LIBRARY is ON)
+  For these control types, use the corresponding shadcn/ui primitive rather than a hand-rolled
+  element, so tokens, focus states, and dark mode come for free:
+  - Buttons → @/components/ui/button (Button, with variant/size).
+  - Text inputs / textareas → @/components/ui/input, @/components/ui/textarea (+ @/components/ui/label).
+  - Selects / comboboxes → @/components/ui/select.
+  - Dropdown / context menus → @/components/ui/dropdown-menu.
+  - Toasts / transient notifications → @/components/ui/toast via the toast hook (never a custom fixed div).
+  - Cards / surfaces → @/components/ui/card.
+  - Data tables → @/components/ui/table primitives (Table, TableHeader, TableRow, TableCell...).
+  - Resizable split panes → @/components/ui/resizable (ResizablePanelGroup / ResizablePanel / ResizableHandle).
+  Only inline a local control when COMPONENT LIBRARY is OFF or the primitive genuinely does not exist.
+
+  ## LONG ONE-SHOT PROMPTS ARE LITERAL SOURCE OF TRUTH
+  When the latest user prompt is long and detailed, treat every sentence as a literal, binding
+  spec. Do not compress, summarize, paraphrase, reorder priorities, or reinterpret it into a
+  more familiar template. Build each stated screen, entity, field, and interaction as written.`;
+
+export function getStyleDirectionBlock(styleId?: string): string {
+  if (!styleId) return STYLE_DIRECTION_BLOCKS["modern-saas"];
+  return STYLE_DIRECTION_BLOCKS[styleId] ?? STYLE_DIRECTION_BLOCKS["modern-saas"];
+}
+
+/**
+ * Builds the strict-override style block for a user's own saved/uploaded
+ * DESIGN.md, used instead of (not alongside) a built-in STYLE_DIRECTION_BLOCKS
+ * entry when the user selected a custom design from "Start with your design".
+ * The user's own document is treated as a hard contract, not a suggestion.
+ */
+export function getCustomDesignBlock(content: string, instructions?: string): string {
+  const trimmedContent = content.trim().slice(0, 12000);
+  const trimmedInstructions = instructions?.trim().slice(0, 2000);
+  return dedent`
+    ## STYLE DIRECTION: Custom user-provided DESIGN.md (STRICT, OVERRIDES ALL BUILT-IN PRESETS)
+    The user has supplied their own design system. Treat every rule in it as a binding
+    contract — follow it exactly for colors, spacing, typography, component shape, and tone.
+    Do not blend in any built-in style preset's conventions; this document fully replaces them.
+    If the document is silent on a specific control, extrapolate conservatively from what it
+    does specify rather than falling back to a generic default look.
+
+    <<<USER_DESIGN_MD_START
+    ${trimmedContent}
+    USER_DESIGN_MD_END>>>
+    ${trimmedInstructions ? `\n    Additional instructions from the user about this design:\n    ${trimmedInstructions}` : ""}`;
+}
+
 export function getMainCodingPrompt(
   mode: "ask" | "plan" | "agent" = "agent",
   hasImage: boolean = false,
   hasCodeFile: boolean = false,
   userPrompt: string = "",
   useShadcn: boolean = true,
+  styleId?: string,
+  aiIntegration?: string | null,
+  aiCapabilities?: string[],
+  customDesign?: { content: string; instructions?: string } | null,
 ): string {
   if (mode === "agent") {
     let p = agentSystemPrompt;
@@ -274,6 +462,21 @@ export function getMainCodingPrompt(
       p += "\n\n" + premiumProductAppPrompt;
     }
 
+    // Phase 1 (B3/B5): additive style + 3D context, appended after all
+    // existing rules. Never modifies obedience/routing/file-structure rules.
+    // A user-supplied custom DESIGN.md (from "Start with your design")
+    // takes precedence over the 12 built-in presets when provided.
+    p += "\n\n" + (customDesign?.content ? getCustomDesignBlock(customDesign.content, customDesign.instructions) : getStyleDirectionBlock(styleId));
+    p += "\n\n" + THREEJS_SUPPORT_RULE;
+    // Phase 1 audit: semantic-token + anti-slop enforcement, appended AFTER the
+    // style block so it reinforces the active preset. Additive; never modifies
+    // obedience/routing/file-structure rules.
+    p += "\n\n" + ANTI_SLOP_TOKEN_RULES;
+
+    // Phase 3: AI integration prompt injection (additive).
+    const aiBlock = getChinnaLLMPromptBlock(aiIntegration, aiCapabilities);
+    if (aiBlock) p += "\n\n" + aiBlock;
+
     return dedent(p);
   }
   if (mode === "plan") return planModePrompt;
@@ -294,3 +497,139 @@ export const prompts = {
   getMainCodingPrompt,
   dynamicFullStackPromptButtons,
 };
+
+/* ============================================================
+ * PHASE 3: AI INTEGRATION PROMPT INJECTION — ADDITIVE ONLY.
+ * Appended after style/3D blocks. Never modifies ABSOLUTE
+ * PROMPT OBEDIENCE, routing, or file-structure sections.
+ * ============================================================ */
+
+export function getChinnaLLMPromptBlock(
+  aiIntegration: string | null | undefined,
+  capabilities: string[] = [],
+): string {
+  if (!aiIntegration) return "";
+
+  const capList = capabilities.length > 0 ? capabilities.join(", ") : "text";
+
+  if (aiIntegration === "chinnallm") {
+    return dedent`
+## AI INTEGRATION: ChinnaLLM SDK (Platform-Managed)
+
+The user chose ChinnaLLM to power AI features (capabilities: ${capList}).
+Generate the following additional files:
+
+1. **lib/chinnallm.ts** — The ChinnaLLM SDK client. Generate this exact file:
+\`\`\`typescript
+// lib/chinnallm.ts — ChinnaLLM AI SDK (auto-injected)
+const CHINNALLM_ENDPOINT = "/api/chinnallm/invoke";
+
+type ChinnaLLMOptions = {
+  model?: "auto" | "lite" | "pro" | "ultra" | "code" | "vision" | "think";
+  maxTokens?: number;
+  temperature?: number;
+  stream?: boolean;
+  useByok?: boolean;
+};
+
+export const chinnaLLM = {
+  async text(prompt: string, options: ChinnaLLMOptions = {}) {
+    const res = await fetch(CHINNALLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "text", prompt, ...options }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async vision(imageUrl: string, prompt: string, options: ChinnaLLMOptions = {}) {
+    const res = await fetch(CHINNALLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "vision", imageUrl, prompt, ...options }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async image(prompt: string, options: ChinnaLLMOptions = {}) {
+    const res = await fetch(CHINNALLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "image", prompt, ...options }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async code(prompt: string, language = "typescript", options: ChinnaLLMOptions = {}) {
+    const res = await fetch(CHINNALLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "code", prompt, language, ...options }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  stream(prompt: string, options: ChinnaLLMOptions = {}) {
+    return fetch(CHINNALLM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "text", prompt, stream: true, ...options }),
+    }).then(res => {
+      if (!res.ok) throw new Error("Stream failed");
+      return res.body;
+    });
+  },
+};
+\`\`\`
+
+2. Do **not** generate direct provider routes or direct AI-provider clients. The platform endpoint already exists at \`/api/chinnallm/invoke\`.
+
+Use \`chinnaLLM.text()\`, \`chinnaLLM.vision()\`, \`chinnaLLM.image()\`, \`chinnaLLM.code()\` in your React components to implement AI features. Import from "lib/chinnallm".
+Always show proper loading states (spinner or skeleton) while awaiting AI responses.
+Always show error states with retry buttons if AI calls fail.
+Use \`try/catch\` around all AI calls and display user-friendly error messages.
+`;
+  }
+
+  if (aiIntegration === "byok") {
+    return dedent`
+## AI INTEGRATION: ChinnaLLM BYOK Mode
+
+The user chose BYOK, but the generated app must still use the ChinnaLLM SDK and platform invoke route.
+Do not expose provider names, provider endpoints, raw model IDs, or secret keys in generated client code.
+Generate the same **lib/chinnallm.ts** SDK as the ChinnaLLM option, with calls to "/api/chinnallm/invoke".
+When making requests, include \`useByok: true\` in the request body through the SDK options.
+
+Required behavior:
+- Use \`chinnaLLM.text()\`, \`chinnaLLM.vision()\`, and \`chinnaLLM.code()\` from \`lib/chinnallm\`.
+- The user's key is already stored securely by the platform; never ask for it inside the generated app unless the exact app itself is an API-key manager.
+- Show loading, empty, success, and retryable error states.
+- Do not import external AI SDKs.
+- Do not create direct provider clients.
+`;
+  }
+
+  if (aiIntegration === "skip") {
+    return dedent`
+## AI INTEGRATION: Skipped (Stubs Only)
+
+The user chose to skip AI integration. For every AI feature:
+- Generate the function as a stub with a clear TODO comment explaining what to implement.
+- Return mock/placeholder data from AI functions.
+- In the UI, show a tasteful "AI feature coming soon" placeholder or disabled state.
+- Do NOT make any real API calls to AI services.
+- Do NOT import any AI SDK or client library.
+
+Example stub:
+\`\`\`typescript
+// TODO: Replace with real AI integration (e.g. ChinnaLLM or OpenAI)
+export async function generateText(prompt: string): Promise<string> {
+  // Stub: returns a placeholder response
+  return "AI response will appear here when connected.";
+}
+\`\`\`
+`;
+  }
+
+  return "";
+}

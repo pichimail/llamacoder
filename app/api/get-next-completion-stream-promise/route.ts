@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AuthzError, requireChatAccess } from "@/lib/authz";
-import { assertValidModel, getFallbackModel, getHistoryCompressionModel } from "@/lib/constants";
+import { assertValidModel, getFallbackModel, getHistoryCompressionModel, getMaxOutputTokensForModel } from "@/lib/constants";
 import { logGeneration } from "@/lib/braintrust";
 import {
   anyProviderConfigured,
@@ -11,6 +11,8 @@ import {
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { patchModeSystemHint } from "@/lib/code-patch";
 import { getPrisma } from "@/lib/prisma";
+import { getChinnaLLMPromptBlock } from "@/lib/prompts";
+import { requiresAI } from "@/lib/ai-detection";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -114,6 +116,13 @@ const requestSchema = z.object({
   model: z.string().min(1),
   reasoning: z.boolean().optional().default(false),
   quality: z.enum(["low", "high"]).optional().default("low"),
+  /** True when this call is an automatic continuation of a response that was
+   * cut off at the token limit. Skips the fresh-build prompt framing and uses
+   * a continuation-specific instruction instead. */
+  isContinuation: z.boolean().optional().default(false),
+  /** The tail of the previously truncated assistant response, so the model
+   * knows exactly where it stopped and doesn't repeat already-written files. */
+  continuationContext: z.string().max(12000).optional(),
 });
 
 function improveAutofixPrompt(messages: ChatMessage[]) {
@@ -136,12 +145,12 @@ export async function POST(req: Request) {
     return new Response("Server misconfiguration: missing database URL", { status: 500 });
   }
   if (!anyProviderConfigured()) {
-    return new Response("Server misconfiguration: configure TOGETHER_API_KEY or OPENROUTER_API_KEY", { status: 500 });
+    return new Response("Server misconfiguration: configure the platform generation provider key", { status: 500 });
   }
 
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return new Response("Invalid request", { status: 400 });
-  const { messageId, model, reasoning, quality } = parsed.data;
+  const { messageId, model, reasoning, quality, isContinuation, continuationContext } = parsed.data;
 
   const prisma = getPrisma();
   const message = await prisma.message.findUnique({ where: { id: messageId } });
@@ -254,7 +263,53 @@ export async function POST(req: Request) {
     ];
   }
 
-  messages = addPromptLock(messages);
+  if (isContinuation) {
+    // Continuation calls must NOT re-trigger the fresh-build prompt-lock framing
+    // (that would tell the model to start the app over from scratch). Instead,
+    // give it a narrow instruction to resume exactly where it left off.
+    messages = [
+      ...messages,
+      {
+        role: "system" as const,
+        content: [
+          "CONTINUATION MODE.",
+          "Your previous response was cut off because it hit the output length limit — it was NOT finished.",
+          "Continue writing EXACTLY where you left off. Do not restart, summarize, or re-explain the app.",
+          "Do not repeat any file that was already completed in full.",
+          "If the last file was cut off mid-way, finish that file completely before moving to any remaining files.",
+          "Output only fenced code blocks with path metadata, exactly like the original response format.",
+          continuationContext
+            ? `\nHere is the tail of the truncated response for context (do not repeat this content verbatim, continue writing forward from it):\n<<<TRUNCATED_TAIL_START\n${continuationContext}\nTRUNCATED_TAIL_END>>>`
+            : "",
+        ].join("\n"),
+      },
+    ];
+  } else {
+    messages = addPromptLock(messages);
+  }
+
+  const chatSettings = access.chat as any;
+  if (chatSettings.aiIntegration) {
+    const detection = requiresAI(access.chat.prompt || latestUserPrompt(messages));
+    const aiBlock = getChinnaLLMPromptBlock(chatSettings.aiIntegration, detection.capabilities);
+    if (aiBlock) messages = [...messages, { role: "system" as const, content: aiBlock }];
+  }
+
+  if (chatSettings.backendMode) {
+    messages = [
+      ...messages,
+      {
+        role: "system" as const,
+        content: [
+          "BACKEND MODE ENABLED FOR THIS CHAT.",
+          "Return complete backend-safe generated files when the user request requires persistence or APIs.",
+          "Use Neon/Postgres + Prisma as the primary backend pattern.",
+          "Generate .env.example, prisma/schema.prisma, lib/db/neon.ts, optional lib/db/supabase.ts, and app/api/*/route.ts files when needed.",
+          "Keep client preview files separated from server-only files.",
+        ].join("\n"),
+      },
+    ];
+  }
   let requestedModel: string;
   try {
     requestedModel = assertValidModel(model);
@@ -272,17 +327,25 @@ export async function POST(req: Request) {
   });
 
   try {
+    // Resolve the safe output-token ceiling per model instead of a single
+    // hardcoded number. Large multi-file builds (AI SDK injection, backend
+    // files, admin UI, style tokens) routinely need more than the old 9000
+    // ceiling — but raising it must stay bounded by what each model actually
+    // supports, so this always goes through getMaxOutputTokensForModel().
+    const resolvedMaxTokens = getMaxOutputTokensForModel(requestedModel);
+
     const result = await createChatStreamWithFallback({
       model: requestedModel,
       messages: messages.map((m) => ({ role: m.role, content: m.content })) as GenerationMessage[],
       temperature: Number(process.env.GENERATION_TEMPERATURE || 0.25),
-      maxTokens: 9000,
+      maxTokens: resolvedMaxTokens,
       reasoningEnabled: reasoning,
     });
     return new Response(result.stream, {
       headers: {
         "x-hyperspeed-model": result.model,
-        "x-hyperspeed-provider": result.provider,
+        "x-hyperspeed-provider": "platform",
+        "x-hyperspeed-max-tokens": String(resolvedMaxTokens),
       },
     });
   } catch (error) {

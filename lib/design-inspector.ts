@@ -27,14 +27,28 @@ export type InspectorSelectMessage = {
   rect: InspectorRect
 }
 
+export type InspectorTreeNode = {
+  id: string
+  tag: string
+  depth: number
+  className: string
+  text: string
+}
+
+export type InspectorTreeMessage = {
+  source: typeof INSPECTOR_MESSAGE_SOURCE
+  type: 'tree'
+  nodes: InspectorTreeNode[]
+}
+
 export type InspectorParentMessage = {
   source: typeof INSPECTOR_MESSAGE_SOURCE
-  type: 'set-enabled' | 'highlight' | 'clear-highlight'
+  type: 'set-enabled' | 'highlight' | 'clear-highlight' | 'request-tree'
   enabled?: boolean
   id?: string | null
 }
 
-export type InspectorOutboundMessage = InspectorHoverMessage | InspectorSelectMessage
+export type InspectorOutboundMessage = InspectorHoverMessage | InspectorSelectMessage | InspectorTreeMessage
 export type InspectorInboundMessage = InspectorParentMessage
 
 export type ElementTarget = {
@@ -226,3 +240,56 @@ export function updateElementClassName(target: ElementTarget, nextClassName: str
   }
   return target.match.replace(/^<([A-Za-z][A-Za-z0-9.]*)/, `<$1 className="${nextClassName}"`)
 }
+
+/**
+ * Precise, single-property className editing for the style property panel.
+ * Unlike replaceClassToken (which strips by string-prefix and can conflate
+ * unrelated classes that happen to share a prefix — e.g. `text-[22px]` for
+ * font size vs `text-[#fff]` for color both start with `text-[`), this takes
+ * a predicate function so each control only ever touches its own class.
+ */
+export function applyClassProperty(
+  className: string,
+  matchToken: (token: string) => boolean,
+  nextToken: string | null,
+): string {
+  const tokens = className.split(/\s+/).filter(Boolean).filter((token) => !matchToken(token))
+  if (nextToken) tokens.push(nextToken)
+  return tokens.join(' ')
+}
+
+/** Reads the current value of a property (if any) matching the predicate,
+ * so the panel can populate controls with the element's existing state. */
+export function readClassProperty(className: string, matchToken: (token: string) => boolean): string | null {
+  const tokens = className.split(/\s+/).filter(Boolean)
+  return tokens.find(matchToken) ?? null
+}
+
+// --- Property → Tailwind token predicates/builders used by the style panel ---
+// Centralized here so the mapping between "typography/color/layout controls"
+// and actual Tailwind classes has one source of truth.
+export const STYLE_PROPERTY_MATCHERS = {
+  fontFamily: (t: string) => t.startsWith('[font-family:'),
+  fontSize: (t: string) => /^text-\[[\d.]+(px|rem|em)\]$/.test(t),
+  fontWeight: (t: string) =>
+    ['font-thin', 'font-extralight', 'font-light', 'font-normal', 'font-medium', 'font-semibold', 'font-bold', 'font-extrabold', 'font-black'].includes(t),
+  italic: (t: string) => t === 'italic' || t === 'not-italic',
+  lineHeight: (t: string) => /^leading-\[[\d.]+(em|px|rem)?\]$/.test(t) || ['leading-none', 'leading-tight', 'leading-snug', 'leading-normal', 'leading-relaxed', 'leading-loose'].includes(t),
+  letterSpacing: (t: string) => /^tracking-\[-?[\d.]+em\]$/.test(t) || ['tracking-tighter', 'tracking-tight', 'tracking-normal', 'tracking-wide', 'tracking-wider', 'tracking-widest'].includes(t),
+  textAlign: (t: string) => ['text-left', 'text-center', 'text-right', 'text-justify'].includes(t),
+  textCase: (t: string) => ['uppercase', 'lowercase', 'capitalize', 'normal-case'].includes(t),
+  textDecoration: (t: string) => ['underline', 'line-through', 'no-underline', 'overline'].includes(t),
+  textColor: (t: string) => /^text-\[#/.test(t),
+  bgColor: (t: string) => /^bg-\[#/.test(t),
+  display: (t: string) => ['block', 'inline-block', 'inline', 'flex', 'inline-flex', 'grid', 'inline-grid', 'hidden'].includes(t),
+  marginTop: (t: string) => /^mt-\[[\d.]+px\]$/.test(t),
+  marginRight: (t: string) => /^mr-\[[\d.]+px\]$/.test(t),
+  marginBottom: (t: string) => /^mb-\[[\d.]+px\]$/.test(t),
+  marginLeft: (t: string) => /^ml-\[[\d.]+px\]$/.test(t),
+  paddingTop: (t: string) => /^pt-\[[\d.]+px\]$/.test(t),
+  paddingRight: (t: string) => /^pr-\[[\d.]+px\]$/.test(t),
+  paddingBottom: (t: string) => /^pb-\[[\d.]+px\]$/.test(t),
+  paddingLeft: (t: string) => /^pl-\[[\d.]+px\]$/.test(t),
+} as const
+
+export type StylePropertyKey = keyof typeof STYLE_PROPERTY_MATCHERS

@@ -130,7 +130,7 @@ export default async function SharePage({
 
 const getMessage = cache(async (messageId: string) => {
   const prisma = getPrisma();
-  return prisma.message.findUnique({
+  const message = await prisma.message.findUnique({
     where: {
       id: messageId,
     },
@@ -147,4 +147,7 @@ const getMessage = cache(async (messageId: string) => {
       },
     },
   });
+  // Admin-hidden artifacts are not publicly viewable.
+  if (message?.chat?.isHidden) return null;
+  return message;
 });

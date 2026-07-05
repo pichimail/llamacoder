@@ -1,11 +1,12 @@
 "use client";
 
 import { createMessage } from "@/app/(main)/actions";
+import { DotFlow } from "@/components/ui/dot-flow";
 import { toast } from "@/hooks/use-toast";
 import { extractAllCodeBlocks, extractFirstCodeBlock, parseReplySegments } from "@/lib/utils";
 import { mergeArtifactFiles } from "@/lib/code-patch";
 import { repairMissingLocalComponentFiles } from "@/lib/artifact-auto-repair";
-import { formatGeneratedCodeIssues, validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
+import { formatGeneratedCodeIssues, rewriteUnambiguousVisualTokens, validateGeneratedCodeFiles } from "@/lib/generated-code-validation";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { useTheme } from "@/components/theme-provider";
@@ -20,12 +21,16 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Star, Trash2 } from "lucide-react";
+import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2 } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
+import { AIIntegrationChooser } from "@/components/chats/ai-integration-chooser";
+import { CreditIndicator } from "@/components/chats/credit-indicator";
+import { requiresAI, type AICapability } from "@/lib/ai-detection";
+import { useFeatureFlags } from "@/hooks/use-feature-flags";
 
 import {
   Dialog,
@@ -35,6 +40,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
@@ -53,9 +59,19 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database" | "canvas";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
-const MAX_AUTO_FIX_ATTEMPTS = 1;
+const MAX_AUTO_FIX_ATTEMPTS = 2;
 const FIX_CONTEXT_FILE_LIMIT = 18;
 const FIX_CONTEXT_CHAR_BUDGET = 70000;
+/** Max automatic "continue where you left off" rounds fired when a response
+ * is cut off at the provider's token limit. This is a distinct, faster-firing
+ * loop from the general autofix loop above — truncation is a known, mechanical
+ * failure mode (not a code-quality issue), so it gets its own generous budget
+ * and doesn't count against MAX_AUTO_FIX_ATTEMPTS. */
+const MAX_CONTINUATION_ROUNDS = 3;
+/** How many trailing characters of a truncated response to send back to the
+ * model as continuation context. Large enough to show the incomplete last
+ * file, small enough to stay well under any model's input budget. */
+const CONTINUATION_TAIL_CHARS = 6000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
@@ -194,10 +210,26 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [designSaving, setDesignSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
-  const [autoFixEnabled, setAutoFixEnabled] = useState(false);
+  // Auto-fix defaults ON: most users never discover a manually-toggled setting,
+  // and leaving it off by default meant validation failures (including
+  // truncated generations) surfaced as dead-end errors instead of self-healing.
+  // The UI toggle below still lets a user turn it off if they want.
+  const [autoFixEnabled, setAutoFixEnabled] = useState(true);
   const [autoFixAttempt, setAutoFixAttempt] = useState(0);
   const [autoFixStatus, setAutoFixStatus] = useState<"idle" | "watching" | "fixing" | "fallback" | "ready">("idle");
   const [builderStatus, setBuilderStatus] = useState<BuilderStatus>(context.streamPromise ? "generating" : "ready");
+  // Phase 1 audit — STEP 2 error UX (presentation layer only; the fix logic
+  // stays in triggerAutoFix / requestFix). When auto-fix is OFF, a build/preview
+  // error opens this non-dismissible dialog. When ON, a non-blocking toast is
+  // shown instead (tracked via autoFixingToastRef).
+  const [buildErrorDialog, setBuildErrorDialog] = useState<{ error: string; status: "idle" | "fixing" | "failed" } | null>(null);
+  const autoFixingToastRef = useRef<ReturnType<typeof toast> | null>(null);
+  // Phase 3: AI integration chooser state
+  const { isEnabled: flagEnabled } = useFeatureFlags();
+  const [aiChooserPending, setAiChooserPending] = useState(false);
+  const [aiChooserCapabilities, setAiChooserCapabilities] = useState<AICapability[]>([]);
+  const [pendingGenerateCallback, setPendingGenerateCallback] = useState<(() => void) | null>(null);
+  const chatAiIntegration = (chat as any).aiIntegration as string | null | undefined;
   const [activeMessage, setActiveMessage] = useState<Message | undefined>(
     chat.messages
       .filter(
@@ -219,6 +251,19 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const lastAutoFixErrorRef = useRef("");
   const lastAutoFixAtRef = useRef(0);
   const hasAutoSwitchedPreviewRef = useRef(false);
+  // Identity of the messageId/model that kicked off the current in-flight
+  // generation. Populated at every site that starts a stream so a truncated
+  // response can automatically fire a "continue" call against the same
+  // message/model without the user having to do anything. If a call site
+  // hasn't been updated to populate this, continuation degrades gracefully
+  // to a manual "Continue generation" action instead of failing silently.
+  const currentGenerationRef = useRef<{ messageId: string; model: string } | null>(null);
+  const continuationRoundRef = useRef(0);
+  const [continuationStatus, setContinuationStatus] = useState<"idle" | "continuing" | "exhausted">("idle");
+  // Accumulates the full generated text across ALL continuation rounds, since
+  // each round runs as a fresh effect invocation with its own local closure.
+  // Reset to "" at every genuinely new (non-continuation) generation start.
+  const accumulatedGenerationTextRef = useRef("");
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
@@ -382,6 +427,23 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   useEffect(() => {
     const messageId = searchParams.get("generate");
     if (!messageId || streamPromiseRef.current || streamTextRef.current) return;
+    // Phase 3: if no AI decision yet on this chat and the prompt needs AI, show chooser
+    if (!chatAiIntegration && chat.messages.length <= 2) {
+      const userPrompt = chat.prompt || "";
+      const detection = requiresAI(userPrompt);
+      if (detection.detected && !aiChooserPending && flagEnabled("ai-chooser") && flagEnabled("chinnallm")) {
+        setAiChooserCapabilities(detection.capabilities);
+        setAiChooserPending(true);
+        // Stash a callback so the chooser resumes generation after selection
+        setPendingGenerateCallback(() => () => {
+          // Trigger a re-render that re-enters this effect with aiIntegration set
+          if (typeof window !== "undefined") {
+            window.location.reload();
+          }
+        });
+        return; // pause — chooser will resume
+      }
+    }
 
     const requestedModel = searchParams.get("model") || chat.model;
     const requestedQuality = searchParams.get("quality") === "high" ? "high" : "low";
@@ -402,6 +464,11 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     setActiveTab("code");
     setBuilderMode("code");
     setMobilePanel("code");
+
+    currentGenerationRef.current = { messageId, model: requestedModel };
+    continuationRoundRef.current = 0;
+    accumulatedGenerationTextRef.current = "";
+    setContinuationStatus("idle");
 
     const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
       method: "POST",
@@ -492,6 +559,10 @@ Fix requirements:
 - Create every local component or helper file that is imported.
 - Preserve working existing files and routes unless they must change for the fix.`;
     const message = await createMessage(chat.id, text, "user");
+    currentGenerationRef.current = { messageId: message.id, model: chat.model };
+    continuationRoundRef.current = 0;
+    accumulatedGenerationTextRef.current = "";
+    setContinuationStatus("idle");
     const controller = new AbortController();
     abortControllerRef.current = controller;
     const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
@@ -517,9 +588,11 @@ Fix requirements:
     setChatCollapsed(false);
   }, [artifactFiles, chat.id, chat.model]);
 
-  const triggerAutoFix = useCallback(async ({ error, files, fallback = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean }) => {
+  const triggerAutoFix = useCallback(async ({ error, files, fallback = false, force = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean; force?: boolean }) => {
     if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
-    if (!autoFixEnabled) {
+    // `force` runs a single fix even when auto-fix is globally OFF (the "Fix with
+    // ChinnaLLM" button in the build-error dialog) WITHOUT flipping the setting.
+    if (!autoFixEnabled && !force) {
       lastAutoFixErrorRef.current = error.trim();
       setBuilderStatus("failed");
       return;
@@ -572,13 +645,46 @@ Fix requirements:
     if (enabled && activeMessage) setBuilderStatus("validating");
   }, [activeMessage]);
 
-  const handlePreviewError = useCallback((error: string) => {
-    if (!autoFixEnabled) {
-      setBuilderStatus("failed");
+  // STEP 2 — the single presentation funnel for a build/preview error.
+  //   OFF: open the non-dismissible build-error dialog (2a).
+  //   ON:  show a non-blocking "fixing automatically…" toast (2b) and let the
+  //        existing pipeline self-heal. Neither branch changes fix logic.
+  const presentBuildError = useCallback((error: string) => {
+    if (autoFixEnabled) {
+      if (!autoFixingToastRef.current) {
+        autoFixingToastRef.current = toast({
+          title: "Error detected — fixing automatically…",
+          description: "ChinnaLLM is applying a fix.",
+        });
+      }
+      void triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [] });
       return;
     }
-    void triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [] });
+    // OFF → blocking dialog. If already open, refresh its error text but keep
+    // whatever action state it's in unless it had failed.
+    setBuildErrorDialog((prev) =>
+      prev && prev.status === "fixing"
+        ? { error, status: "failed" }
+        : { error, status: prev?.status === "failed" ? "failed" : "idle" },
+    );
+    setBuilderStatus("failed");
   }, [autoFixEnabled, triggerAutoFix, activeMessage]);
+
+  const handlePreviewError = useCallback((error: string) => {
+    presentBuildError(error);
+  }, [presentBuildError]);
+
+  const handleDialogFixWithChinnaLLM = useCallback(async () => {
+    if (!buildErrorDialog) return;
+    const error = buildErrorDialog.error;
+    setBuildErrorDialog({ error, status: "fixing" });
+    // One-shot fix without changing the global auto-fix setting.
+    await triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [], force: true });
+  }, [buildErrorDialog, triggerAutoFix, activeMessage]);
+
+  const handleDialogDismiss = useCallback(() => {
+    setBuildErrorDialog(null);
+  }, []);
 
   const handlePreviewReady = useCallback(() => {
     if (streamPromiseRef.current || streamTextRef.current) return;
@@ -588,6 +694,16 @@ Fix requirements:
     setAutoFixAttempt(0);
     setAutoFixStatus("ready");
     setBuilderStatus("ready");
+    // STEP 2 — the preview compiled, so any pending error UX has been resolved.
+    // 2b: flip the auto-fixing toast to success, then auto-dismiss after 3s.
+    if (autoFixingToastRef.current) {
+      const t = autoFixingToastRef.current;
+      autoFixingToastRef.current = null;
+      t.update({ id: t.id, title: "Fixed — preview updated", description: "The build error was resolved." });
+      setTimeout(() => t.dismiss(), 3000);
+    }
+    // 2a: close the build-error dialog once the fix produced a working preview.
+    setBuildErrorDialog(null);
     if (!hasAutoSwitchedPreviewRef.current && activeMessage) {
       hasAutoSwitchedPreviewRef.current = true;
       setActiveTab("preview");
@@ -666,9 +782,60 @@ Fix requirements:
               variant: "destructive",
             });
           });
-        completionStream.on("finalContent", async (finalText) => {
+        completionStream.on("finalContent", async (finalText, info) => {
             abortControllerRef.current = null;
-            const resolvedText = String(finalText ?? "");
+            const roundText = String(finalText ?? "");
+            accumulatedGenerationTextRef.current += roundText;
+            const resolvedText = accumulatedGenerationTextRef.current;
+            const wasTruncated = Boolean((info as { wasTruncated?: boolean } | undefined)?.wasTruncated);
+
+            if (wasTruncated && resolvedText.trim() && currentGenerationRef.current && continuationRoundRef.current < MAX_CONTINUATION_ROUNDS) {
+              continuationRoundRef.current += 1;
+              setContinuationStatus("continuing");
+              setBuilderStatus("generating");
+              toast({
+                title: "Finishing remaining files...",
+                description: `This build needs a bit more room (round ${continuationRoundRef.current}/${MAX_CONTINUATION_ROUNDS}). Continuing automatically.`,
+              });
+              try {
+                const { messageId: contMessageId, model: contModel } = currentGenerationRef.current;
+                const controller = new AbortController();
+                abortControllerRef.current = controller;
+                const continuationPromise = fetch("/api/get-next-completion-stream-promise", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  signal: controller.signal,
+                  body: JSON.stringify({
+                    messageId: contMessageId,
+                    model: contModel,
+                    isContinuation: true,
+                    continuationContext: resolvedText.slice(-CONTINUATION_TAIL_CHARS),
+                  }),
+                }).then(async (res) => {
+                  if (!res.ok) throw new Error((await res.text()) || "Failed to continue generation");
+                  if (!res.body) throw new Error("No body on continuation response");
+                  return res.body;
+                });
+                isHandlingStreamRef.current = false;
+                streamPromiseRef.current = continuationPromise;
+                setStreamPromise(continuationPromise);
+                return;
+              } catch (continuationError) {
+                console.error("Auto-continuation failed:", continuationError);
+                setContinuationStatus("exhausted");
+                // Fall through to commit whatever we have rather than losing it.
+              }
+            } else if (wasTruncated && continuationRoundRef.current >= MAX_CONTINUATION_ROUNDS) {
+              setContinuationStatus("exhausted");
+              toast({
+                title: "Generation still incomplete after 3 attempts",
+                description: "This build is unusually large. The partial result was saved — click Regenerate or simplify the request.",
+                variant: "destructive",
+              });
+            } else {
+              setContinuationStatus("idle");
+            }
+
             if (!resolvedText.trim()) {
               isHandlingStreamRef.current = false;
               setStreamPromise(undefined);
@@ -685,9 +852,14 @@ Fix requirements:
               // + whatever the new response provides. This prevents accidental loss of files across turns.
               const baseFiles = activeMessage ? getMessageFiles(activeMessage) : [];
               const currentFiles = extractAllCodeBlocks(resolvedText) as RawGeneratedFile[];
-              const mergedFiles = repairMissingLocalComponentFiles(
+              const repairedFiles = repairMissingLocalComponentFiles(
                 mergeArtifactFiles(baseFiles, currentFiles),
               ) as RawGeneratedFile[];
+              // Phase 1 audit — STEP 1: apply the unambiguous semantic-token
+              // rewrites (e.g. bg-white → bg-background, text-black →
+              // text-foreground) before validation, so only genuinely-ambiguous
+              // visual issues reach the validator/autofix pipeline.
+              const { files: mergedFiles } = rewriteUnambiguousVisualTokens(repairedFiles);
               if (mergedFiles.length === 0) {
                 if (isPlanConversation) {
                   await createMessage(chat.id, resolvedText, "assistant", []);
@@ -729,13 +901,9 @@ Fix requirements:
                 setStreamPromise(undefined);
                 setStreamReasoningEnabled(false);
                 if (!autoFixEnabled) {
-                  setBuilderStatus("failed");
-                  toast({
-                    title: "Generated code needs a fix",
-                    description: formatGeneratedCodeIssues(validationIssues).slice(0, 900),
-                    variant: "destructive",
-                  });
-                  refreshPage();
+                  // STEP 2a — surface the validation failure through the same
+                  // non-dismissible build-error dialog used for preview errors.
+                  presentBuildError(validationError);
                   return;
                 }
                 await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
@@ -774,7 +942,7 @@ Fix requirements:
       }
     }
     readStream();
-  }, [chat.id, chat.messages, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix, isPlanConversation]);
+  }, [chat.id, chat.messages, streamPromise, context, autoFixEnabled, syncWorkspaceFiles, triggerAutoFix, presentBuildError, isPlanConversation]);
 
   const detectRequiredEnvKeys = useCallback((files: ArtifactFile[]) => {
     const keys = new Set<string>();
@@ -798,7 +966,7 @@ Fix requirements:
     if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_API_KEY');
     if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_API_SECRET');
     if (/shopify|SHOPIFY/i.test(code)) keys.add('SHOPIFY_STORE_DOMAIN');
-    if (/chinna|openrouter|OPENROUTER_API_KEY/i.test(code)) keys.add('OPENROUTER_API_KEY');
+    if (/chinna|chinnallm|chinnaLLM|api\/chinnallm/i.test(code)) keys.add('CHINNALLM_ENABLED');
     return Array.from(keys);
   }, []);
 
@@ -949,6 +1117,7 @@ Fix requirements:
       return (
         <DesignWorkspace
           chatId={chat.id}
+          chatModel={chat.model}
           files={artifactFiles}
           isStreaming={!!streamPromise}
           onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: artifactFiles.length <= 1, files: artifactFiles }))}
@@ -1020,7 +1189,7 @@ Fix requirements:
 
   if (isFullscreenPreview) {
     const files = activeMessage ? getMessageFiles(activeMessage) : [];
-    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showWebPreviewChrome showDeviceToggle sandpackOptions={sandpackOptions} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin" /><p>No generated version to preview yet.</p></div>}</main>;
+    return <main className="h-dvh w-full bg-background text-foreground" aria-label={`Fullscreen preview of ${chat.title}`}>{files.length > 0 ? <CodeRunner files={files.map((f) => ({ path: f.path, content: f.code ?? f.content ?? "" }))} previewMode={previewMode} showWebPreviewChrome showDeviceToggle sandpackOptions={sandpackOptions} /> : <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"><DotFlow size={7} label="Preparing preview" /><p>No generated version to preview yet.</p></div>}</main>;
   }
 
   const nextPreviewMode = previewMode === "web" ? "mobile" : "web";
@@ -1034,6 +1203,8 @@ Fix requirements:
     builderStatus !== "failed" &&
     activeTab !== "preview" &&
     builderMode !== "design";
+
+  const backendSetupKeys = ["DATABASE_URL", "DIRECT_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY"];
 
   return (
     <TooltipProvider>
@@ -1131,6 +1302,25 @@ Fix requirements:
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
               {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
               <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
+              <CreditIndicator visible={chatAiIntegration === "chinnallm" && flagEnabled("credit-indicator")} className="hidden md:inline-flex" />
+              {chatAiIntegration === "skip" && (
+                <Tip label="Add AI to this app">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden h-8 gap-1.5 px-2.5 text-xs md:inline-flex"
+                    onClick={() => {
+                      const detection = requiresAI(chat.prompt || "");
+                      setAiChooserCapabilities(detection.capabilities.length ? detection.capabilities : ["text"]);
+                      setPendingGenerateCallback(null);
+                      setAiChooserPending(true);
+                    }}
+                  >
+                    <Sparkles className="size-3.5" />
+                    Add AI
+                  </Button>
+                </Tip>
+              )}
               <div className="hidden md:block"><ThemeToggle /></div>
             </div>
           </header>
@@ -1141,6 +1331,12 @@ Fix requirements:
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
                     {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+                    {chat.backendMode ? (
+                      <BackendSetupPanel
+                        envKeys={backendSetupKeys}
+                        onConfigure={() => { setRequiredEnvKeys(backendSetupKeys); setEnvModalOpen(true); }}
+                      />
+                    ) : null}
                     <div className="min-h-0 flex-1 overflow-hidden">
                       <ChatPanel
                         chat={chat}
@@ -1163,7 +1359,55 @@ Fix requirements:
                         onRestoreCheckpoint={handleSwitchVersion}
                       />
                     </div>
-                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                    {continuationStatus === "exhausted" && !streamPromise && (
+                      <div className="shrink-0 px-3 pt-3">
+                        <Alert variant="destructive" className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                            <div>
+                              <AlertTitle className="text-sm">Generation was interrupted</AlertTitle>
+                              <AlertDescription className="text-xs">
+                                This build needed more room than usual to finish. Your progress was saved — click Continue to pick up exactly where it left off.
+                              </AlertDescription>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0"
+                            onClick={() => {
+                              if (!currentGenerationRef.current) return;
+                              continuationRoundRef.current = 0;
+                              setContinuationStatus("continuing");
+                              setBuilderStatus("generating");
+                              const { messageId: contMessageId, model: contModel } = currentGenerationRef.current;
+                              const controller = new AbortController();
+                              abortControllerRef.current = controller;
+                              const continuationPromise = fetch("/api/get-next-completion-stream-promise", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                signal: controller.signal,
+                                body: JSON.stringify({
+                                  messageId: contMessageId,
+                                  model: contModel,
+                                  isContinuation: true,
+                                  continuationContext: accumulatedGenerationTextRef.current.slice(-CONTINUATION_TAIL_CHARS),
+                                }),
+                              }).then(async (res) => {
+                                if (!res.ok) throw new Error((await res.text()) || "Failed to continue generation");
+                                if (!res.body) throw new Error("No body on continuation response");
+                                return res.body;
+                              });
+                              streamPromiseRef.current = continuationPromise;
+                              setStreamPromise(continuationPromise);
+                            }}
+                          >
+                            Continue
+                          </Button>
+                        </Alert>
+                      </div>
+                    )}
+                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; if (options?.messageId && options?.model) { currentGenerationRef.current = { messageId: options.messageId, model: options.model }; continuationRoundRef.current = 0; accumulatedGenerationTextRef.current = ""; setContinuationStatus("idle"); } setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                   </section>
                 </ResizablePanel>
                 <ResizableHandle withHandle className="hidden md:flex" />
@@ -1171,7 +1415,24 @@ Fix requirements:
             ) : null}
 
             <ResizablePanel id="builder-panel" minSize="45%" className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-transparent md:flex`}>
-              <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
+              {aiChooserPending ? (
+                <section className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-y-auto p-4" aria-label="AI integration chooser">
+                  <AIIntegrationChooser
+                    chatId={chat.id}
+                    capabilities={aiChooserCapabilities}
+                    onSelect={(choice) => {
+                      setAiChooserPending(false);
+                      // Resume the pending generation
+                      if (pendingGenerateCallback) {
+                        pendingGenerateCallback();
+                        setPendingGenerateCallback(null);
+                      }
+                    }}
+                  />
+                </section>
+              ) : (
+                <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" aria-label="Artifact builder panel">{renderBuilderSurface()}</section>
+              )}
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
@@ -1296,7 +1557,68 @@ Fix requirements:
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* STEP 2a — non-dismissible build-error dialog, shown only when auto-fix
+            is OFF. Closes on a successful fix (via handlePreviewReady) or Dismiss. */}
+        <Dialog open={!!buildErrorDialog} onOpenChange={() => { /* non-dismissible: only footer actions close it */ }}>
+          <DialogContent
+            className="max-w-2xl [&>button]:hidden"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="size-5 text-destructive" aria-hidden="true" /> Build error
+              </DialogTitle>
+              <DialogDescription>
+                {buildErrorDialog?.status === "failed"
+                  ? "The automatic fix didn't resolve the error. Review the details below and try again or dismiss to edit manually."
+                  : "The preview couldn't build. Fix it with ChinnaLLM, or dismiss to edit the code manually."}
+              </DialogDescription>
+            </DialogHeader>
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 font-mono text-xs leading-5 text-foreground">
+              {buildErrorDialog?.error || "Unknown build error."}
+            </pre>
+            <DialogFooter>
+              <Button variant="ghost" onClick={handleDialogDismiss} disabled={buildErrorDialog?.status === "fixing"}>
+                Dismiss
+              </Button>
+              <Button onClick={handleDialogFixWithChinnaLLM} disabled={buildErrorDialog?.status === "fixing"}>
+                {buildErrorDialog?.status === "fixing" ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" /> Fixing…
+                  </>
+                ) : (
+                  "Fix with ChinnaLLM"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </TooltipProvider>
+  );
+}
+
+function BackendSetupPanel({ envKeys, onConfigure }: { envKeys: string[]; onConfigure: () => void }) {
+  return (
+    <div className="border-b border-border/60 px-4 py-3">
+      <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Database className="size-4 text-muted-foreground" aria-hidden="true" /> Backend setup
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Neon/Postgres + Prisma files are enabled for this build. Add required variables before deploy.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 rounded-lg" onClick={onConfigure}>Configure</Button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {envKeys.map((key) => (
+            <span key={key} className="rounded-md border border-border/70 px-2 py-1 font-mono text-[11px] text-muted-foreground">{key}</span>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         prompt: userPrompt,
         title,
         shadcn: false,
-        projectId: project.id,
+        project: { connect: { id: project.id } },
         messages: {
           create: [
             {

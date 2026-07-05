@@ -10,8 +10,12 @@ export async function GET() {
     googleAuth: s.googleAuth === "on" && googleReady,
     authRequired: s.saasMode === "on" && s.googleAuth === "on" && googleReady,
     gallery: s.gallery !== "off",
-    // Keep auto-fix opt-in. Silent automatic repair loops can burn API credits
-    // when a generated artifact repeatedly fails in the preview sandbox.
-    autoFixDefault: false,
+    // Bug fix: this was previously hardcoded to `false`, which silently
+    // overrode whatever value an admin configured in Settings (and the
+    // platform default) every single time. Auto-fix has a bounded retry
+    // count (MAX_AUTO_FIX_ATTEMPTS) and a separate, tightly-capped
+    // continuation loop for truncated generations, so it does not risk
+    // runaway credit usage — it now correctly reflects the real setting.
+    autoFixDefault: s.autoFixDefault !== "off",
   });
 }

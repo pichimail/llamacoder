@@ -16,10 +16,24 @@ type Listener = (...args: unknown[]) => void;
  * Parses OpenAI-compatible SSE and Together NDJSON streams from the generation API.
  * OpenRouter returns SSE (`data: {...}`); Together returns newline-delimited JSON.
  */
+/** Provider finish reasons that indicate the response was cut off before completion,
+ * not because the model chose to stop. Different providers use slightly different
+ * strings for this, so we normalize them all to a single truncation signal. */
+const TRUNCATION_FINISH_REASONS = new Set([
+  "length",
+  "max_tokens",
+  "model_length",
+  "content_length",
+]);
+
 export class ChatCompletionStreamClient {
   private listeners: Record<string, Listener[]> = {};
   private content = "";
   private reasoning = "";
+  /** Raw finish_reason/stop_reason string reported by the provider, if any. */
+  public finishReason: string | null = null;
+  /** True once we've seen a finish_reason indicating truncation (not natural stop). */
+  public wasTruncated = false;
 
   on(event: string, cb: Listener) {
     if (!this.listeners[event]) this.listeners[event] = [];
@@ -83,10 +97,18 @@ export class ChatCompletionStreamClient {
         }
       }
 
-      this.emit("finalContent", this.content);
+      this.emit("finalContent", this.content, {
+        finishReason: this.finishReason,
+        wasTruncated: this.wasTruncated,
+      });
     } catch (error) {
       this.emit("error", error);
-      if (this.content) this.emit("finalContent", this.content);
+      if (this.content) {
+        this.emit("finalContent", this.content, {
+          finishReason: this.finishReason,
+          wasTruncated: this.wasTruncated,
+        });
+      }
     }
   }
 
@@ -141,7 +163,17 @@ export class ChatCompletionStreamClient {
       throw new Error(chunk.error.message);
     }
 
-    const delta = chunk.choices?.[0]?.delta;
+    const choice = chunk.choices?.[0];
+    const delta = choice?.delta;
+
+    if (choice?.finish_reason) {
+      this.finishReason = choice.finish_reason;
+      if (TRUNCATION_FINISH_REASONS.has(choice.finish_reason)) {
+        this.wasTruncated = true;
+      }
+      this.emit("finishReason", choice.finish_reason, this.wasTruncated);
+    }
+
     if (!delta) return;
 
     const textDelta = delta.content;

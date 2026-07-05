@@ -47,7 +47,17 @@ export async function getPinnedFeaturedApps(): Promise<FeaturedApp[]> {
     const pins = await prisma.featuredPin.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
-    return pins.map(pinToFeaturedApp);
+    // Drop pins whose underlying artifact has been admin-hidden.
+    const messageIds = pins.map((p) => p.messageId).filter(Boolean);
+    let hiddenMessageIds = new Set<string>();
+    if (messageIds.length > 0) {
+      const hidden = await prisma.message.findMany({
+        where: { id: { in: messageIds }, chat: { isHidden: true } },
+        select: { id: true },
+      });
+      hiddenMessageIds = new Set(hidden.map((m) => m.id));
+    }
+    return pins.filter((pin) => !hiddenMessageIds.has(pin.messageId)).map(pinToFeaturedApp);
   } catch {
     return [];
   }

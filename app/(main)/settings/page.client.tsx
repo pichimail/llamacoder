@@ -23,6 +23,7 @@ type BuilderSettings = {
   deepThinkingDefault: boolean;
   canvasDefault: boolean;
   shadcnDefault: boolean;
+  styleDefault: string;
   autoStartGeneration: boolean;
   autoRepairPreview: boolean;
   memoryCompression: boolean;
@@ -45,7 +46,8 @@ const defaults: BuilderSettings = {
   webSearchDefault: false,
   deepThinkingDefault: false,
   canvasDefault: false,
-  shadcnDefault: false,
+  shadcnDefault: true,
+  styleDefault: "modern-saas",
   autoStartGeneration: true,
   autoRepairPreview: true,
   memoryCompression: true,
@@ -190,6 +192,9 @@ export default function SettingsPageClient() {
                 </NativeSelect>
                 <NativeSelect label="Styling" value={settings.defaultStyling} onChange={(value) => update("defaultStyling", value as BuilderSettings["defaultStyling"])}>
                   <option value="shadcn">shadcn/ui</option><option value="tailwind">Tailwind only</option><option value="css">Plain CSS</option>
+                </NativeSelect>
+                <NativeSelect label="Default output style" value={settings.styleDefault} onChange={(value) => update("styleDefault", value)}>
+                  <option value="modern-saas">Modern SaaS (indigo)</option><option value="editorial-dark">Editorial (amber)</option><option value="warm-neutral">Warm (orange)</option><option value="vibrant-accent">Vibrant (violet)</option><option value="glassmorphism">Glass (cyan)</option>
                 </NativeSelect>
               </div>
               <div className="mt-4">

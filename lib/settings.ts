@@ -14,7 +14,11 @@ const DEFAULTS: Record<string, string> = {
   saasMode: "on",
   googleAuth: "on",
   gallery: "on",
-  autoFixDefault: "off",
+  // Auto-fix defaults ON. Leaving this off meant most users never discovered
+  // the toggle, so validation failures (including truncated generations)
+  // dead-ended into an error instead of self-healing. Admins can still turn
+  // it off platform-wide from Settings if they prefer manual control.
+  autoFixDefault: "on",
 };
 
 export async function getSettings(): Promise<Record<string, string>> {
