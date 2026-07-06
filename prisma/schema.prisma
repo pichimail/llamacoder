@@ -24,6 +24,7 @@ model Chat {
   title             String
   llamaCoderVersion String        @default("v2")
   shadcn            Boolean
+  styleId           String        @default("modern-saas")
   aiIntegration     String?       // "chinnallm" | "byok" | "skip" | null
   backendMode       Boolean       @default(false)
   messages          Message[]

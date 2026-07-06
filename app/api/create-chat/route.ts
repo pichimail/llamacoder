@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
         prompt,
         title: buildSpec.title,
         shadcn,
+        styleId,
         project: { connect: { id: project.id } },
         aiIntegration: aiIntegration ?? null,
         backendMode: buildSpec.backendMode,

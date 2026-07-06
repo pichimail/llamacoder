@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
   if (patched.length === 0) patched = currentFiles;
 
   // validate
-  const issues = await validateGeneratedCodeFiles(patched);
+  const issues = await validateGeneratedCodeFiles(patched, access.chat.styleId);
   if (issues.length > 0) {
     return NextResponse.json({ ok: false, validation: { ok: false, issues: issues.slice(0,5), formatted: formatGeneratedCodeIssues(issues) } }, { status: 400 });
   }

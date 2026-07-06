@@ -297,9 +297,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const sandpackOptions = useMemo<SandpackBuildOptions>(
     () => ({
       includeShadcn: chat.shadcn,
+      styleId: chat.styleId,
       theme: resolvedTheme === "dark" ? "dark" : "light",
     }),
-    [chat.shadcn, resolvedTheme],
+    [chat.shadcn, chat.styleId, resolvedTheme],
   );
 
   const hasCodeInStream = useMemo(
@@ -883,7 +884,7 @@ Fix requirements:
                 });
                 return;
               }
-              const validationIssues = await validateGeneratedCodeFiles(mergedFiles);
+              const validationIssues = await validateGeneratedCodeFiles(mergedFiles, chat.styleId);
               if (validationIssues.length > 0) {
                 const validationError = `Generated code validation failed before preview commit.\n\n${formatGeneratedCodeIssues(validationIssues)}`;
                 const blockedMessage = await createMessage(chat.id, resolvedText, "assistant", mergedFiles);

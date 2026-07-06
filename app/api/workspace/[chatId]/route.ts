@@ -72,12 +72,13 @@ function summarizeBuildSpec(chat: {
   };
 }
 
-async function summarizeValidation(files: Array<{ path: string; content: string }>) {
+async function summarizeValidation(files: Array<{ path: string; content: string }>, styleId?: string) {
   const issues = await validateGeneratedCodeFiles(
     files.map((file) => ({
       path: file.path,
       content: file.content,
     })),
+    styleId,
   );
 
   return {
@@ -124,6 +125,7 @@ async function serializeWorkspace(chatId: string) {
   ]);
   const validation = await summarizeValidation(
     projectFiles.map((file) => ({ path: file.path, content: file.content })),
+    workspace.chat.styleId,
   );
   const buildSpec = summarizeBuildSpec(workspace.chat);
 
@@ -187,7 +189,7 @@ async function syncFiles(chatId: string, files: WorkspaceFileInput[]) {
       }),
     ),
   ]);
-  const validation = await summarizeValidation(clean);
+  const validation = await summarizeValidation(clean, workspace.chat.styleId);
   return { workspace, count: clean.length, files: clean, deletedPaths, validation };
 }
 
@@ -358,7 +360,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
             })
           ).map((file) => ({ path: file.path, content: file.content }));
 
-    const validation = await summarizeValidation(files);
+    const validation = await summarizeValidation(files, chat.styleId);
     return NextResponse.json({
       ok: validation.ok,
       validation,
