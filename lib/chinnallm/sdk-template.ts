@@ -8,7 +8,7 @@ export const CHINNALLM_SDK = `// lib/chinnallm.ts — ChinnaLLM AI SDK (auto-inj
 const CHINNALLM_ENDPOINT = "/api/chinnallm/invoke";
 
 type ChinnaLLMOptions = {
-  model?: "auto" | "lite" | "pro" | "ultra" | "code" | "vision" | "think";
+  model?: "auto" | "free" | "lite" | "pro" | "ultra" | "code" | "vision" | "think";
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
@@ -72,7 +72,8 @@ export const chinnaLLM = {
 /** Maps SDK-facing friendly model aliases to ChinnaLLM tiers. */
 export const SDK_MODEL_ALIAS_TO_TIER: Record<string, string> = {
   auto: "auto",
-  lite: "budget",
+  free: "free",
+  lite: "free",
   pro: "flagship",
   ultra: "flagship",
   code: "coding",

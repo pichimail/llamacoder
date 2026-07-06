@@ -540,7 +540,7 @@ Generate the following additional files:
 const CHINNALLM_ENDPOINT = "/api/chinnallm/invoke";
 
 type ChinnaLLMOptions = {
-  model?: "auto" | "lite" | "pro" | "ultra" | "code" | "vision" | "think";
+  model?: "auto" | "free" | "lite" | "pro" | "ultra" | "code" | "vision" | "think";
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
@@ -600,6 +600,11 @@ export const chinnaLLM = {
 2. Do **not** generate direct provider routes or direct AI-provider clients. The platform endpoint already exists at \`/api/chinnallm/invoke\`.
 
 Use \`chinnaLLM.text()\`, \`chinnaLLM.vision()\`, \`chinnaLLM.image()\`, \`chinnaLLM.code()\` in your React components to implement AI features. Import from "lib/chinnallm".
+Model routing guidance:
+- For small text, summaries, basic chat, short classifications, and lightweight suggestions, pass \`{ model: "free" }\` or omit the model so ChinnaLLM starts with OpenRouter Free and falls back automatically.
+- For larger answers, planning, data-heavy responses, or uncertain complexity, pass \`{ model: "auto" }\`.
+- For coding-heavy work, pass \`{ model: "code" }\`; for deep reasoning, pass \`{ model: "think" }\`; for image understanding, pass \`{ model: "vision" }\`; for premium multimodal or long-form tasks, pass \`{ model: "pro" }\`.
+- Do not request direct image/video/music provider SDKs; keep all AI calls behind ChinnaLLM so the platform can route to the right model tier.
 Always show proper loading states (spinner or skeleton) while awaiting AI responses.
 Always show error states with retry buttons if AI calls fail.
 Use \`try/catch\` around all AI calls and display user-friendly error messages.

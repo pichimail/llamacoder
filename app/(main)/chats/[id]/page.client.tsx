@@ -284,6 +284,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [aiChooserCapabilities, setAiChooserCapabilities] = useState<AICapability[]>([]);
   const [pendingGenerateCallback, setPendingGenerateCallback] = useState<(() => void) | null>(null);
   const chatAiIntegration = (chat as any).aiIntegration as string | null | undefined;
+  const aiChooserStorageKey = useMemo(() => `ai-chooser:${chat.id}`, [chat.id]);
   const [activeMessage, setActiveMessage] = useState<Message | undefined>(
     chat.messages
       .filter(
@@ -349,6 +350,29 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     };
   }, []);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (chatAiIntegration) {
+      window.sessionStorage.removeItem(aiChooserStorageKey);
+      setAiChooserPending(false);
+      return;
+    }
+    if (window.sessionStorage.getItem(aiChooserStorageKey) !== "pending") return;
+    if (!flagEnabled("ai-chooser") || !flagEnabled("chinnallm")) return;
+
+    const detection = requiresAI(chat.prompt || "");
+    if (!detection.detected) {
+      window.sessionStorage.removeItem(aiChooserStorageKey);
+      return;
+    }
+
+    setAiChooserCapabilities(detection.capabilities);
+    setAiChooserPending(true);
+    setPendingGenerateCallback(() => () => {
+      if (typeof window !== "undefined") window.location.reload();
+    });
+  }, [aiChooserStorageKey, chat.prompt, chatAiIntegration, flagEnabled]);
 
   useEffect(() => {
     if (searchParams.get("preview") !== "1") return;
@@ -515,6 +539,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       const userPrompt = chat.prompt || "";
       const detection = requiresAI(userPrompt);
       if (detection.detected && !aiChooserPending && flagEnabled("ai-chooser") && flagEnabled("chinnallm")) {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(aiChooserStorageKey, "pending");
+        }
         setAiChooserCapabilities(detection.capabilities);
         setAiChooserPending(true);
         // Stash a callback so the chooser resumes generation after selection
@@ -1632,6 +1659,9 @@ Fix requirements:
                     chatId={chat.id}
                     capabilities={aiChooserCapabilities}
                     onSelect={(choice) => {
+                      if (typeof window !== "undefined") {
+                        window.sessionStorage.removeItem(aiChooserStorageKey);
+                      }
                       setAiChooserPending(false);
                       // Resume the pending generation
                       if (pendingGenerateCallback) {

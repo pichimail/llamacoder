@@ -5,6 +5,7 @@ import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { getPrisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/chinnallm/encryption";
 import { SDK_MODEL_ALIAS_TO_TIER } from "@/lib/chinnallm/sdk-template";
+import { getBYOKProvider, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
 import {
   invokeChinnaLLM,
   ChinnaLLMError,
@@ -65,7 +66,131 @@ function resolveTier(body: z.infer<typeof invokeSchema>): string | undefined {
   if (body.action === "vision") return "vision";
   if (body.action === "code") return "coding";
   if (body.action === "image") return "image";
-  return undefined;
+  if (body.action === "text") return "free";
+  return "free";
+}
+
+function flattenMessages(messages: ChinnaLLMMessage[]) {
+  return messages.map((message) => ({
+    role: message.role,
+    content: typeof message.content === "string"
+      ? message.content
+      : message.content.map((part) => part.type === "text" ? part.text : `[image: ${part.image_url.url}]`).join("\n"),
+  }));
+}
+
+async function invokeDirectByokProvider(params: {
+  providerId: BYOKProviderId;
+  key: string;
+  messages: ChinnaLLMMessage[];
+  maxTokens?: number;
+  temperature?: number;
+}) {
+  const provider = getBYOKProvider(params.providerId);
+  const started = Date.now();
+  const textMessages = flattenMessages(params.messages);
+  const maxTokens = params.maxTokens ?? 1024;
+  const temperature = params.temperature ?? 0.7;
+
+  async function openAICompatible(url: string, model = provider.defaultModel) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: textMessages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ChinnaLLMError(json?.error?.message || `${provider.label} request failed.`, response.status);
+    }
+    return {
+      content: json?.choices?.[0]?.message?.content ?? "",
+      inputTokens: json?.usage?.prompt_tokens,
+      outputTokens: json?.usage?.completion_tokens,
+    };
+  }
+
+  let result: { content: string; inputTokens?: number; outputTokens?: number };
+  if (provider.id === "anthropic") {
+    const system = textMessages.find((message) => message.role === "system")?.content;
+    const messages = textMessages
+      .filter((message) => message.role !== "system")
+      .map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", content: message.content }));
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": params.key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: provider.defaultModel,
+        system,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ChinnaLLMError(json?.error?.message || `${provider.label} request failed.`, response.status);
+    }
+    result = {
+      content: Array.isArray(json?.content)
+        ? json.content.map((part: any) => part?.text || "").join("")
+        : "",
+      inputTokens: json?.usage?.input_tokens,
+      outputTokens: json?.usage?.output_tokens,
+    };
+  } else if (provider.id === "google") {
+    const prompt = textMessages.map((message) => `${message.role}: ${message.content}`).join("\n\n");
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${provider.defaultModel}:generateContent?key=${encodeURIComponent(params.key)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
+        }),
+      },
+    );
+    const json = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ChinnaLLMError(json?.error?.message || `${provider.label} request failed.`, response.status);
+    }
+    result = {
+      content: json?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("") ?? "",
+      inputTokens: json?.usageMetadata?.promptTokenCount,
+      outputTokens: json?.usageMetadata?.candidatesTokenCount,
+    };
+  } else {
+    const urls: Record<string, string> = {
+      openai: "https://api.openai.com/v1/chat/completions",
+      xai: "https://api.x.ai/v1/chat/completions",
+      together: "https://api.together.xyz/v1/chat/completions",
+      nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+    };
+    result = await openAICompatible(urls[provider.id] ?? urls.openai);
+  }
+
+  const content = result.content || "";
+  return {
+    model: provider.shortName,
+    tier: "byok",
+    content,
+    inputTokens: result.inputTokens ?? Math.max(Math.ceil(JSON.stringify(textMessages).length / 4), 1),
+    outputTokens: result.outputTokens ?? Math.max(Math.ceil(content.length / 4), 1),
+    creditsUsed: 0,
+    latencyMs: Date.now() - started,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -87,14 +212,30 @@ export async function POST(request: NextRequest) {
 
     // BYOK: decrypt the user's stored key server-side; the key never round-trips.
     let byokKey: string | undefined;
+    let byokProvider: BYOKProviderId | undefined;
     if (body.useByok) {
       await assertFeatureAllowed(user.id, "byok");
       const prisma = getPrisma();
-      const stored = await prisma.apiKeyStore.findUnique({
-        where: { userId_provider: { userId: user.id, provider: "openrouter" } },
+      const stored = await prisma.apiKeyStore.findFirst({
+        where: { userId: user.id },
+        orderBy: { updatedAt: "desc" },
       });
       if (!stored) return NextResponse.json({ error: "No BYOK key stored. Add one in Settings → API Keys." }, { status: 400 });
       byokKey = decrypt(stored.encryptedKey, stored.iv);
+      byokProvider = getBYOKProvider(stored.provider).id;
+      if (byokProvider !== "openrouter") {
+        if (body.stream) {
+          return NextResponse.json({ error: "Streaming BYOK is currently available through OpenRouter keys only." }, { status: 400 });
+        }
+        const byokResult = await invokeDirectByokProvider({
+          providerId: byokProvider,
+          key: byokKey,
+          messages,
+          maxTokens: body.maxTokens,
+          temperature: body.temperature,
+        });
+        return NextResponse.json(byokResult);
+      }
     }
 
     const result = await invokeChinnaLLM({

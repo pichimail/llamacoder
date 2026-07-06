@@ -5,9 +5,10 @@ import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { getPrisma } from "@/lib/prisma";
 import { encrypt, maskKey } from "@/lib/chinnallm/encryption";
 import { assertFeatureAllowed, PlanLimitError, planErrorResponseBody } from "@/lib/plan";
+import { BYOK_PROVIDER_IDS } from "@/lib/chinnallm/provider-catalog";
 
 const storeSchema = z.object({
-  provider: z.enum(["openrouter", "openai", "anthropic"]).default("openrouter"),
+  provider: z.enum(BYOK_PROVIDER_IDS).default("openrouter"),
   key: z.string().min(8).max(400),
   label: z.string().max(120).optional(),
 });

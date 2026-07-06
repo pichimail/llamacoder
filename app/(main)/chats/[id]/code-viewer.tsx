@@ -849,17 +849,22 @@ function BuildProgressLoader({ compact = false }: { compact?: boolean }) {
 
   return (
     <div
-      className={`flex h-full w-full flex-col items-center justify-center gap-4 bg-background px-6 text-center ${compact ? "gap-3" : "gap-4"}`}
+      className={`relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-background px-6 text-center ${compact ? "gap-3" : "gap-4"}`}
       aria-live="polite"
       aria-label="Building your app"
     >
-      <DotFlow size={compact ? 8 : 10} count={4} className="text-primary" label="Building" />
-      <div className="h-1 w-40 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <div className="hs-build-progress-bar h-full w-1/3 rounded-full bg-primary" />
+      <div className="absolute inset-6 rounded-[2rem] border border-primary/10 bg-[radial-gradient(circle_at_50%_20%,hsl(var(--primary)/0.18),transparent_34%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)/0.55))] shadow-[0_0_80px_hsl(var(--primary)/0.13)]" aria-hidden="true" />
+      <div className={`relative flex flex-col items-center justify-center rounded-3xl border border-border/70 bg-card/85 shadow-2xl shadow-primary/10 backdrop-blur-xl ${compact ? "gap-3 px-5 py-4" : "gap-4 px-8 py-7"}`}>
+        <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3 shadow-[0_0_36px_hsl(var(--primary)/0.24)]">
+          <DotFlow size={compact ? 8 : 10} count={4} className="text-primary" label="Building" />
+        </div>
+        <div className="h-1.5 w-48 overflow-hidden rounded-full border border-border/60 bg-muted/70 shadow-inner" aria-hidden="true">
+          <div className="hs-build-progress-bar h-full w-1/3 rounded-full bg-primary shadow-[0_0_18px_hsl(var(--primary)/0.7)]" />
+        </div>
+        <p key={messageIndex} className="hs-composer-swap max-w-sm text-sm font-medium text-foreground/85">
+          {BUILD_STATUS_MESSAGES[messageIndex]}
+        </p>
       </div>
-      <p key={messageIndex} className="hs-composer-swap max-w-sm text-sm text-muted-foreground">
-        {BUILD_STATUS_MESSAGES[messageIndex]}
-      </p>
     </div>
   );
 }

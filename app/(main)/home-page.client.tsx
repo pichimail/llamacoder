@@ -3,7 +3,7 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Heart, Store, Upload, Video, Wand2, Zap } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -859,7 +859,7 @@ export default function HomePageClient() {
               <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
                 <motion.div {...heroWordAnimation} transition={{ duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}>
                   <Badge variant="outline" className="mb-6 rounded-full border-white/15 bg-white/[0.05] px-4 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur-sm">
-                    <Sparkles className="mr-1.5 size-3.5 text-indigo-300" /> Now with 5 premium output styles & Three.js
+                    <Heart className="mr-1.5 size-3.5 text-indigo-300" /> Now with 5 premium output styles & Three.js
                   </Badge>
                 </motion.div>
                 <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-foreground sm:text-[44px] md:text-[80px] lg:text-[92px]">

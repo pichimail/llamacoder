@@ -4,16 +4,18 @@
  * Non-blocking inline card shown in the chat stream BEFORE generation begins,
  * only when AI capabilities are detected in the prompt. */
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { KeyRound, Loader2, Sparkles, SkipForward, Zap } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { AlertTriangle, CheckCircle2, ExternalLink, KeyRound, Loader2, Sparkles, SkipForward, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import type { AICapability } from "@/lib/ai-detection";
+import { BYOK_PROVIDERS, getBYOKProvider, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
 
 export type AIIntegrationChoice = "chinnallm" | "byok" | "skip";
 
@@ -42,11 +44,20 @@ interface AIIntegrationChooserProps {
   onDismiss?: () => void;
 }
 
-export function AIIntegrationChooser({ chatId, capabilities, onSelect, onDismiss }: AIIntegrationChooserProps) {
+type KeyTestState =
+  | { status: "idle"; message: string }
+  | { status: "testing"; message: string }
+  | { status: "success"; message: string; provider: BYOKProviderId; key: string }
+  | { status: "error"; message: string };
+
+export function AIIntegrationChooser({ chatId, capabilities, onSelect }: AIIntegrationChooserProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [showByokInput, setShowByokInput] = useState(false);
   const [byokKey, setByokKey] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState<BYOKProviderId>("openrouter");
+  const [testState, setTestState] = useState<KeyTestState>({ status: "idle", message: "" });
   const [isPending, startTransition] = useTransition();
+  const selectedProvider = useMemo(() => getBYOKProvider(selectedProviderId), [selectedProviderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,11 +89,15 @@ export function AIIntegrationChooser({ chatId, capabilities, onSelect, onDismiss
       toast({ title: "Enter a valid API key", variant: "destructive" });
       return;
     }
+    if (testState.status !== "success" || testState.key !== key || testState.provider !== selectedProviderId) {
+      toast({ title: "Test the key first", description: `Run a live ${selectedProvider.shortName} key test before saving.`, variant: "destructive" });
+      return;
+    }
     startTransition(async () => {
       const response = await fetch("/api/chinnallm/byok", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "openrouter", key, label: "Chat BYOK" }),
+        body: JSON.stringify({ provider: selectedProviderId, key, label: `${selectedProvider.shortName} BYOK` }),
       }).catch(() => null);
       if (!response?.ok) {
         const data = await response?.json().catch(() => null);
@@ -91,6 +106,49 @@ export function AIIntegrationChooser({ chatId, capabilities, onSelect, onDismiss
       }
       await patchChat("byok");
       onSelect("byok");
+    });
+  };
+
+  const handleProviderChange = (value: string) => {
+    setSelectedProviderId(value as BYOKProviderId);
+    setTestState({ status: "idle", message: "" });
+  };
+
+  const handleKeyChange = (value: string) => {
+    setByokKey(value);
+    setTestState({ status: "idle", message: "" });
+  };
+
+  const handleTestKey = () => {
+    const key = byokKey.trim();
+    if (key.length < 8) {
+      toast({ title: "Enter a valid API key", variant: "destructive" });
+      return;
+    }
+
+    setTestState({ status: "testing", message: `Testing ${selectedProvider.shortName}...` });
+    startTransition(async () => {
+      const response = await fetch("/api/chinnallm/byok/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: selectedProviderId, key }),
+      }).catch(() => null);
+      const data = await response?.json().catch(() => null);
+      if (!response?.ok || !data?.ok) {
+        setTestState({
+          status: "error",
+          message: data?.message || data?.error || `${selectedProvider.shortName} did not accept this key.`,
+        });
+        return;
+      }
+      setTestState({
+        status: "success",
+        provider: selectedProviderId,
+        key,
+        message: data.modelCount
+          ? `${selectedProvider.shortName} responded with ${data.modelCount} available models.`
+          : data.message || `${selectedProvider.shortName} key is working.`,
+      });
     });
   };
 
@@ -139,6 +197,9 @@ export function AIIntegrationChooser({ chatId, capabilities, onSelect, onDismiss
               <p className="mt-1 text-xs text-muted-foreground">
                 Supported: {capabilities.map((c) => CAPABILITY_LABELS[c]).join(", ")}
               </p>
+              <p className="mt-2 rounded-lg border border-primary/15 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                Uses OpenRouter Free for lightweight text, then OpenRouter Auto and stronger ChinnaLLM tiers for larger, reasoning, image, video, or music work.
+              </p>
             </div>
             {isPending ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : null}
           </div>
@@ -165,22 +226,71 @@ export function AIIntegrationChooser({ chatId, capabilities, onSelect, onDismiss
           {showByokInput ? (
             <div className="mt-3 grid gap-3 pl-12">
               <div className="grid gap-2">
+                <Label htmlFor="byok-provider" className="text-xs">AI provider</Label>
+                <div className="flex gap-2">
+                  <Select value={selectedProviderId} onValueChange={handleProviderChange}>
+                    <SelectTrigger id="byok-provider" className="h-11 rounded-lg border-border/70 bg-background/80">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BYOK_PROVIDERS.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          <span className="inline-flex items-center gap-2">
+                            <img src={provider.logoUrl} alt="" className="size-4 rounded-sm" />
+                            {provider.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button asChild variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-lg" title={`Get ${selectedProvider.shortName} API key`}>
+                    <a href={selectedProvider.apiKeyUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="size-4" />
+                      <span className="sr-only">Open API key page</span>
+                    </a>
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="byok-inline-key" className="text-xs">API Key</Label>
                 <Input
                   id="byok-inline-key"
                   type="password"
                   value={byokKey}
-                  onChange={(event) => setByokKey(event.target.value)}
-                  placeholder="sk-..."
+                  onChange={(event) => handleKeyChange(event.target.value)}
+                  placeholder={selectedProvider.placeholder}
                   autoFocus
                   autoComplete="off"
                   className="h-10 rounded-lg"
                 />
               </div>
-              <Button onClick={handleByokSave} disabled={isPending || byokKey.trim().length < 8} size="sm" className="min-h-[40px] w-full rounded-lg sm:w-auto">
-                {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                Save & continue
-              </Button>
+              {testState.message ? (
+                <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
+                  testState.status === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                    : testState.status === "error"
+                      ? "border-destructive/30 bg-destructive/10 text-destructive"
+                      : "border-border bg-muted/40 text-muted-foreground"
+                }`}>
+                  {testState.status === "success" ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" /> : testState.status === "error" ? <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> : <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin" />}
+                  <span>{testState.message}</span>
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button onClick={handleTestKey} disabled={isPending || byokKey.trim().length < 8 || testState.status === "testing"} size="sm" variant="outline" className="min-h-[40px] rounded-lg">
+                  {testState.status === "testing" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Zap className="mr-2 size-4" />}
+                  Test key
+                </Button>
+                <Button
+                  onClick={handleByokSave}
+                  disabled={isPending || testState.status !== "success" || testState.key !== byokKey.trim() || testState.provider !== selectedProviderId}
+                  size="sm"
+                  className="min-h-[40px] rounded-lg"
+                >
+                  {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                  Save & continue
+                </Button>
+              </div>
             </div>
           ) : null}
         </div>

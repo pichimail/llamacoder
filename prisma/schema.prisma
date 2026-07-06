@@ -437,7 +437,7 @@ model ApiKeyStore {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider     String   @default("openrouter") // openrouter|openai|anthropic
+  provider     String   @default("openrouter") // openrouter|openai|anthropic|xai|google|together|nvidia
   encryptedKey String   // AES-256-GCM encrypted
   iv           String   // initialization vector
   label        String?

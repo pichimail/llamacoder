@@ -23,17 +23,17 @@ export type ChinnaLLMSeedModel = {
 
 export const CHINNALLM_DEFAULT_MODELS: ChinnaLLMSeedModel[] = [
   // Budget
-  { displayName: "ChinnaLLM Lite", openRouterId: "deepseek/deepseek-chat-v3.2", tier: "budget", costPerKTokens: 1, enabled: true, sortOrder: 0, description: "Fast, low-cost general model for everyday tasks.", capabilities: ["text", "streaming"] },
+  { displayName: "ChinnaLLM Lite", openRouterId: "openrouter/free", tier: "budget", costPerKTokens: 0, enabled: true, sortOrder: 0, description: "Free lightweight route for everyday text tasks.", capabilities: ["text", "streaming"] },
   { displayName: "ChinnaLLM Code Lite", openRouterId: "qwen/qwen3-coder", tier: "budget", costPerKTokens: 1, enabled: true, sortOrder: 1, description: "Budget-friendly coding assistant.", capabilities: ["text", "streaming"] },
   // Coding
-  { displayName: "ChinnaLLM Code", openRouterId: "anthropic/claude-sonnet-4.5", tier: "coding", costPerKTokens: 3, enabled: true, sortOrder: 0, description: "High-quality code generation and refactoring.", capabilities: ["text", "vision", "streaming"] },
-  { displayName: "ChinnaLLM Code Pro", openRouterId: "deepseek/deepseek-coder", tier: "coding", costPerKTokens: 3, enabled: true, sortOrder: 1, description: "Specialist coding model for large edits.", capabilities: ["text", "streaming"] },
+  { displayName: "ChinnaLLM Code", openRouterId: "anthropic/claude-sonnet-5", tier: "coding", costPerKTokens: 3, enabled: true, sortOrder: 0, description: "High-quality code generation and refactoring.", capabilities: ["text", "vision", "streaming"] },
+  { displayName: "ChinnaLLM Code Pro", openRouterId: "deepseek/deepseek-v4-pro", tier: "coding", costPerKTokens: 3, enabled: true, sortOrder: 1, description: "Specialist coding model for large edits.", capabilities: ["text", "streaming"] },
   // Flagship
-  { displayName: "ChinnaLLM Pro", openRouterId: "anthropic/claude-opus-4", tier: "flagship", costPerKTokens: 10, enabled: true, sortOrder: 0, description: "Top-tier reasoning and generation quality.", capabilities: ["text", "vision", "streaming"] },
-  { displayName: "ChinnaLLM Ultra", openRouterId: "openai/gpt-4o", tier: "flagship", costPerKTokens: 10, enabled: true, sortOrder: 1, description: "Flagship multimodal model.", capabilities: ["text", "vision", "streaming"] },
+  { displayName: "ChinnaLLM Pro", openRouterId: "sakana/fugu-ultra", tier: "flagship", costPerKTokens: 10, enabled: true, sortOrder: 0, description: "Top-tier multi-agent reasoning and generation quality.", capabilities: ["text", "vision", "streaming", "reasoning"] },
+  { displayName: "ChinnaLLM Ultra", openRouterId: "anthropic/claude-opus-4.8", tier: "flagship", costPerKTokens: 10, enabled: true, sortOrder: 1, description: "Flagship multimodal model.", capabilities: ["text", "vision", "streaming"] },
   // Reasoning
-  { displayName: "ChinnaLLM Think", openRouterId: "deepseek/deepseek-r1", tier: "reasoning", costPerKTokens: 8, enabled: true, sortOrder: 0, description: "Deep step-by-step reasoning.", capabilities: ["text", "streaming", "reasoning"] },
-  { displayName: "ChinnaLLM Reason", openRouterId: "anthropic/claude-3.7-sonnet", tier: "reasoning", costPerKTokens: 8, enabled: true, sortOrder: 1, description: "Extended-thinking reasoning model.", capabilities: ["text", "vision", "streaming", "reasoning"] },
+  { displayName: "ChinnaLLM Think", openRouterId: "qwen/qwen3-max-thinking", tier: "reasoning", costPerKTokens: 8, enabled: true, sortOrder: 0, description: "Deep step-by-step reasoning.", capabilities: ["text", "streaming", "reasoning"] },
+  { displayName: "ChinnaLLM Reason", openRouterId: "deepseek/deepseek-v4-pro", tier: "reasoning", costPerKTokens: 8, enabled: true, sortOrder: 1, description: "Extended-thinking reasoning model.", capabilities: ["text", "streaming", "reasoning"] },
   // Vision
   { displayName: "ChinnaLLM Vision", openRouterId: "anthropic/claude-sonnet-4.5", tier: "vision", costPerKTokens: 5, enabled: true, sortOrder: 0, description: "Image understanding and analysis.", capabilities: ["text", "vision", "streaming"] },
   { displayName: "ChinnaLLM Vision Pro", openRouterId: "openai/gpt-4o", tier: "vision", costPerKTokens: 5, enabled: true, sortOrder: 1, description: "Advanced multimodal vision.", capabilities: ["text", "vision", "streaming"] },
@@ -44,10 +44,10 @@ export const CHINNALLM_DEFAULT_MODELS: ChinnaLLMSeedModel[] = [
   // Music gen
   { displayName: "ChinnaLLM Music", openRouterId: "suno/suno-chirp-v3", tier: "music", costPerKTokens: 30, enabled: true, sortOrder: 0, description: "Music and audio generation.", capabilities: ["music"] },
   // Code gen (max)
-  { displayName: "ChinnaLLM Code Max", openRouterId: "qwen/qwen3-coder-480b", tier: "code", costPerKTokens: 5, enabled: true, sortOrder: 0, description: "Largest coding model for complex codebases.", capabilities: ["text", "streaming"] },
+  { displayName: "ChinnaLLM Code Max", openRouterId: "qwen/qwen3-coder-next", tier: "code", costPerKTokens: 5, enabled: true, sortOrder: 0, description: "Largest coding model for complex codebases.", capabilities: ["text", "streaming"] },
   // Free
-  { displayName: "ChinnaLLM Free", openRouterId: "meta-llama/llama-3.3-70b-instruct:free", tier: "free", costPerKTokens: 0, enabled: true, sortOrder: 0, description: "Free general model.", capabilities: ["text", "streaming"] },
-  { displayName: "ChinnaLLM Free Fast", openRouterId: "mistralai/mistral-7b-instruct:free", tier: "free", costPerKTokens: 0, enabled: true, sortOrder: 1, description: "Free fast lightweight model.", capabilities: ["text", "streaming"] },
+  { displayName: "ChinnaLLM Free", openRouterId: "openrouter/free", tier: "free", costPerKTokens: 0, enabled: true, sortOrder: 0, description: "OpenRouter free route for basic AI output.", capabilities: ["text", "streaming"] },
+  { displayName: "ChinnaLLM Free Fallback", openRouterId: "openrouter/auto", tier: "free", costPerKTokens: 0, enabled: true, sortOrder: 1, description: "Automatic fallback when free-route capacity is unavailable.", capabilities: ["text", "streaming"] },
   // Auto
   { displayName: "ChinnaLLM Auto", openRouterId: "openrouter/auto", tier: "auto", costPerKTokens: 3, enabled: true, sortOrder: 0, description: "Automatically routes to the best model.", capabilities: ["text", "streaming"] },
 ];
