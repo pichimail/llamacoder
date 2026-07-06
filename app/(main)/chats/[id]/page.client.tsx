@@ -21,7 +21,7 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Minimize2, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2 } from "lucide-react";
+import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2, X } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
@@ -236,6 +236,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   // DesignWorkspace portals its typography/color/layout inspector into this
   // node instead of the chat composer, so the two never stack side by side.
   const [designControlsSlot, setDesignControlsSlot] = useState<HTMLDivElement | null>(null);
+  // The floating composer (shown when the chat rail is collapsed/immersive)
+  // starts as a minimal single-line input; clicking its leading icon expands
+  // it to the full composer, which then collapses back once a message sends.
+  const [floatingComposerExpanded, setFloatingComposerExpanded] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   // Auto-fix defaults ON: most users never discover a manually-toggled setting,
   // and leaving it off by default meant validation failures (including
@@ -306,6 +310,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   );
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
+  useEffect(() => {
+    if (!effectiveChatCollapsed) setFloatingComposerExpanded(false);
+  }, [effectiveChatCollapsed]);
 
   // Tell the root GlobalAppShell to hide its own nav while immersive
   // fullscreen is active, and restore it on exit or unmount.
@@ -834,6 +841,7 @@ Fix requirements:
       const activeElement = document.activeElement as HTMLElement | null;
       const isInput = Boolean(activeElement && ["TEXTAREA", "INPUT", "SELECT"].includes(activeElement.tagName));
       if (((e.metaKey || e.ctrlKey) && e.key === ".") || e.key === "Escape") {
+        if (e.key === "Escape" && immersiveFullscreen) { e.preventDefault(); setImmersiveFullscreen(false); return; }
         if (streamPromise) { e.preventDefault(); stopStreaming(); }
         if (showUnsavedOverlay) { e.preventDefault(); setShowUnsavedOverlay(false); }
       }
@@ -845,7 +853,7 @@ Fix requirements:
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [streamPromise, stopStreaming, setModeSafely, showUnsavedOverlay]);
+  }, [streamPromise, stopStreaming, setModeSafely, showUnsavedOverlay, immersiveFullscreen]);
 
   useEffect(() => {
     async function readStream() {
@@ -1361,14 +1369,14 @@ Fix requirements:
         <SidebarInset className="min-h-0 overflow-hidden">
       <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
           {immersiveFullscreen && (
-            <Tip label="Exit fullscreen">
+            <Tip label="Exit fullscreen (Esc)">
               <button
                 type="button"
                 onClick={() => setImmersiveFullscreen(false)}
-                className="hs-composer-swap fixed right-3 top-3 z-50 inline-flex size-8 items-center justify-center rounded-md border border-border/70 bg-background/90 text-muted-foreground shadow-lg backdrop-blur transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                className="hs-composer-swap fixed right-3 top-3 z-50 inline-flex size-8 items-center justify-center rounded-full text-muted-foreground/70 opacity-70 transition hover:bg-accent hover:text-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                 aria-label="Exit fullscreen"
               >
-                <Minimize2 className="size-4" aria-hidden="true" />
+                <X className="size-4" aria-hidden="true" />
               </button>
             </Tip>
           )}
@@ -1581,10 +1589,15 @@ Fix requirements:
               instead, so "chat" is always reachable regardless of layout. */}
           {effectiveChatCollapsed && (
             <div className="hs-composer-swap pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-              <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/30 backdrop-blur">
+              <div className={`pointer-events-auto w-full rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/30 backdrop-blur ${floatingComposerExpanded ? "max-w-xl" : "max-w-md"}`}>
                 <ChatBox
                   chat={chat}
-                  onNewStreamPromise={(promise, options) => handleNewStreamPromise(promise, options, { keepChatCollapsed: true })}
+                  variant={floatingComposerExpanded ? "full" : "minimal"}
+                  onExpand={() => setFloatingComposerExpanded(true)}
+                  onNewStreamPromise={(promise, options) => {
+                    setFloatingComposerExpanded(false);
+                    handleNewStreamPromise(promise, options, { keepChatCollapsed: true });
+                  }}
                   onAbortController={(c) => { abortControllerRef.current = c; }}
                   isStreaming={!!streamPromise}
                   onStop={stopStreaming}

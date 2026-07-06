@@ -383,16 +383,6 @@ export default function CodeViewer({
   const isStreaming = Boolean(streamText);
   const streamingPath = draft.find((file) => file.isPartial)?.path ?? streamAllFiles.at(-1)?.path;
   const hasUnsaved = dirty.size > 0;
-  const progressStats = useMemo(() => {
-    const totalChars = streamAllFiles.reduce((sum, file) => sum + (file.code?.length ?? 0), 0);
-    const completeFiles = streamAllFiles.filter((file) => !file.isPartial).length;
-    return {
-      files: Math.max(streamAllFiles.length, draft.filter((file) => !file.path.endsWith(".gitkeep")).length),
-      completeFiles,
-      totalChars,
-      activePath: streamingPath,
-    };
-  }, [draft, streamAllFiles, streamingPath]);
   const runnerFiles = useMemo(
     () =>
       (isStreaming ? previewFiles : draft).map((file) => ({
@@ -556,9 +546,14 @@ export default function CodeViewer({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex h-8 shrink-0 items-center border-b border-border/70 px-3 text-xs text-muted-foreground"><LayoutPanelTop className="mr-2 size-3.5" aria-hidden="true" />Live preview</div>
           {isStreaming ? (
-            <GeneratingPreviewSurface stats={progressStats} compact />
+            <BuildProgressLoader compact />
           ) : (
-            <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} />
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} />
+              {builderStatus !== "ready" && builderStatus !== "failed" && (
+                <div className="absolute inset-0 z-10 bg-background"><BuildProgressLoader compact /></div>
+              )}
+            </div>
           )}
         </div>
       );
@@ -750,24 +745,29 @@ export default function CodeViewer({
               </ResizablePanel>
             </ResizablePanelGroup>
           ) : (
-            <div role="tabpanel" aria-label="Live preview" className="min-h-0 flex-1 overflow-hidden">
+            <div role="tabpanel" aria-label="Live preview" className="relative min-h-0 flex-1 overflow-hidden">
               {isStreaming ? (
-                <GeneratingPreviewSurface stats={progressStats} />
+                <BuildProgressLoader />
               ) : runnerFiles.length > 0 ? (
-                <CodeRunner
-                  key={`${refresh}-${previewMode}`}
-                  files={runnerFiles}
-                  extraDependencies={extraDeps}
-                  onRequestFix={onRequestFix}
-                  onPreviewError={onPreviewError}
-                  onPreviewReady={onPreviewReady}
-                  previewMode={previewMode}
-                  onPreviewModeChange={onPreviewModeChange}
-                  showWebPreviewChrome
-                  showDeviceToggle
-                  onRefresh={() => setRefresh((value) => value + 1)}
-                  sandpackOptions={sandpackOptions}
-                />
+                <>
+                  <CodeRunner
+                    key={`${refresh}-${previewMode}`}
+                    files={runnerFiles}
+                    extraDependencies={extraDeps}
+                    onRequestFix={onRequestFix}
+                    onPreviewError={onPreviewError}
+                    onPreviewReady={onPreviewReady}
+                    previewMode={previewMode}
+                    onPreviewModeChange={onPreviewModeChange}
+                    showWebPreviewChrome
+                    showDeviceToggle
+                    onRefresh={() => setRefresh((value) => value + 1)}
+                    sandpackOptions={sandpackOptions}
+                  />
+                  {builderStatus !== "ready" && builderStatus !== "failed" && (
+                    <div className="absolute inset-0 z-10 bg-background"><BuildProgressLoader /></div>
+                  )}
+                </>
               ) : (
                 <EmptyState isStreaming={isStreaming} />
               )}
@@ -818,84 +818,48 @@ export default function CodeViewer({
 function EmptyState({ isStreaming }: { isStreaming: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-      {isStreaming ? <><DotFlow size={7} label="Generating your app" /><p aria-live="polite">Generating your app…</p></> : <p>No files yet. Send a prompt to generate an app.</p>}
+      {isStreaming ? <BuildProgressLoader compact /> : <p>No files yet. Send a prompt to generate an app.</p>}
     </div>
   );
 }
 
-function GeneratingPreviewSurface({
-  stats,
-  compact = false,
-}: {
-  stats: { files: number; completeFiles: number; totalChars: number; activePath?: string | null };
-  compact?: boolean;
-}) {
-  const progressItems = [
-    { label: "Composing routes", value: `${stats.files || 1} files mapped` },
-    { label: "Writing interface", value: stats.activePath || "Preparing app shell" },
-    { label: "Bundling preview", value: `${Math.max(stats.completeFiles, 0)} files sealed` },
-    { label: "Polishing states", value: `${Math.max(Math.round(stats.totalChars / 1000), 1)}k chars streamed` },
-  ];
+/** Rotating, plain-language status lines shown while an app is being built —
+ * cycles every 3-5s so a long build doesn't feel stuck on one static message. */
+const BUILD_STATUS_MESSAGES = [
+  "Reading your prompt and planning the app...",
+  "Sketching out the pages and layout...",
+  "Wiring up components and interactions...",
+  "Connecting state so everything works together...",
+  "Styling things to look sharp...",
+  "Double-checking imports and structure...",
+  "Compiling your app for preview...",
+  "Almost there — polishing the final details...",
+];
+
+function BuildProgressLoader({ compact = false }: { compact?: boolean }) {
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(
+      () => setMessageIndex((current) => (current + 1) % BUILD_STATUS_MESSAGES.length),
+      3000 + Math.random() * 2000,
+    );
+    return () => clearInterval(id);
+  }, []);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-[#050505] text-white" aria-live="polite" aria-label="Generating live preview">
-      <div className="code-viewer-preview-grid absolute inset-0 opacity-45" aria-hidden="true" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(244,114,182,0.22),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.2),transparent_28%),radial-gradient(circle_at_50%_90%,rgba(251,191,36,0.16),transparent_34%)]" aria-hidden="true" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-fuchsia-300/70 to-transparent" aria-hidden="true" />
-      <div className="absolute inset-y-0 left-1/2 w-px bg-gradient-to-b from-transparent via-violet-300/20 to-transparent" aria-hidden="true" />
-
-      <div className={`relative z-10 mx-auto flex h-full w-full max-w-5xl flex-col justify-center ${compact ? "p-5" : "p-6 sm:p-10"}`}>
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] uppercase text-white/70 backdrop-blur">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-fuchsia-300 opacity-60" />
-              <span className="relative inline-flex size-2 rounded-full bg-fuchsia-300" />
-            </span>
-            Preview synthesis
-          </div>
-          <div className="hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[11px] text-amber-200 sm:block">
-            {stats.activePath ? `writing ${stats.activePath}` : "initializing workspace"}
-          </div>
-        </div>
-
-        <div className={`grid gap-5 ${compact ? "" : "lg:grid-cols-[1.05fr_0.95fr] lg:items-center"}`}>
-          <div className="min-w-0">
-            <p className="text-xs uppercase text-fuchsia-200/80">Building generated artifact</p>
-            <h2 className={`${compact ? "mt-2 text-2xl" : "mt-3 text-4xl sm:text-5xl"} max-w-3xl font-semibold leading-tight text-white`}>
-              Streaming code into a live preview surface.
-            </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/62">
-              The editor is receiving files now. Preview validation starts as soon as the artifact is complete, then this panel switches to the rendered app automatically.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/35 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-xl">
-            <div className="grid grid-cols-12 gap-1" aria-hidden="true">
-              {Array.from({ length: compact ? 72 : 120 }).map((_, index) => {
-                const active = index % 7 === 0 || index % 11 === 0 || index < Math.min(96, Math.max(18, stats.totalChars / 180));
-                return (
-                  <span
-                    key={index}
-                    className={`aspect-square rounded-[2px] ${active ? "bg-fuchsia-300 shadow-[0_0_12px_rgba(244,114,182,0.55)]" : "bg-white/[0.055]"}`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className={`mt-6 grid gap-2 ${compact ? "" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
-          {progressItems.map((item, index) => (
-            <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.045] p-3 backdrop-blur">
-              <div className="flex items-center gap-2 text-[11px] uppercase text-white/45">
-                <span className="font-mono text-amber-200">{String(index + 1).padStart(2, "0")}</span>
-                {item.label}
-              </div>
-              <div className="mt-2 truncate font-mono text-xs text-white/82">{item.value}</div>
-            </div>
-          ))}
-        </div>
+    <div
+      className={`flex h-full w-full flex-col items-center justify-center gap-4 bg-background px-6 text-center ${compact ? "gap-3" : "gap-4"}`}
+      aria-live="polite"
+      aria-label="Building your app"
+    >
+      <DotFlow size={compact ? 8 : 10} count={4} className="text-primary" label="Building" />
+      <div className="h-1 w-40 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+        <div className="hs-build-progress-bar h-full w-1/3 rounded-full bg-primary" />
       </div>
+      <p key={messageIndex} className="hs-composer-swap max-w-sm text-sm text-muted-foreground">
+        {BUILD_STATUS_MESSAGES[messageIndex]}
+      </p>
     </div>
   );
 }

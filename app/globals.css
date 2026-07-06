@@ -438,6 +438,24 @@
   animation: hs-composer-swap-in 220ms ease-out;
 }
 
+/* Indeterminate "progressive" build-loader bar — slides back and forth rather
+   than sitting static, used while an app is building/generating. */
+@keyframes hs-build-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(60%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.hs-build-progress-bar {
+  animation: hs-build-progress 1.6s ease-in-out infinite;
+}
+
 /* Desktop context menu keeps its intentional popover surface. */
 [aria-label="Chats workspace menu"],
 [aria-label="Chats workspace menu"] [role="menuitem"]:hover {
@@ -456,12 +474,6 @@
   background: transparent !important;
   color: hsl(var(--foreground)) !important;
   box-shadow: inset 0 -1px 0 hsl(var(--foreground) / 0.45) !important;
-}
-
-.code-viewer-preview-grid {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 1px, transparent 1.5px), radial-gradient(circle, rgba(244, 114, 182, 0.24) 1px, transparent 1.5px);
-  background-position: 0 0, 10px 10px;
-  background-size: 20px 20px;
 }
 
 /* Richer text and icon contrast across builder chrome. */
