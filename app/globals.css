@@ -421,6 +421,23 @@
   background: hsl(0 0% 8% / 0.72) !important;
 }
 
+/* Smooth crossfade when the chat composer swaps with the design-controls
+   portal target (and vice versa) as builder mode changes. */
+@keyframes hs-composer-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hs-composer-swap {
+  animation: hs-composer-swap-in 220ms ease-out;
+}
+
 /* Desktop context menu keeps its intentional popover surface. */
 [aria-label="Chats workspace menu"],
 [aria-label="Chats workspace menu"] [role="menuitem"]:hover {

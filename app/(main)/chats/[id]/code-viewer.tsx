@@ -244,7 +244,6 @@ export default function CodeViewer({
   streamText,
   message,
   activeTab,
-  onTabChange,
   onRequestFix,
   onPreviewError,
   onPreviewReady,
@@ -262,7 +261,6 @@ export default function CodeViewer({
   streamText: string;
   message?: Message;
   activeTab: string;
-  onTabChange: (v: "code" | "preview") => void;
   onRequestFix: (e: string) => void;
   onPreviewError: (e: string) => void;
   onPreviewReady: () => void;
@@ -609,34 +607,11 @@ export default function CodeViewer({
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.08),transparent_20%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_18%),transparent] text-foreground">
-        <div className="flex h-10 shrink-0 items-center justify-between border-b border-fuchsia-500/15 bg-zinc-950/65 px-2 text-sm backdrop-blur">
-          <div className="flex items-center gap-0.5" role="tablist" aria-label="Output view">
-            {(["code", "preview"] as const).map((tab) => {
-              const isActive = activeTab === tab;
-              return isActive ? (
-                <button
-                  key={tab}
-                  role="tab"
-                  aria-selected="true"
-                  onClick={() => onTabChange(tab)}
-                  className="rounded-md border px-3 py-1 text-xs font-medium capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring border-fuchsia-400/30 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.14),rgba(251,191,36,0.08))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.14)]"
-                >
-                  {tab}
-                </button>
-              ) : (
-                <button
-                  key={tab}
-                  role="tab"
-                  aria-selected="false"
-                  onClick={() => onTabChange(tab)}
-                  className="rounded-md border border-transparent px-3 py-1 text-xs font-medium capitalize text-muted-foreground transition hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  {tab}
-                </button>
-              );
-            })}
-          </div>
-
+        {/* Mode switching lives in the shared outer header (Preview/Code/Design/…)
+            — this inner toolbar only carries code-view-specific tools, so it
+            follows the same chrome as preview/design mode instead of showing a
+            second, redundant tab switcher. */}
+        <div className="flex h-10 shrink-0 items-center justify-end border-b border-fuchsia-500/15 bg-zinc-950/65 px-2 text-sm backdrop-blur">
           <div className="flex items-center gap-1">
             <AutoFixStatusBadge status={autoFixStatus} attempt={autoFixAttempt} />
             {autoFixEnabled && autoFixStatus === "fixing" ? (

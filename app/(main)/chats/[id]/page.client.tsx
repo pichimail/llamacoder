@@ -21,7 +21,7 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2 } from "lucide-react";
+import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Minimize2, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2 } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
@@ -214,6 +214,12 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [builderMode, setBuilderMode] = useState<BuilderMode>("code");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code");
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  // Immersive fullscreen: hides the sidebar, outer header, and chat rail so the
+  // builder surface (preview/code/design) fills the whole viewport. Distinct
+  // from chatCollapsed (a persistent layout preference) — this is a transient
+  // "focus mode" toggle that restores whatever chatCollapsed was on exit.
+  const [immersiveFullscreen, setImmersiveFullscreen] = useState(false);
+  const effectiveChatCollapsed = chatCollapsed || immersiveFullscreen;
   const [mobileOptionsOpen, setMobileOptionsOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const { user, authEnabled, isAuthenticated } = useHomeSidebarData();
@@ -226,6 +232,10 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [requiredEnvKeys, setRequiredEnvKeys] = useState<string[]>([]);
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [designSaving, setDesignSaving] = useState(false);
+  // Portal target for the design-tool controls: when Design mode is active,
+  // DesignWorkspace portals its typography/color/layout inspector into this
+  // node instead of the chat composer, so the two never stack side by side.
+  const [designControlsSlot, setDesignControlsSlot] = useState<HTMLDivElement | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("web");
   // Auto-fix defaults ON: most users never discover a manually-toggled setting,
   // and leaving it off by default meant validation failures (including
@@ -296,6 +306,17 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   );
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
+
+  // Tell the root GlobalAppShell to hide its own nav while immersive
+  // fullscreen is active, and restore it on exit or unmount.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("hs-immersive-fullscreen", { detail: { active: immersiveFullscreen } }));
+  }, [immersiveFullscreen]);
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent("hs-immersive-fullscreen", { detail: { active: false } }));
+    };
+  }, []);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
 
   useEffect(() => {
@@ -553,6 +574,37 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       console.warn("Failed to sync generated workspace files:", error);
     }
   }, [workspaceRequest]);
+
+  const handleNewStreamPromise = useCallback(
+    (
+      promise: Promise<ReadableStream>,
+      options?: { reasoning: boolean; messageId?: string; model?: string },
+      config?: { keepChatCollapsed?: boolean },
+    ) => {
+      setReasoningText("");
+      setStreamText("");
+      streamTextRef.current = "";
+      setStreamReasoningEnabled(options?.reasoning ?? false);
+      autoFixPendingRef.current = false;
+      if (options?.messageId && options?.model) {
+        currentGenerationRef.current = { messageId: options.messageId, model: options.model };
+        continuationRoundRef.current = 0;
+        accumulatedGenerationTextRef.current = "";
+        setContinuationStatus("idle");
+      }
+      startGenerationBudget();
+      setStreamPromise(promise);
+      setBuilderStatus("generating");
+      setBuilderMode("code");
+      setMobilePanel("code");
+      // The floating composer (shown while the chat rail is collapsed/immersive)
+      // deliberately keeps the rail collapsed so the user stays immersed in the
+      // preview while a follow-up generates; the normal docked composer always
+      // re-expands the rail so newly streamed code is visible.
+      if (!config?.keepChatCollapsed) setChatCollapsed(false);
+    },
+    [startGenerationBudget],
+  );
 
   const requestFix = useCallback(async ({ error, auto, attempt, fallback, files }: { error: string; auto: boolean; attempt: number; fallback: boolean; files?: RawGeneratedFile[] }) => {
     // A user-initiated ("Fix") request is a fresh turn, so it opens a new
@@ -1206,6 +1258,7 @@ Fix requirements:
           saveRequest={designSaveRequest}
           previewMode={previewMode}
           sandpackOptions={sandpackOptions}
+          controlsPortalTarget={!effectiveChatCollapsed ? designControlsSlot : null}
         />
       );
     }
@@ -1231,11 +1284,6 @@ Fix requirements:
         chat={chat}
         message={activeMessage}
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setBuilderMode(tab);
-          setMobilePanel(tab === "preview" ? "preview" : "code");
-        }}
         onRequestFix={(error) => startTransition(async () => requestFix({ error, auto: false, attempt: 1, fallback: artifactFiles.length <= 1, files: artifactFiles }))}
         onPreviewError={handlePreviewError}
         onPreviewReady={handlePreviewReady}
@@ -1301,16 +1349,31 @@ Fix requirements:
         onPublish={handlePublishMobile}
       />
       <SidebarProvider defaultOpen={false} className="h-dvh overflow-hidden">
-        <ChatsAppSidebar
-          currentChatId={chat.id}
-          chats={sidebarChats}
-          user={user}
-          authEnabled={authEnabled}
-          isAuthenticated={isAuthenticated}
-        />
+        {!immersiveFullscreen && (
+          <ChatsAppSidebar
+            currentChatId={chat.id}
+            chats={sidebarChats}
+            user={user}
+            authEnabled={authEnabled}
+            isAuthenticated={isAuthenticated}
+          />
+        )}
         <SidebarInset className="min-h-0 overflow-hidden">
       <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground" onContextMenu={handleWorkspaceContextMenu}>
-          <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/70 bg-transparent px-3 text-sm">
+          {immersiveFullscreen && (
+            <Tip label="Exit fullscreen">
+              <button
+                type="button"
+                onClick={() => setImmersiveFullscreen(false)}
+                className="hs-composer-swap fixed right-3 top-3 z-50 inline-flex size-8 items-center justify-center rounded-md border border-border/70 bg-background/90 text-muted-foreground shadow-lg backdrop-blur transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                aria-label="Exit fullscreen"
+              >
+                <Minimize2 className="size-4" aria-hidden="true" />
+              </button>
+            </Tip>
+          )}
+          {!immersiveFullscreen && (
+          <header className="hs-composer-swap grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/70 bg-transparent px-3 text-sm">
             <div className="flex min-w-0 items-center gap-2">
               <Tip label="Open app menu">
                 <SidebarTrigger className="inline-flex size-8 md:hidden" />
@@ -1366,6 +1429,7 @@ Fix requirements:
               </div>
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
               {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
+              <Tip label="Enter fullscreen"><button type="button" onClick={() => setImmersiveFullscreen(true)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label="Enter fullscreen"><Maximize2 className="size-4" aria-hidden="true" /></button></Tip>
               <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
               <CreditIndicator visible={chatAiIntegration === "chinnallm" && flagEnabled("credit-indicator")} className="hidden md:inline-flex" />
               {chatAiIntegration === "skip" && (
@@ -1389,9 +1453,10 @@ Fix requirements:
               <div className="hidden md:block"><ThemeToggle /></div>
             </div>
           </header>
+          )}
 
           <ResizablePanelGroup id="chat-builder-split" orientation="horizontal" className="min-h-0 flex-1 overflow-hidden">
-            {!chatCollapsed ? (
+            {!effectiveChatCollapsed ? (
               <>
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
@@ -1472,7 +1537,15 @@ Fix requirements:
                         </Alert>
                       </div>
                     )}
-                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; if (options?.messageId && options?.model) { currentGenerationRef.current = { messageId: options.messageId, model: options.model }; continuationRoundRef.current = 0; accumulatedGenerationTextRef.current = ""; setContinuationStatus("idle"); } startGenerationBudget(); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                    {builderMode === "design" ? (
+                      <div
+                        key="design-controls"
+                        ref={setDesignControlsSlot}
+                        className="hs-composer-swap min-h-0 flex-1 overflow-y-auto border-t border-border/70"
+                      />
+                    ) : (
+                      <div key="chat-composer" className="hs-composer-swap shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                    )}
                   </section>
                 </ResizablePanel>
                 <ResizableHandle withHandle className="hidden md:flex" />
@@ -1500,6 +1573,31 @@ Fix requirements:
               )}
             </ResizablePanel>
           </ResizablePanelGroup>
+
+          {/* The docked composer only exists inside the chat rail, so once
+              that rail is collapsed (manually, or via immersive fullscreen)
+              there'd be no way to keep iterating on the artifact without
+              re-expanding it. Surface the same ChatBox as a floating pill
+              instead, so "chat" is always reachable regardless of layout. */}
+          {effectiveChatCollapsed && (
+            <div className="hs-composer-swap pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+              <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/30 backdrop-blur">
+                <ChatBox
+                  chat={chat}
+                  onNewStreamPromise={(promise, options) => handleNewStreamPromise(promise, options, { keepChatCollapsed: true })}
+                  onAbortController={(c) => { abortControllerRef.current = c; }}
+                  isStreaming={!!streamPromise}
+                  onStop={stopStreaming}
+                  onUndo={handleUndo}
+                  versions={assistantVersions}
+                  currentVersionId={activeMessage?.id}
+                  onSwitchVersion={handleSwitchVersion}
+                  shouldFocusInput={shouldFocusInput}
+                  onInputFocused={() => setShouldFocusInput(false)}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <ChatsContextMenu

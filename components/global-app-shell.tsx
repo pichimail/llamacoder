@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import {
   CreditCard,
   BadgeDollarSign,
@@ -165,27 +165,48 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
 export function GlobalAppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  const [immersiveFullscreen, setImmersiveFullscreen] = useState(false);
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
+
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setImmersiveFullscreen(Boolean((event as CustomEvent<{ active: boolean }>).detail?.active));
+    };
+    window.addEventListener("hs-immersive-fullscreen", onChange);
+    return () => window.removeEventListener("hs-immersive-fullscreen", onChange);
+  }, []);
 
   if (isAdminRoute) {
     // Admin routes render their own layout + sidebar.
     return <>{children}</>;
   }
 
+  // IMPORTANT: `children` must stay at the same structural depth/position in
+  // both branches below. Early-returning a differently-shaped tree (e.g. bare
+  // `{children}` vs. children nested inside the grid wrapper) makes React
+  // treat it as a different subtree and remount it — which would silently
+  // wipe all of the chats page's local state (including the very
+  // immersiveFullscreen toggle that triggered this) a moment after switching.
+  // So immersive mode only hides the sidebar/mobile-bar siblings, it never
+  // changes where `children` sits in the tree.
   return (
-    <div className={cn("h-dvh overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out lg:grid", collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]")}>
-      <div className="hidden lg:sticky lg:top-0 lg:block lg:h-dvh lg:overflow-hidden">
-        <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur lg:hidden">
-          <button type="button" onClick={() => setMobileOpen(true)} className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" aria-label="Open navigation">
-            <Menu className="size-4" aria-hidden="true" />
-          </button>
-          <Link href="/" className="text-sm font-semibold">Chinna-Coder</Link>
-          <span className="size-9" aria-hidden="true" />
+    <div className={cn("h-dvh overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out", !immersiveFullscreen && "lg:grid", !immersiveFullscreen && (collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]"))}>
+      {!immersiveFullscreen && (
+        <div className="hidden lg:sticky lg:top-0 lg:block lg:h-dvh lg:overflow-hidden">
+          <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
         </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {!immersiveFullscreen && (
+          <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur lg:hidden">
+            <button type="button" onClick={() => setMobileOpen(true)} className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" aria-label="Open navigation">
+              <Menu className="size-4" aria-hidden="true" />
+            </button>
+            <Link href="/" className="text-sm font-semibold">Chinna-Coder</Link>
+            <span className="size-9" aria-hidden="true" />
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {children}
         </div>
