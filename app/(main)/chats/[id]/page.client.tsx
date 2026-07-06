@@ -1757,7 +1757,7 @@ Fix requirements:
             </pre>
             <DialogFooter>
               <Button variant="ghost" onClick={handleDialogDismiss} disabled={buildErrorDialog?.status === "fixing"}>
-                Dismiss
+                Cancel
               </Button>
               <Button onClick={handleDialogFixWithChinnaLLM} disabled={buildErrorDialog?.status === "fixing"}>
                 {buildErrorDialog?.status === "fixing" ? (
@@ -1765,7 +1765,7 @@ Fix requirements:
                     <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" /> Fixing…
                   </>
                 ) : (
-                  "Fix with ChinnaLLM"
+                  "Fix"
                 )}
               </Button>
             </DialogFooter>
