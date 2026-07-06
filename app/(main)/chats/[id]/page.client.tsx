@@ -80,10 +80,15 @@ const CONTINUATION_TAIL_CHARS = 6000;
  * fix+continuation rounds toward the route's 300s ceiling. Truncation
  * continuations are deliberately NOT gated on this clock (they finish an
  * in-flight generation; cutting them off would emit broken code) — they stay
- * bounded by MAX_CONTINUATION_ROUNDS instead. Frontend-only apps target the
- * 30-60s window; full-stack apps (backend mode) get the wider 30-120s window. */
-const GENERATION_BUDGET_MS = 60_000;
-const GENERATION_BUDGET_FULLSTACK_MS = 120_000;
+ * bounded by MAX_CONTINUATION_ROUNDS instead. These are intentionally generous
+ * circuit-breaker ceilings (not the SLA target itself): they exist to stop
+ * runaway fix+continuation churn well before the route's 300s cap, while still
+ * leaving room for a large initial generation PLUS at least one full fix round
+ * to finish without tripping. Frontend-only apps aim for the 30-60s window but
+ * get 120s of slack; full-stack apps (backend mode) aim for 30-120s and get
+ * 240s of slack. */
+const GENERATION_BUDGET_MS = 120_000;
+const GENERATION_BUDGET_FULLSTACK_MS = 240_000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
