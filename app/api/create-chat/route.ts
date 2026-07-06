@@ -12,6 +12,7 @@ import { seedBuildArtifacts } from "@/lib/build-workspace";
 import { requireCurrentUser } from "@/lib/authz";
 import { assertCanCreateProject, assertFeatureAllowed, PlanLimitError, planErrorResponseBody } from "@/lib/plan";
 import { logAudit } from "@/lib/audit";
+import { DEFAULT_STYLE_ID } from "@/lib/sandbox-theme";
 
 const createChatSchema = z.object({
   prompt: z.string().trim().min(1, "Prompt is required").max(20000),
@@ -31,7 +32,7 @@ const createChatSchema = z.object({
     .optional()
     .default([]),
   shadcn: z.boolean().optional().default(true),
-  styleId: z.string().trim().max(64).optional().default("modern-saas"),
+  styleId: z.string().trim().max(64).optional().default(DEFAULT_STYLE_ID),
   designPresetId: z.string().trim().max(64).optional(),
   aiIntegration: z.enum(["chinnallm", "byok", "skip"]).optional().nullable().default(null),
   aiCapabilities: z.array(z.string().max(24)).max(10).optional().default([]),

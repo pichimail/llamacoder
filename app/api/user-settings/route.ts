@@ -19,7 +19,7 @@ const settingsSchema = z.object({
   canvasDefault: z.boolean().default(false),
   backendDefault: z.boolean().default(false),
   shadcnDefault: z.boolean().default(true),
-  styleDefault: z.enum(["modern-saas", "editorial-dark", "warm-neutral", "vibrant-accent", "glassmorphism"]).default("modern-saas"),
+  styleDefault: z.enum(["modern-saas", "editorial-dark", "warm-neutral", "vibrant-accent", "glassmorphism"]).default("glassmorphism"),
   autoStartGeneration: z.boolean().default(true),
   autoRepairPreview: z.boolean().default(true),
   memoryCompression: z.boolean().default(true),

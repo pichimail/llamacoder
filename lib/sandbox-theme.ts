@@ -4,7 +4,7 @@
  *
  * Phase 1: five premium token sets replace the single flat gray palette.
  * `getThemeCSS(styleId)` returns the full globals CSS for a preset.
- * `SANDBOX_GLOBALS_CSS` remains exported (defaults to "modern-saas") for
+ * `SANDBOX_GLOBALS_CSS` remains exported (defaults to DEFAULT_STYLE_ID) for
  * backward compatibility with existing imports.
  */
 
@@ -22,7 +22,7 @@ export type SandboxStyleId =
   | "minimal-mono"
   | "shadcn-default";
 
-export const DEFAULT_STYLE_ID: SandboxStyleId = "modern-saas";
+export const DEFAULT_STYLE_ID: SandboxStyleId = "glassmorphism";
 
 export const SANDBOX_STYLE_PRESETS: Array<{
   id: SandboxStyleId;

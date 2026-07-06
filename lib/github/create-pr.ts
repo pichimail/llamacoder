@@ -59,6 +59,7 @@ export async function createArtifactPullRequest({
   };
   const api = `https://api.github.com/repos/${owner}/${name}`;
   const branch = `${branchPrefix}/${Date.now()}`;
+  let branchCreated = false;
 
   try {
     const baseRef = await githubJson(`${api}/git/ref/heads/${defaultBranch}`, { headers });
@@ -70,6 +71,7 @@ export async function createArtifactPullRequest({
       headers,
       body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: baseSha }),
     });
+    branchCreated = true;
 
     for (const file of cleanFiles) {
       const encodedPath = cleanRepoPath(file.path);
@@ -111,6 +113,15 @@ export async function createArtifactPullRequest({
 
     return { ok: true as const, url: pr.html_url as string, branch, number: pr.number as number };
   } catch (error) {
+    // A partially-committed branch with no PR is dead weight and clutters the
+    // remote on every retry — clean it up before surfacing the failure.
+    if (branchCreated) {
+      try {
+        await githubJson(`${api}/git/refs/heads/${encodeURIComponent(branch)}`, { method: "DELETE", headers });
+      } catch {
+        // best-effort cleanup; the original error is what the caller needs
+      }
+    }
     return { ok: false as const, reason: error instanceof Error ? error.message : "GitHub PR creation failed." };
   }
 }

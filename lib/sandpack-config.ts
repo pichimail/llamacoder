@@ -12,7 +12,7 @@ import {
 export type SandpackBuildOptions = {
   includeShadcn?: boolean;
   theme?: SandboxTheme;
-  /** Style preset id ("modern-saas" | "editorial-dark" | "warm-neutral" | "vibrant-accent" | "glassmorphism"). Defaults to "modern-saas". */
+  /** Style preset id ("modern-saas" | "editorial-dark" | "warm-neutral" | "vibrant-accent" | "glassmorphism" | ...). Defaults to DEFAULT_STYLE_ID ("glassmorphism"). */
   styleId?: string;
   designInspector?: boolean;
 };
