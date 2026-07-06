@@ -22,6 +22,7 @@ type BuilderSettings = {
   webSearchDefault: boolean;
   deepThinkingDefault: boolean;
   canvasDefault: boolean;
+  backendDefault: boolean;
   shadcnDefault: boolean;
   styleDefault: string;
   autoStartGeneration: boolean;
@@ -46,6 +47,7 @@ const defaults: BuilderSettings = {
   webSearchDefault: false,
   deepThinkingDefault: false,
   canvasDefault: false,
+  backendDefault: false,
   shadcnDefault: true,
   styleDefault: "glassmorphism",
   autoStartGeneration: true,
@@ -200,6 +202,7 @@ export default function SettingsPageClient() {
               <div className="mt-4">
                 <SettingSwitch title="Default shadcn UI" description="Start new builds with shadcn-style components and accessible form primitives." checked={settings.shadcnDefault} onChange={(value) => update("shadcnDefault", value)} />
                 <SettingSwitch title="Deep thinking by default" description="Use the reasoning-capable generation mode for complex builds." checked={settings.deepThinkingDefault} onChange={(value) => update("deepThinkingDefault", value)} />
+                <SettingSwitch title="Backend by default" description="Start new builds with database-ready backend scaffolding and server routes when the app needs real persistence." checked={settings.backendDefault} onChange={(value) => update("backendDefault", value)} />
                 <SettingSwitch title="Web search by default" description="Reserve source-aware UI states for builds that need external data." checked={settings.webSearchDefault} onChange={(value) => update("webSearchDefault", value)} />
                 <SettingSwitch title="Canvas by default" description="Add editable visual workspace behavior when the app request benefits from it." checked={settings.canvasDefault} onChange={(value) => update("canvasDefault", value)} />
               </div>

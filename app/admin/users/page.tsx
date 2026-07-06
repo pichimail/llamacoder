@@ -4,12 +4,21 @@
  * plan changes, credit grants, BYOK revoke with confirmation. */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Eye, KeyRound, Loader2, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, Eye, FolderKanban, KeyRound, Loader2, MoreHorizontal, Search, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,6 +64,19 @@ export default function AdminUsersPage() {
   const [grantDialogOpen, setGrantDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const querySearch = params.get("search");
+    const queryPlan = params.get("plan");
+    const queryByok = params.get("byok");
+    if (querySearch) {
+      setSearch(querySearch);
+      setDebouncedSearch(querySearch);
+    }
+    if (queryPlan) setPlanFilter(queryPlan);
+    if (queryByok) setByokFilter(queryByok);
+  }, []);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -137,6 +159,33 @@ export default function AdminUsersPage() {
 
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
+  const userActions = (user: UserRow) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-9 rounded-lg" aria-label={`Actions for ${user.email ?? user.id}`}>
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel>User actions</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => openDetail(user.id)}>
+          <Eye className="size-4" />View details
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/projects?owner=${encodeURIComponent(user.email || user.name || "")}`}>
+            <FolderKanban className="size-4" />Owner projects
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/credits?search=${encodeURIComponent(user.email || user.name || "")}`}>
+            <KeyRound className="size-4" />Credit ledger
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div>
@@ -190,53 +239,79 @@ export default function AdminUsersPage() {
             <p className="py-10 text-center text-sm text-muted-foreground">No users match these filters.</p>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead className="text-right">Credits</TableHead>
-                    <TableHead className="text-right">Apps</TableHead>
-                    <TableHead className="text-center">BYOK</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id} className="transition-colors hover:bg-muted/40">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="size-8">
-                            <AvatarImage src={user.image ?? undefined} alt="" />
-                            <AvatarFallback className="text-xs">{(user.name || user.email || "?").slice(0, 1).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="max-w-[180px] truncate text-sm font-medium">
-                              {user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}
-                            </p>
-                            <p className="max-w-[180px] truncate text-xs text-muted-foreground">{user.email}</p>
-                          </div>
+              <div className="space-y-3 md:hidden">
+                {users.map((user) => (
+                  <div key={user.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="size-9">
+                          <AvatarImage src={user.image ?? undefined} alt="" />
+                          <AvatarFallback className="text-xs">{(user.name || user.email || "?").slice(0, 1).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}</p>
+                          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                         </div>
-                      </TableCell>
-                      <TableCell><Badge variant="outline" className="rounded-full capitalize">{user.planTier}</Badge></TableCell>
-                      <TableCell className="text-right tabular-nums">{user.creditBalance ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{user.appsBuilt}</TableCell>
-                      <TableCell className="text-center">
-                        {user.byokCount > 0
-                          ? <Badge variant="secondary" className="rounded-full text-[10px]"><KeyRound className="mr-1 size-2.5" />{user.byokCount}</Badge>
-                          : <span className="text-xs text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{new Date(user.joinedAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="size-9" onClick={() => openDetail(user.id)} aria-label={`View ${user.email ?? user.id}`}>
-                          <Eye className="size-4" />
-                        </Button>
-                      </TableCell>
+                      </div>
+                      {userActions(user)}
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded-xl bg-muted/50 p-2"><strong className="block text-base">{user.creditBalance ?? "—"}</strong>Credits</div>
+                      <div className="rounded-xl bg-muted/50 p-2"><strong className="block text-base">{user.appsBuilt}</strong>Apps</div>
+                      <div className="rounded-xl bg-muted/50 p-2"><strong className="block text-base">{user.byokCount}</strong>BYOK</div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                      <Badge variant="outline" className="rounded-full capitalize">{user.planTier}</Badge>
+                      <span>Joined {new Date(user.joinedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead className="text-right">Credits</TableHead>
+                      <TableHead className="text-right">Apps</TableHead>
+                      <TableHead className="text-center">BYOK</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id} className="transition-colors hover:bg-muted/40">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="size-8">
+                              <AvatarImage src={user.image ?? undefined} alt="" />
+                              <AvatarFallback className="text-xs">{(user.name || user.email || "?").slice(0, 1).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="max-w-[180px] truncate text-sm font-medium">
+                                {user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}
+                              </p>
+                              <p className="max-w-[180px] truncate text-xs text-muted-foreground">{user.email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell><Badge variant="outline" className="rounded-full capitalize">{user.planTier}</Badge></TableCell>
+                        <TableCell className="text-right tabular-nums">{user.creditBalance ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">{user.appsBuilt}</TableCell>
+                        <TableCell className="text-center">
+                          {user.byokCount > 0
+                            ? <Badge variant="secondary" className="rounded-full text-[10px]"><KeyRound className="mr-1 size-2.5" />{user.byokCount}</Badge>
+                            : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{new Date(user.joinedAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">{userActions(user)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
                 <div className="flex gap-2">

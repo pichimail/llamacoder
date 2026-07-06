@@ -43,7 +43,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Content",
     items: [
-      { href: "/admin/projects", label: "Featured Apps", icon: Star },
+      { href: "/admin/projects", label: "Projects", icon: Star },
       { href: "/admin/gallery", label: "Gallery Management", icon: Images },
       { href: "/admin/artifacts", label: "Artifact Moderation", icon: ShieldAlert },
     ],

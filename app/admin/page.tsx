@@ -2,10 +2,20 @@
 
 /** Admin dashboard home (Phase 4): real DB stats, charts, recent activity. */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Activity, CreditCard, Rocket, Users } from "lucide-react";
+import { Activity, ArrowUpRight, CreditCard, FolderKanban, MoreHorizontal, Rocket, Settings2, Tags, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -36,6 +46,12 @@ export default function AdminDashboardPage() {
     { label: "Active Sessions", value: data?.stats.activeToday, icon: Activity },
     { label: "Credits Consumed Today", value: data?.stats.creditsToday, icon: CreditCard },
   ];
+  const routeCards = [
+    { href: "/admin/projects", label: "Projects", description: "Inspect projects, owners, chats, deployments, and workspace health.", icon: FolderKanban },
+    { href: "/admin/users", label: "Users", description: "Search users, grant credits, change plans, and revoke BYOK keys.", icon: Users },
+    { href: "/admin/pricing", label: "Plans", description: "Tune pricing, monthly grants, features, and credit bundles.", icon: Tags },
+    { href: "/admin/settings", label: "Settings", description: "Switch SaaS, auth, gallery, and auto-fix defaults.", icon: Settings2 },
+  ];
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -63,6 +79,21 @@ export default function AdminDashboardPage() {
               )}
             </CardHeader>
           </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {routeCards.map((card) => (
+          <Link key={card.href} href={card.href} className="group rounded-2xl border border-border/70 bg-card p-4 transition hover:border-primary/45 hover:shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="rounded-2xl border border-border bg-background p-2 text-muted-foreground transition group-hover:text-primary">
+                <card.icon className="size-4" />
+              </div>
+              <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-primary" />
+            </div>
+            <h2 className="mt-4 font-semibold">{card.label}</h2>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">{card.description}</p>
+          </Link>
         ))}
       </div>
 
@@ -173,6 +204,7 @@ export default function AdminDashboardPage() {
                   <TableHead>Model</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">When</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -185,6 +217,32 @@ export default function AdminDashboardPage() {
                       <Badge variant={row.status === "ready" ? "secondary" : "outline"} className="rounded-full text-[10px]">{row.status}</Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-right text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-9 rounded-lg" aria-label={`Actions for ${row.title}`}>
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuLabel>Generation</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/chats/${row.id}`}><ArrowUpRight className="size-4" />Open chat</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/projects?search=${encodeURIComponent(row.title || row.promptPreview)}`}><FolderKanban className="size-4" />Find project</Link>
+                          </DropdownMenuItem>
+                          {row.user && row.user !== "—" ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                <Link href={`/admin/users?search=${encodeURIComponent(row.user)}`}><Users className="size-4" />Find user</Link>
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
