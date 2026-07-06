@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
   const files = Array.isArray(snapshot?.files) ? snapshot.files : [];
 
   // validate
-  const issues = await validateGeneratedCodeFiles(files);
+  const issues = await validateGeneratedCodeFiles(files, access.chat.styleId);
   if (issues.length > 0) {
     return NextResponse.json({ ok: false, error: "Validation failed on restore" }, { status: 400 });
   }

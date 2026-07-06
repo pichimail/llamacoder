@@ -2,7 +2,7 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
+import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
@@ -38,6 +38,8 @@ export default function ChatBox({
   onSwitchVersion,
   shouldFocusInput,
   onInputFocused,
+  variant = "full",
+  onExpand,
 }: {
   chat: Chat;
   onNewStreamPromise: (
@@ -53,6 +55,12 @@ export default function ChatBox({
   onSwitchVersion?: (id: string) => void;
   shouldFocusInput?: boolean;
   onInputFocused?: () => void;
+  /** "minimal" renders a single-line input (message icon + text + send) with
+   * every other control (mode, model, mic, attach, suggestions) hidden — used
+   * for the floating composer shown when the chat rail isn't docked. Clicking
+   * the leading icon calls onExpand so the caller can swap in the full variant. */
+  variant?: "full" | "minimal";
+  onExpand?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const disabled = isPending || isStreaming;
@@ -358,22 +366,24 @@ export default function ChatBox({
           aria-label="Attach image or file"
         />
 
-        {mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
+        {variant === "full" && mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 
-        <Suggestions className="mb-2 px-1">
-          {suggestionItems.map((item) => (
-            <Suggestion
-              key={item.label}
-              suggestion={item.value}
-              onClick={(value) => setPrompt(value)}
-              disabled={disabled}
-              className="h-8 shrink-0 gap-1.5 border-border/70 bg-zinc-950/70 px-3 text-xs text-muted-foreground hover:border-fuchsia-400/30 hover:bg-zinc-900 hover:text-foreground"
-            >
-              {item.icon}
-              {item.label}
-            </Suggestion>
-          ))}
-        </Suggestions>
+        {variant === "full" && (
+          <Suggestions className="mb-2 px-1">
+            {suggestionItems.map((item) => (
+              <Suggestion
+                key={item.label}
+                suggestion={item.value}
+                onClick={(value) => setPrompt(value)}
+                disabled={disabled}
+                className="h-8 shrink-0 gap-1.5 border-border/70 bg-zinc-950/70 px-3 text-xs text-muted-foreground hover:border-fuchsia-400/30 hover:bg-zinc-900 hover:text-foreground"
+              >
+                {item.icon}
+                {item.label}
+              </Suggestion>
+            ))}
+          </Suggestions>
+        )}
 
         <InputBar
           value={prompt}
@@ -389,8 +399,8 @@ export default function ChatBox({
           }
           placeholder="Describe a change…"
           disabled={disabled}
-          autoFocus
-          onAttach={handleAttachClick}
+          autoFocus={variant === "full"}
+          onAttach={variant === "full" ? handleAttachClick : undefined}
           onPaste={handlePaste}
           attachedImages={attachedImages}
           attachedFiles={attachedFiles}
@@ -402,22 +412,36 @@ export default function ChatBox({
             setAttachedFiles([]);
             setScreenshotUrl(undefined);
           }}
-          infoBar={chatInfoBar}
+          infoBar={variant === "full" ? chatInfoBar : undefined}
           leftActions={
-            <OptionDropdown
-              value={mode}
-              onValueChange={(value) => setMode(value as ComposerMode)}
-              aria-label="Select mode"
-              tip="Mode"
-              triggerLabel={<span className="capitalize">{mode}</span>}
-              triggerClassName={ghostTrigger}
-              options={(["ask", "plan", "agent"] as const).map((value) => ({
-                value,
-                label: <span className="capitalize">{value}</span>,
-              }))}
-            />
+            variant === "minimal" ? (
+              <Tip label="Show full composer">
+                <button
+                  type="button"
+                  onClick={onExpand}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                  aria-label="Show full composer"
+                >
+                  <MessageSquare className="size-3.5" aria-hidden="true" />
+                </button>
+              </Tip>
+            ) : (
+              <OptionDropdown
+                value={mode}
+                onValueChange={(value) => setMode(value as ComposerMode)}
+                aria-label="Select mode"
+                tip="Mode"
+                triggerLabel={<span className="capitalize">{mode}</span>}
+                triggerClassName={ghostTrigger}
+                options={(["ask", "plan", "agent"] as const).map((value) => ({
+                  value,
+                  label: <span className="capitalize">{value}</span>,
+                }))}
+              />
+            )
           }
           rightActions={
+            variant === "minimal" ? undefined :
             <div className="flex items-center gap-1">
               <SpeechInput
                 onTranscriptionChange={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}

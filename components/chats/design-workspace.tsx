@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { ChevronLeft, ChevronRight, Monitor, RefreshCw, Smartphone, Tablet, ZoomIn, ZoomOut, History, Settings2 } from 'lucide-react'
@@ -33,6 +34,11 @@ interface DesignWorkspaceProps {
   saveRequest?: number
   previewMode: PreviewMode
   sandpackOptions?: SandpackBuildOptions
+  /** When provided, the design-tool controls (typography/color/layout inspector)
+   * are portaled into this element instead of rendering in a local right-side
+   * column — used so the chat composer slot can swap to design controls while
+   * Design mode is active, instead of stacking a second panel next to it. */
+  controlsPortalTarget?: HTMLElement | null
 }
 
 export function DesignWorkspace({
@@ -48,6 +54,7 @@ export function DesignWorkspace({
   saveRequest = 0,
   previewMode,
   sandpackOptions,
+  controlsPortalTarget,
 }: DesignWorkspaceProps) {
   const [liveFiles, setLiveFiles] = useState(files)
   const [inspectorActive, setInspectorActive] = useState(true)
@@ -138,9 +145,11 @@ export function DesignWorkspace({
         </div>
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
           <span className="hidden sm:inline">Design Mode</span>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => setRightOpen(!rightOpen)} title="Toggle inspector">
-            <Settings2 className="size-3.5" />
-          </Button>
+          {!controlsPortalTarget && (
+            <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => setRightOpen(!rightOpen)} title="Toggle inspector">
+              <Settings2 className="size-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -251,7 +260,13 @@ export function DesignWorkspace({
   )
 
   const inspectorPane = (
-    <aside className={cn("flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-border/60 bg-background/95", !rightOpen && "hidden xl:block")}>
+    <aside
+      className={cn(
+        "flex h-full min-h-0 w-full flex-col overflow-hidden bg-background/95",
+        controlsPortalTarget ? "border-t border-border/60" : "border-l border-border/60",
+        !controlsPortalTarget && !rightOpen && "hidden xl:block",
+      )}
+    >
       <ModeDesign
         chatId={chatId}
         chatModel={chatModel}
@@ -278,12 +293,20 @@ export function DesignWorkspace({
       {/* Center dominant preview canvas */}
       <div className="min-w-0 flex-1 overflow-hidden">{previewPane}</div>
 
-      {/* Right inspector (collapsible on xl) */}
-      <div className="hidden min-w-0 shrink-0 border-l xl:block" style={{ width: rightOpen ? 'min(380px, 28vw)' : '0' }}>
-        {rightOpen && inspectorPane}
-      </div>
+      {/* Right inspector: portaled into the chat composer slot when available
+          (desktop) so the controls replace the composer instead of stacking a
+          second panel next to it; falls back to a local collapsible column
+          when no portal target was supplied. */}
+      {controlsPortalTarget ? (
+        createPortal(inspectorPane, controlsPortalTarget)
+      ) : (
+        <div className="hidden min-w-0 shrink-0 border-l xl:block" style={{ width: rightOpen ? 'min(380px, 28vw)' : '0' }}>
+          {rightOpen && inspectorPane}
+        </div>
+      )}
 
-      {/* Mobile inspector bottom sheet */}
+      {/* Mobile inspector bottom sheet (always local — the composer slot isn't
+          visible on mobile while Design mode is active). */}
       <div className="xl:hidden border-t">
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center justify-between bg-background px-3 py-2 text-xs">Inspector <span className="text-muted-foreground group-open:hidden">tap to open</span></summary>

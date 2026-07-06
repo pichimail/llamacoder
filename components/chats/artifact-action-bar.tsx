@@ -130,6 +130,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
   const [duplicateProtected, setDuplicateProtected] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"vercel-project" | "integrations" | "environment-variables" | "ai-keys" | "github" | "template" | "domains" | "backups" | "seo" | "mcp" | "analytics" | "advanced">("vercel-project");
   const [appName, setAppName] = useState(chatTitle);
   const [appDescription, setAppDescription] = useState("");
@@ -1230,7 +1231,44 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
       <Tip label="Share link"><button type="button" className={iconButton} onClick={handleShare} disabled={!activeMessageId} aria-label="Copy share link"><Share2 className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="Publish share"><button type="button" onClick={() => startTransition(() => { void handlePublish(); })} disabled={!canAct || isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45" aria-label="Publish share"><ExternalLink className="size-3.5 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" aria-hidden="true" /><span className="hidden lg:inline">Publish</span></button></Tip>
       {workspace?.hasGithub && <Tip label="Create pull request"><button type="button" className={iconButton} onClick={handleCreatePr} disabled={!canAct || isPending} aria-label="Create GitHub pull request"><GitPullRequest className="size-4" aria-hidden="true" /></button></Tip>}
+      <Tip label="History"><button type="button" className={iconButton} onClick={() => setHistoryOpen(true)} aria-label="Open version history" aria-haspopup="dialog"><History className="size-4" aria-hidden="true" /></button></Tip>
+      <Tip label="Settings"><button type="button" className={iconButton} onClick={() => { setSettingsTab("vercel-project"); setSettingsOpen(true); }} aria-label="Open project settings" aria-haspopup="dialog"><Settings className="size-4" aria-hidden="true" /></button></Tip>
       <Tip label="More project actions"><button ref={moreButtonRef} type="button" className={iconButton} onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-controls={menuId} aria-label="More project actions"><MoreHorizontal className="size-4" aria-hidden="true" /></button></Tip>
+
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-sm">
+          <SheetHeader className="border-b border-border px-4 py-3">
+            <SheetTitle className="flex items-center gap-2 text-sm"><History className="size-4" aria-hidden="true" /> History</SheetTitle>
+            <SheetDescription className="text-xs">Snapshots of this project you can restore at any time.</SheetDescription>
+          </SheetHeader>
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <Input value={checkpointName} onChange={(e) => setCheckpointName(e.target.value)} placeholder="Snapshot name (optional)" className="h-8 text-xs" aria-label="Snapshot name" />
+            <Button onClick={handleCreateCheckpoint} size="sm" className="h-8 shrink-0" disabled={isPending || !canAct}>Save</Button>
+          </div>
+          <div className="flex-1 overflow-auto p-3">
+            {workspace?.checkpoints?.length ? (
+              <div className="space-y-1.5">
+                {workspace.checkpoints.map((cp) => (
+                  <div key={cp.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{cp.name}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(cp.createdAt).toLocaleString()}</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => handleRestoreCheckpoint(cp.id)} disabled={isPending}>Restore</Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-center">
+                <History className="size-8 text-muted-foreground/50" aria-hidden="true" />
+                <p className="max-w-[220px] text-sm text-muted-foreground">
+                  No version history yet. Generate or edit your project to create snapshots.
+                </p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {open && (
         <div ref={menuRef} id={menuId} className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
@@ -1254,7 +1292,6 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
             <button type="button" className={menuItem} onClick={handleSync} disabled={!canAct || isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Sync artifact files</button>
             <button type="button" className={menuItem} onClick={handleBootstrap} disabled={isPending}><RefreshCw className="size-3.5" aria-hidden="true" /> Reseed scaffold</button>
             <button type="button" className={menuItem} onClick={workspace?.hasGithub ? handleCreatePr : handleConnectGithub} disabled={isPending}><GitPullRequest className="size-3.5" aria-hidden="true" /> {workspace?.hasGithub ? "Create PR request" : "Connect GitHub"}</button>
-            <button type="button" className={menuItem} onClick={() => { setOpen(false); setSettingsOpen(true); }} disabled={!canAct}><Settings className="size-3.5" aria-hidden="true" /> App Settings</button>
           </div>
           <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><Input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" aria-label="Environment variable key" className="h-8 text-xs" /><Input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" aria-label="Environment variable value" className="h-8 text-xs" /><Button type="button" variant="outline" size="sm" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} aria-label="Save environment variable" className="h-8 px-2 text-xs">Save</Button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
         </div>
