@@ -8,24 +8,24 @@
   --an-max-width: 420px;
 
   /* Colors - Light mode defaults */
-  --an-background: #ffffff;
-  --an-background-secondary: #f0f0f0;
-  --an-background-tertiary: #f8f8f8;
-  --an-foreground: #1a1a1a;
-  --an-foreground-muted: #737373;
-  --an-foreground-subtle: #a3a3a3;
-  --an-border-color: #e4e4e7;
-  --an-primary-color: #3b82f6;
+  --an-background: #f7f2ea;
+  --an-background-secondary: #eee7dc;
+  --an-background-tertiary: #fbf7f0;
+  --an-foreground: #1f1a16;
+  --an-foreground-muted: #6f6358;
+  --an-foreground-subtle: #9b8e80;
+  --an-border-color: #d9cec0;
+  --an-primary-color: #2f6fed;
 
   /* User Messages */
-  --an-user-message-bg: #f5f5f5;
-  --an-user-message-text: #1a1a1a;
+  --an-user-message-bg: #efe7dc;
+  --an-user-message-text: #1f1a16;
 
   /* Input */
-  --an-input-background: #ffffff;
-  --an-input-border-color: #e4e4e7;
-  --an-input-color: #1a1a1a;
-  --an-input-placeholder-color: #a3a3a3;
+  --an-input-background: #fffaf2;
+  --an-input-border-color: #d7cab9;
+  --an-input-color: #1f1a16;
+  --an-input-placeholder-color: #8c7f72;
   --an-input-focus-outline: transparent;
   --an-context-padding: 10px;
 
@@ -34,10 +34,10 @@
   --an-send-button-color: #ffffff;
 
   /* Tools */
-  --an-tool-background: #f5f5f5;
-  --an-tool-border-color: #e4e4e7;
-  --an-tool-color: #1a1a1a;
-  --an-tool-color-muted: #737373;
+  --an-tool-background: #f1e9dd;
+  --an-tool-border-color: #d9cec0;
+  --an-tool-color: #1f1a16;
+  --an-tool-color-muted: #6f6358;
 
   /* Code */
   --an-code-background: #1e1e1e;

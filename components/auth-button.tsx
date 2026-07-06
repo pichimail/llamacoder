@@ -65,7 +65,7 @@ export default function AuthButton() {
     return (
       <Link
         href="/login"
-        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/10 px-3 text-xs font-semibold text-slate-950 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+        className="hs-auth-button inline-flex h-9 items-center gap-1.5 rounded-full border border-stone-300/90 bg-[#fffaf2]/95 px-3 text-xs font-semibold text-stone-950 shadow-sm shadow-stone-950/10 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-950/40 dark:border-white/20 dark:bg-white/[0.12] dark:text-white dark:shadow-black/30 dark:hover:bg-white/20 dark:focus-visible:outline-white/70"
         title={enabled ? "Sign in" : "Get started"}
       >
         <LogIn className="size-3.5" aria-hidden="true" />
@@ -79,7 +79,7 @@ export default function AuthButton() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex size-9 items-center justify-center rounded-full ring-1 ring-border transition hover:ring-foreground/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="hs-auth-button inline-flex size-9 items-center justify-center rounded-full bg-[#fffaf2] ring-1 ring-stone-300 shadow-sm shadow-stone-950/10 transition hover:ring-stone-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring dark:bg-white/[0.12] dark:ring-white/20 dark:shadow-black/30 dark:hover:ring-white/[0.45]"
           aria-label="Open account menu"
         >
           <Avatar className="size-9">

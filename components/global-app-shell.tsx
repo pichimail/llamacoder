@@ -150,7 +150,7 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
         <ThemeToggle
           showLabel={!collapsed}
           className={cn(
-            "border-0 bg-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+            "border border-border/80 bg-background/90 text-foreground shadow-sm hover:bg-muted/80 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/[0.16]",
             collapsed ? "size-9 justify-center rounded-lg p-0" : "w-full justify-start rounded-lg px-3",
           )}
         />

@@ -29,7 +29,7 @@ function ThemeToggle({
         aria-pressed="true"
         title={mounted ? `Theme: ${label}. Click to change` : "Theme"}
         className={cn(
-          "group relative inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/5 px-2.5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
+          "hs-theme-toggle group relative inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-2.5 text-white/90 shadow-sm shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/[0.18] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
           !showLabel && "size-9 px-0",
           className,
         )}
@@ -52,7 +52,7 @@ function ThemeToggle({
       aria-pressed="false"
       title={mounted ? `Theme: ${label}. Click to change` : "Theme"}
       className={cn(
-        "group relative inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/5 px-2.5 text-[#F4F4F5]/80 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985]",
+        "hs-theme-toggle group relative inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-[#fffaf2] px-2.5 text-stone-800 shadow-sm shadow-stone-950/10 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-stone-100 hover:text-stone-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.985] dark:border-white/15 dark:bg-white/10 dark:text-white/90 dark:shadow-black/20 dark:hover:bg-white/[0.18] dark:hover:text-white",
         !showLabel && "size-9 px-0",
         className,
       )}

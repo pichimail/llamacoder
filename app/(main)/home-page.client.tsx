@@ -3,7 +3,7 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Heart, Store, Upload, Video, Wand2, Zap } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -87,11 +87,11 @@ function useTypewriterPlaceholder(active: boolean) {
 }
 
 function ToggleItem({ label, icon, checked, onChange }: { label: string; icon: ReactNode; checked: boolean; onChange: (value: boolean) => void }) {
-  return <DropdownMenuItem onClick={() => onChange(!checked)} className="flex justify-between gap-3"><span className="flex items-center gap-2">{icon}{label}</span><span aria-hidden="true" className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-white" : "bg-zinc-700"}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full transition ${checked ? "left-[18px] bg-zinc-950" : "left-0.5 bg-white"}`} /></span></DropdownMenuItem>;
+  return <DropdownMenuItem onClick={() => onChange(!checked)} className="flex justify-between gap-3"><span className="flex items-center gap-2">{icon}{label}</span><span aria-hidden="true" className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-zinc-950 dark:bg-white" : "bg-stone-300 dark:bg-zinc-700"}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full transition ${checked ? "left-[18px] bg-white dark:bg-zinc-950" : "left-0.5 bg-white dark:bg-white"}`} /></span></DropdownMenuItem>;
 }
 
 function ModeItem({ mode, current, label, description, icon, onSelect }: { mode: Mode; current: Mode; label: string; description: string; icon: ReactNode; onSelect: (mode: Mode) => void }) {
-  return <DropdownMenuItem onClick={() => onSelect(mode)} className="items-start gap-3"><span className="mt-0.5 text-zinc-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-sm text-white">{label}{current === mode ? <Check className="size-3.5 text-emerald-300" /> : null}</span><span className="mt-0.5 block text-xs leading-4 text-zinc-400">{description}</span></span></DropdownMenuItem>;
+  return <DropdownMenuItem onClick={() => onSelect(mode)} className="items-start gap-3"><span className="mt-0.5 text-stone-500 dark:text-zinc-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-sm text-stone-950 dark:text-white">{label}{current === mode ? <Check className="size-3.5 text-emerald-600 dark:text-emerald-300" /> : null}</span><span className="mt-0.5 block text-xs leading-4 text-stone-500 dark:text-zinc-400">{description}</span></span></DropdownMenuItem>;
 }
 
 /* Phase 1 (B6): style preset chip selector. Same pattern as the mode toggles. */
@@ -122,16 +122,16 @@ function DesignPicker({
           disabled={disabled}
           title={selectedSavedDesignId ? "Custom design active" : activePreset?.description}
           aria-label="Choose a design style"
-          className="inline-flex size-10 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30 disabled:opacity-40"
+          className="inline-flex size-10 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-900/[0.06] hover:text-stone-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/25 disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300 dark:focus-visible:ring-white/30"
         >
           <Palette className="size-5" style={selectedSavedDesignId ? undefined : { color: activePreset?.swatch }} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 rounded-xl border-white/10 bg-zinc-900 p-0 text-white shadow-xl">
+      <PopoverContent align="start" className="w-72 rounded-xl border-stone-200/80 bg-[#fffaf2] p-0 text-stone-950 shadow-xl shadow-stone-950/10 dark:border-white/10 dark:bg-zinc-900 dark:text-white">
         <button
           type="button"
           onClick={() => { setOpen(false); onOpenDesignDialog(); }}
-          className="flex w-full items-center gap-2.5 border-b border-white/10 px-3.5 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/[0.06]"
+          className="flex w-full items-center gap-2.5 border-b border-stone-200 px-3.5 py-3 text-left text-sm font-medium text-stone-950 transition-colors hover:bg-stone-900/[0.05] dark:border-white/10 dark:text-white dark:hover:bg-white/[0.06]"
         >
           <Plus className="size-4" />
           Start with your design
@@ -140,15 +140,15 @@ function DesignPicker({
           <div className="p-1.5">
             {savedDesigns.length > 0 ? (
               <>
-                <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Your designs</div>
+                <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-stone-500 dark:text-zinc-500">Your designs</div>
                 {savedDesigns.map((design) => (
                   <button
                     key={design.id}
                     type="button"
                     onClick={() => { onSelectSavedDesign(design); setOpen(false); }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-white/[0.06] ${selectedSavedDesignId === design.id ? "bg-white/10 text-white" : "text-zinc-300"}`}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-stone-900/[0.05] dark:hover:bg-white/[0.06] ${selectedSavedDesignId === design.id ? "bg-stone-900/10 text-stone-950 dark:bg-white/10 dark:text-white" : "text-stone-700 dark:text-zinc-300"}`}
                   >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 text-[10px] font-semibold uppercase">{design.name.slice(0, 1)}</span>
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-stone-400 to-stone-700 text-[10px] font-semibold uppercase text-white">{design.name.slice(0, 1)}</span>
                     <span className="truncate">{design.name}</span>
                     {selectedSavedDesignId === design.id ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
                   </button>
@@ -156,18 +156,18 @@ function DesignPicker({
                 <div className="my-1 h-px bg-white/10" />
               </>
             ) : null}
-            <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Design styles</div>
+            <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-stone-500 dark:text-zinc-500">Design styles</div>
             {SANDBOX_STYLE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => { onChange(preset.id); setOpen(false); }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-white/[0.06] ${!selectedSavedDesignId && value === preset.id ? "bg-white/10 text-white" : "text-zinc-300"}`}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-stone-900/[0.05] dark:hover:bg-white/[0.06] ${!selectedSavedDesignId && value === preset.id ? "bg-stone-900/10 text-stone-950 dark:bg-white/10 dark:text-white" : "text-stone-700 dark:text-zinc-300"}`}
               >
                 <span aria-hidden="true" className="size-4 shrink-0 rounded-full" style={{ backgroundColor: preset.swatch }} />
                 <span className="flex flex-col">
                   <span>{preset.label}</span>
-                  <span className="text-[11px] text-zinc-500">{preset.description}</span>
+                  <span className="text-[11px] text-stone-500 dark:text-zinc-500">{preset.description}</span>
                 </span>
                 {!selectedSavedDesignId && value === preset.id ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
               </button>
@@ -444,7 +444,7 @@ function PresetChipsScroller({ onSelect }: { onSelect: (prompt: string) => void 
               if (drag.current.moved) return; // ignore click that ended a drag
               onSelect(group.prompt);
             }}
-            className="shrink-0 snap-start rounded-[6px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[13px] font-medium whitespace-nowrap text-zinc-400 backdrop-blur-md transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+            className="hs-home-preset-chip shrink-0 snap-start rounded-[6px] border border-stone-300/90 bg-[#fffaf2]/70 px-3 py-1.5 text-[13px] font-medium whitespace-nowrap text-stone-600 backdrop-blur-md transition-colors duration-150 hover:border-stone-400 hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/30 dark:!border-white/10 dark:!bg-white/[0.04] dark:!text-zinc-400 dark:hover:!border-white/20 dark:hover:!bg-white/[0.08] dark:hover:!text-white dark:focus-visible:ring-white/40"
           >
             {group.title}
           </button>
@@ -465,7 +465,7 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
   const anyBuilderToggle = flagEnabled("web-search") || flagEnabled("deep-thinking") || flagEnabled("canvas-mode");
   return (
     <div className="w-full">
-      <div className={`rounded-2xl border bg-zinc-950/60 text-white backdrop-blur-xl transition-colors duration-200 ${focused ? "border-white/25" : "border-white/10"}`}>
+      <div className={`hs-home-composer rounded-2xl border bg-[#fffaf2]/96 text-stone-950 shadow-[0_18px_60px_rgba(43,31,18,0.12)] backdrop-blur-xl transition-colors duration-200 dark:bg-zinc-950/70 dark:text-white dark:shadow-black/30 ${focused ? "border-stone-400/80 dark:border-white/25" : "border-stone-300/80 dark:border-white/10"}`}>
         <textarea
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
@@ -476,52 +476,52 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
           aria-label="Describe what to build"
           disabled={disabled}
           rows={3}
-          className="min-h-[96px] w-full resize-none rounded-t-2xl bg-transparent px-5 pb-3 pt-5 text-base leading-relaxed text-white outline-none placeholder:text-zinc-500 disabled:opacity-60"
+          className="min-h-[96px] w-full resize-none rounded-t-2xl bg-transparent px-5 pb-3 pt-5 text-base leading-relaxed text-stone-950 outline-none placeholder:text-stone-500 disabled:opacity-60 dark:text-white dark:placeholder:text-zinc-500"
         />
-        {attachmentReady ? <div className="mx-5 mb-2 inline-flex rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-300">Attachment ready</div> : null}
-        {variableCount > 0 ? <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1.5 text-xs text-zinc-500"><span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-zinc-400">{variableCount} variables</span></div> : null}
+        {attachmentReady ? <div className="mx-5 mb-2 inline-flex rounded-full border border-stone-300 bg-stone-100/80 px-3 py-1 text-xs text-stone-700 dark:border-white/15 dark:bg-white/[0.04] dark:text-zinc-300">Attachment ready</div> : null}
+        {variableCount > 0 ? <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1.5 text-xs text-stone-500 dark:text-zinc-500"><span className="rounded-full bg-stone-900/[0.06] px-2.5 py-1 text-stone-600 dark:bg-white/[0.06] dark:text-zinc-400">{variableCount} variables</span></div> : null}
         {promptLibraryOn && savedPrompts.length > 0 ? (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {savedPrompts.slice(0, 5).map((item) => (
-              <button key={item.id} type="button" onClick={() => onUseSavedPrompt(item)} className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-200">
+              <button key={item.id} type="button" onClick={() => onUseSavedPrompt(item)} className="shrink-0 rounded-full border border-stone-300 px-2.5 py-1 text-xs text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-950 dark:border-white/10 dark:text-zinc-400 dark:hover:border-white/20 dark:hover:text-zinc-200">
                 {item.title}
               </button>
             ))}
           </div>
         ) : null}
-        <div className="flex min-h-[54px] items-center justify-between gap-2 border-t border-white/[0.06] px-2.5 py-1.5">
+        <div className="flex min-h-[54px] items-center justify-between gap-2 border-t border-stone-200/90 px-2.5 py-1.5 dark:border-white/[0.06]">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 disabled={disabled}
-                className="inline-flex size-10 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30 disabled:opacity-40"
+                className="inline-flex size-10 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-900/[0.06] hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/25 disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300 dark:focus-visible:ring-white/30"
                 aria-label="Open prompt actions"
               >
                 <Plus className="size-5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[min(86vw,340px)] rounded-xl border-white/10 bg-zinc-900 p-1.5 text-white shadow-lg">
-              <DropdownMenuLabel className="text-xs text-zinc-500">Actions</DropdownMenuLabel>
+            <DropdownMenuContent align="start" className="w-[min(86vw,340px)] rounded-xl border-stone-200/80 bg-[#fffaf2] p-1.5 text-stone-950 shadow-lg shadow-stone-950/10 dark:border-white/10 dark:bg-zinc-900 dark:text-white">
+              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem>
               {flagEnabled("github-import") ? <DropdownMenuItem onClick={onImportGithub} className="gap-3"><Github className="size-4" />Import from GitHub</DropdownMenuItem> : null}
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuLabel className="text-xs text-zinc-500">Mode</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
+              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Mode</DropdownMenuLabel>
               <ModeItem mode="agent" current={buildMode} label="Agent" description="Build the app, write files, validate preview, then self-correct once if needed." icon={<Bot className="size-4" />} onSelect={onBuildModeChange} />
               <ModeItem mode="plan" current={buildMode} label="Plan" description="Create a buildability plan only: possible, not possible, backend, files, and steps." icon={<ListChecks className="size-4" />} onSelect={onBuildModeChange} />
               <ModeItem mode="ask" current={buildMode} label="Ask" description="Answer questions without writing a full artifact." icon={<MessageSquare className="size-4" />} onSelect={onBuildModeChange} />
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuLabel className="text-xs text-zinc-500">Builder</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
+              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Builder</DropdownMenuLabel>
               <ToggleItem label="shadcn UI" icon={<Palette className="size-4" />} checked={shadcnEnabled} onChange={onShadcnChange} />
-              {anyBuilderToggle ? <DropdownMenuSeparator className="bg-white/10" /> : null}
+              {anyBuilderToggle ? <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" /> : null}
               {flagEnabled("web-search") ? <ToggleItem label="Web search" icon={<SearchIcon className="size-4" />} checked={webSearchEnabled} onChange={onWebSearchChange} /> : null}
               {flagEnabled("deep-thinking") ? <ToggleItem label="Deep thinking" icon={<Brain className="size-4" />} checked={deepThinkingEnabled} onChange={onDeepThinkingChange} /> : null}
               {flagEnabled("canvas-mode") ? <ToggleItem label="Canvas" icon={<ImageIcon className="size-4" />} checked={canvasEnabled} onChange={onCanvasChange} /> : null}
               <ToggleItem label="Backend" icon={<Database className="size-4" />} checked={backendEnabled} onChange={onBackendChange} />
               {promptLibraryOn ? (
                 <>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuLabel className="text-xs text-zinc-500">Prompts</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
+                  <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Prompts</DropdownMenuLabel>
                   <DropdownMenuItem onClick={onSavePrompt} disabled={!value.trim()} className="gap-3"><Sparkles className="size-4" />Save this prompt</DropdownMenuItem>
                   <DropdownMenuItem asChild className="gap-3"><Link href="/library"><Layers className="size-4" />Prompt library</Link></DropdownMenuItem>
                 </>
@@ -547,14 +547,14 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
                 value={model}
                 onChange={(event) => onModelChange(event.target.value)}
                 disabled={disabled}
-                className="peer h-9 w-full appearance-none rounded-full border-0 bg-transparent py-0 pl-0 pr-6 text-sm text-zinc-500 outline-none transition-colors hover:text-zinc-300 focus:text-zinc-200 disabled:opacity-50"
+                className="peer h-9 w-full appearance-none rounded-full border-0 bg-transparent py-0 pl-0 pr-6 text-sm text-stone-600 outline-none transition-colors hover:text-stone-950 focus:text-stone-950 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-300 dark:focus:text-zinc-200"
               >
                 {models.map((m: any) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-zinc-600 transition-colors group-hover:text-zinc-400" aria-hidden="true" />
+              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-stone-500 transition-colors group-hover:text-stone-800 dark:text-zinc-600 dark:group-hover:text-zinc-400" aria-hidden="true" />
             </div>
-            {flagEnabled("voice-input") ? <SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-0 bg-transparent text-zinc-500 transition-colors hover:bg-transparent hover:text-zinc-300" aria-label="Dictate prompt" /> : null}
-            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full bg-white text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 disabled:opacity-30" aria-label="Start build">{isLoading ? <DotFlow size={5} label="Starting build" /> : <ArrowUp className="size-5" />}</button>
+            {flagEnabled("voice-input") ? <SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-0 bg-transparent text-stone-500 transition-colors hover:bg-transparent hover:text-stone-950 dark:text-zinc-500 dark:hover:text-zinc-300" aria-label="Dictate prompt" /> : null}
+            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full bg-stone-950 text-white shadow-sm transition-colors hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-950/40 disabled:opacity-30 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-white/40" aria-label="Start build">{isLoading ? <DotFlow size={5} label="Starting build" /> : <ArrowUp className="size-5" />}</button>
           </div>
         </div>
       </div>
@@ -857,11 +857,6 @@ export default function HomePageClient() {
             <Header hideLogo />
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
               <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
-                <motion.div {...heroWordAnimation} transition={{ duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}>
-                  <Badge variant="outline" className="mb-6 rounded-full border-white/15 bg-white/[0.05] px-4 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur-sm">
-                    <Heart className="mr-1.5 size-3.5 text-indigo-300" /> Now with 5 premium output styles & Three.js
-                  </Badge>
-                </motion.div>
                 <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-foreground sm:text-[44px] md:text-[80px] lg:text-[92px]">
                   {["Build.", "Preview.", "Ship."].map((word, index) => (
                     <motion.span
