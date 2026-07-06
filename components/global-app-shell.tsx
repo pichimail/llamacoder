@@ -64,7 +64,7 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
   const recentChats = useMemo(() => chats.slice(0, 8), [chats]);
 
   return (
-    <aside className={cn("flex h-full flex-col border-r border-border/70 bg-card/30 transition-[width] duration-200 ease-out", collapsed ? "w-[68px]" : "w-[264px]")}>
+    <aside className={cn("flex h-dvh flex-col overflow-hidden border-r border-border/70 bg-card/30 transition-[width] duration-200 ease-out", collapsed ? "w-[68px]" : "w-[264px]")}>
       {/* Header */}
       <div className={cn("flex items-center p-3", collapsed ? "justify-center" : "justify-between gap-2")}>
         <Link href="/" onClick={onNavigate} className={cn("flex items-center rounded-lg transition-colors hover:bg-muted/70", collapsed ? "size-10 justify-center" : "min-w-0 gap-2 px-2 py-1.5")} aria-label="Chinna-Coder home">
@@ -174,19 +174,21 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={cn("min-h-dvh bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out lg:grid", collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]")}>
-      <div className="hidden lg:sticky lg:top-0 lg:block lg:h-dvh">
+    <div className={cn("h-dvh overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out lg:grid", collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]")}>
+      <div className="hidden lg:sticky lg:top-0 lg:block lg:h-dvh lg:overflow-hidden">
         <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
-      <div className="min-w-0">
-        <div className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur lg:hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur lg:hidden">
           <button type="button" onClick={() => setMobileOpen(true)} className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" aria-label="Open navigation">
             <Menu className="size-4" aria-hidden="true" />
           </button>
           <Link href="/" className="text-sm font-semibold">Chinna-Coder</Link>
           <span className="size-9" aria-hidden="true" />
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {children}
+        </div>
       </div>
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">

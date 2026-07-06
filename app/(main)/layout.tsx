@@ -9,7 +9,7 @@ export default function Layout({
 }>) {
   return (
     <Providers>
-      <div className="flex min-h-full flex-col">
+      <div className="flex h-full min-h-0 flex-col">
         {children}
         <Toaster richColors closeButton position="top-right" />
         <RadixToaster />

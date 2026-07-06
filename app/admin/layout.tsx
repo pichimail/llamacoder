@@ -87,7 +87,7 @@ function isActive(pathname: string, href: string) {
 
 function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Admin navigation">
+    <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Admin navigation">
       {NAV_SECTIONS.map((section) => (
         <div key={section.title}>
           <p className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
@@ -123,18 +123,20 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
 function SidebarFooter() {
   const { user } = useHomeSidebarData();
   return (
-    <div className="flex items-center gap-3 border-t border-border/60 p-3">
-      <Avatar className="size-8">
-        <AvatarImage src={(user as any)?.image ?? (user as any)?.avatarUrl ?? undefined} alt="" />
-        <AvatarFallback className="text-xs">{(user?.name || user?.email || "A").slice(0, 1).toUpperCase()}</AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{user?.name || user?.email || "Admin"}</p>
-        <Badge variant="secondary" className="mt-0.5 rounded-full px-2 py-0 text-[10px]">
-          <Shield className="mr-1 size-2.5" /> Admin
-        </Badge>
+    <div className="shrink-0 border-t border-border/60 p-3">
+      <div className="flex items-center gap-3">
+        <Avatar className="size-8">
+          <AvatarImage src={(user as any)?.image ?? (user as any)?.avatarUrl ?? undefined} alt="" />
+          <AvatarFallback className="text-xs">{(user?.name || user?.email || "A").slice(0, 1).toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{user?.name || user?.email || "Admin"}</p>
+          <Badge variant="secondary" className="mt-0.5 rounded-full px-2 py-0 text-[10px]">
+            <Shield className="mr-1 size-2.5" /> Admin
+          </Badge>
+        </div>
+        <ThemeToggle />
       </div>
-      <ThemeToggle />
     </div>
   );
 }
@@ -154,24 +156,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="flex min-h-dvh bg-background text-foreground">
+    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border/60 bg-card/40 md:flex">
+      <aside className="hidden h-dvh w-60 shrink-0 flex-col overflow-hidden border-r border-border/60 bg-card/40 md:flex">
         {sidebarHeader}
         <SidebarNav pathname={pathname} />
         <SidebarFooter />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="size-11" aria-label="Open admin menu">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex w-72 flex-col gap-0 p-0">
+            <SheetContent side="left" className="flex h-full w-72 flex-col gap-0 overflow-hidden p-0">
               <SheetTitle className="sr-only">Admin navigation</SheetTitle>
               {sidebarHeader}
               <SidebarNav pathname={pathname} onNavigate={() => setMobileOpen(false)} />
@@ -182,7 +184,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="ml-auto"><ThemeToggle /></div>
         </header>
 
-        <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">{children}</main>
       </div>
     </div>
   );
