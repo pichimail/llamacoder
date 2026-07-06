@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+import { Task, TaskTrigger, TaskContent, TaskItem } from "@/components/ai-elements/task";
 import { Checkpoint } from "@/components/ai-elements/checkpoint";
 import { PlanResponseCard } from "@/components/plan-mode-panel";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Brain, Archive, ListTodo, Layers, Sparkles, ListChecks } from "lucide-react";
+import { DotFlow } from "@/components/ui/dot-flow";
 import type { Message } from "./page";
 
 interface ChatPanelProps {
@@ -60,6 +62,18 @@ export function ChatPanel({
     ] : []
   );
 
+  // Unique single English words about the building artifact — Claude style
+  const buildArtifactWords = [
+    "Scaffolding", "Architecting", "Composing", "Wiring", "Styling",
+    "Refining", "Polishing", "Validating", "Optimizing", "Assembling",
+    "Structuring", "Templating", "Theming"
+  ];
+  const getBuildWord = () => {
+    // Stable cycling based on time so it feels alive but not frantic
+    const idx = Math.floor(Date.now() / 1100) % buildArtifactWords.length;
+    return buildArtifactWords[idx];
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
       <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3">
@@ -69,6 +83,17 @@ export function ChatPanel({
           <span>{visibleMessages.length} messages</span>
         </div>
       </div>
+
+      {/* Claude-style live artifact build status (single words + dotted loader) */}
+      {(isStreaming || isReasoningStreaming) && (
+        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 text-xs">
+          <DotFlow size={5} />
+          <span className="font-medium text-foreground/90">
+            {isReasoningStreaming ? "Reasoning" : getBuildWord()}
+          </span>
+          <span className="ml-1 text-[10px] uppercase tracking-[1px] text-muted-foreground/70">artifact</span>
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <Accordion
@@ -183,26 +208,26 @@ export function ChatPanel({
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="space-y-2 py-2">
+                <div className="space-y-1 py-2">
                   {activeTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="rounded-lg border border-border/50 bg-muted/20 p-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className={`size-2 rounded-full ${
-                          task.status === "completed" ? "bg-emerald-400" :
-                          task.status === "in-progress" ? "bg-amber-400 animate-pulse" :
-                          "bg-muted-foreground"
-                        }`} />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-foreground">{task.title}</div>
-                          {task.description && (
-                            <div className="mt-1 text-xs text-muted-foreground">{task.description}</div>
-                          )}
+                    <Task key={task.id} defaultOpen={task.status !== "completed"}>
+                      <TaskTrigger title={task.title}>
+                        <div className="flex w-full items-center gap-2 text-sm">
+                          <div className={`size-2 rounded-full ${
+                            task.status === "completed" ? "bg-emerald-400" :
+                            task.status === "in-progress" ? "bg-amber-400 animate-pulse" :
+                            "bg-muted-foreground"
+                          }`} />
+                          <span className="text-foreground">{task.title}</span>
+                          {task.status === "in-progress" && <span className="ml-auto text-[10px] text-amber-400">in progress</span>}
                         </div>
-                      </div>
-                    </div>
+                      </TaskTrigger>
+                      {task.description && (
+                        <TaskContent>
+                          <TaskItem>{task.description}</TaskItem>
+                        </TaskContent>
+                      )}
+                    </Task>
                   ))}
                 </div>
               </AccordionContent>

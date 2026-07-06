@@ -3,6 +3,7 @@
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
+import { DotFlow } from "@/components/ui/dot-flow";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
@@ -351,7 +352,7 @@ export default function ChatBox({
 
   return (
     <TooltipProvider>
-      <div ref={composerRef} className="relative w-full">
+      <div ref={composerRef} className="relative w-full chat-composer">
         <label htmlFor="screenshot" className="sr-only">
           Attach image or file
         </label>
@@ -365,6 +366,17 @@ export default function ChatBox({
           disabled={!isScreenshotUploadAvailable}
           aria-label="Attach image or file"
         />
+
+        {/* Claude / v0 style live build word + dotted loader above composer */}
+        {(isStreaming || status === "submitted") && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 px-3 py-1 text-[11px]">
+            <span className="inline-flex"><DotFlow size={4} /></span>
+            <span className="font-medium text-foreground/85 tracking-tight">
+              {["Scaffolding", "Architecting", "Composing", "Wiring", "Refining", "Polishing", "Validating"][Math.floor(Date.now() / 950) % 7]}
+            </span>
+            <span className="ml-px text-[10px] text-muted-foreground/70">the artifact…</span>
+          </div>
+        )}
 
         {variant === "full" && mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 

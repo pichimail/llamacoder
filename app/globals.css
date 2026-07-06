@@ -72,24 +72,24 @@
   }
   .dark {
     --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    --foreground: 0 0% 99%;
     --card: 0 0% 5.5%;
-    --card-foreground: 0 0% 98%;
+    --card-foreground: 0 0% 99%;
     --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 98%;
+    --popover-foreground: 0 0% 99%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
     --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary-foreground: 0 0% 99%;
     --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 74%;
+    --muted-foreground: 0 0% 78%;
     --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 0 0% 99%;
     --destructive: 0 62.8% 45%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 22%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 83.1%;
+    --border: 0 0% 18%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 85%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -397,6 +397,62 @@
 
 [aria-label="Chat panel"] form textarea::placeholder {
   color: hsl(var(--muted-foreground)) !important;
+}
+
+/* === Rich high-contrast whites for chats dark mode (sleek + readable) === */
+.dark .hs-composer-swap,
+.dark header.hs-composer-swap,
+.dark [data-slot="chat-header"],
+.dark .chat-header {
+  background: hsl(0 0% 4.5%) !important;
+  border-color: hsl(0 0% 16%) !important;
+}
+
+.dark .hs-composer-swap .text-foreground,
+.dark .hs-composer-swap button:not([disabled]),
+.dark header .text-foreground {
+  color: hsl(0 0% 99%) !important;
+}
+
+.dark .hs-composer-swap .text-muted-foreground,
+.dark header .text-muted-foreground {
+  color: hsl(0 0% 78%) !important;
+}
+
+.dark .hs-composer-swap button,
+.dark header button {
+  color: hsl(0 0% 95%);
+}
+
+.dark .hs-composer-swap button:hover,
+.dark header button:hover {
+  color: hsl(0 0% 100%);
+  background-color: hsl(0 0% 10%);
+}
+
+.dark [aria-label="Chat panel"] form > div,
+.dark .chat-composer {
+  background: hsl(0 0% 7% / 0.96) !important;
+  border-color: hsl(0 0% 20%) !important;
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04), 0 10px 30px hsl(0 0% 0% / 0.35) !important;
+}
+
+.dark [aria-label="Chat panel"] form textarea {
+  color: hsl(0 0% 99%) !important;
+}
+
+.dark .chat-composer textarea::placeholder {
+  color: hsl(0 0% 65%) !important;
+}
+
+/* Sleek rich contrast buttons and badges in dark chat surfaces */
+.dark .chat-surface button,
+.dark .chat-surface .btn {
+  color: hsl(0 0% 96%);
+}
+
+.dark .chat-surface .border {
+  border-color: hsl(0 0% 18%);
 }
 
 [aria-label="Chat panel"] form button[type="submit"],

@@ -23,7 +23,6 @@ import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
 import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2, X } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
-import { ArtifactActionBar } from "@/components/chats/artifact-action-bar";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
@@ -40,6 +39,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
@@ -1521,17 +1528,120 @@ Fix requirements:
               <BuilderModeButton mode="canvas" current={builderMode} label="Canvas" icon={<ImageIcon className="size-3.5" />} onClick={() => setModeSafely("canvas")} />
             </div>
 
-            <div className="flex items-center justify-end gap-1">
+            <div className="flex items-center justify-end gap-1.5">
+              {/* Mobile compact controls */}
               <div className="flex items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:hidden" aria-label="Mobile panels">
                 <MobilePanelButton panel="chat" current={mobilePanel} label="Chat" icon={<MessageSquare className="size-3.5" />} onClick={() => switchMobilePanel("chat")} />
                 <MobilePanelButton panel="code" current={mobilePanel} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => switchMobilePanel("code")} />
                 <MobilePanelButton panel="preview" current={mobilePanel} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => switchMobilePanel("preview")} />
               </div>
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
-              {(builderMode === "preview" || builderMode === "design") && <Tip label={`Switch to ${nextPreviewMode} preview`}><button type="button" onClick={() => setPreviewMode(nextPreviewMode)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label={`Switch to ${nextPreviewMode} preview`}>{previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}</button></Tip>}
-              <Tip label="Enter fullscreen"><button type="button" onClick={() => setImmersiveFullscreen(true)} className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex" aria-label="Enter fullscreen"><Maximize2 className="size-4" aria-hidden="true" /></button></Tip>
-              <div className="hidden md:flex"><ArtifactActionBar chatId={chat.id} chatTitle={chat.title} activeMessageId={activeMessage?.id} activeVersionLabel={activeVersion?.label} versions={assistantVersions} files={artifactFiles} onSwitchVersion={handleSwitchVersion} onDownload={handleDownloadZip} /></div>
+
+              {/* Desktop: clean non-crowded toolbar with dynamic visibility */}
+              {(builderMode === "preview" || builderMode === "design") && (
+                <Tip label={`Switch to ${nextPreviewMode} preview`}>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode(nextPreviewMode)}
+                    className="hidden size-8 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex"
+                    aria-label={`Switch to ${nextPreviewMode} preview`}
+                  >
+                    {previewMode === "web" ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}
+                  </button>
+                </Tip>
+              )}
+
+              <Tip label="Enter immersive fullscreen">
+                <button
+                  type="button"
+                  onClick={() => setImmersiveFullscreen(true)}
+                  className="hidden size-8 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:inline-flex"
+                  aria-label="Enter fullscreen"
+                >
+                  <Maximize2 className="size-4" aria-hidden="true" />
+                </button>
+              </Tip>
+
+              {/* Compact primary actions + overflow dropdown for the rest (fixes overlap/crowding) */}
+              <div className="hidden items-center gap-1 md:flex">
+                {/* Dynamic: only show if we have an active artifact */}
+                {canAct && (
+                  <>
+                    <Tip label="Share">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-muted-foreground hover:text-foreground"
+                        onClick={handleShareLink}
+                        aria-label="Share chat"
+                        disabled={!activeMessage?.id}
+                      >
+                        <Share2 className="size-4" />
+                      </Button>
+                    </Tip>
+                    <Tip label="Download ZIP">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-muted-foreground hover:text-foreground"
+                        onClick={handleDownloadZip}
+                        aria-label="Download zip"
+                        disabled={!canAct}
+                      >
+                        <Download className="size-4" />
+                      </Button>
+                    </Tip>
+                  </>
+                )}
+
+                {/* Consolidated actions dropdown — replaces crowded ArtifactActionBar in header */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-muted-foreground hover:text-foreground"
+                      aria-label="More actions"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="text-xs">Artifact actions</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleShareLink} disabled={!activeMessage?.id}>
+                      <Share2 className="mr-2 size-4" /> Share link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handlePublishMobile} disabled={!canAct}>
+                      <ExternalLink className="mr-2 size-4" /> Publish site
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDownloadZip} disabled={!canAct}>
+                      <Download className="mr-2 size-4" /> Download ZIP
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCreatePrMobile} disabled={!canAct}>
+                      <GitPullRequest className="mr-2 size-4" /> Create PR
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent("open-artifact-settings"))}>
+                      <Settings className="mr-2 size-4" /> Workspace settings
+                    </DropdownMenuItem>
+                    {assistantVersions.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] text-muted-foreground">Versions</DropdownMenuLabel>
+                        {assistantVersions.slice().reverse().slice(0, 5).map((v) => (
+                          <DropdownMenuItem key={v.id} onClick={() => handleSwitchVersion(v.id)}>
+                            Restore {v.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
               <CreditIndicator visible={chatAiIntegration === "chinnallm" && flagEnabled("credit-indicator")} className="hidden md:inline-flex" />
+
               {chatAiIntegration === "skip" && (
                 <Tip label="Add AI to this app">
                   <Button
@@ -1550,6 +1660,7 @@ Fix requirements:
                   </Button>
                 </Tip>
               )}
+
               <div className="hidden md:block"><ThemeToggle /></div>
             </div>
           </header>
