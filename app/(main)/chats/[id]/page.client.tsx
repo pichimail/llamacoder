@@ -725,13 +725,15 @@ Fix requirements:
     const normalized = error.trim();
     const now = Date.now();
     const same = normalized === lastAutoFixErrorRef.current;
-    if (same && now - lastAutoFixAtRef.current < 4500) return;
+    // A forced (user-clicked "Fix") request must never silently no-op — the
+    // dialog is already showing "fixing" and has no other way out.
+    if (!force && same && now - lastAutoFixAtRef.current < 4500) return;
     const currentFiles = files && files.length > 0 ? files : artifactFiles;
-    if (!same) autoFixAttemptRef.current = 0;
+    if (!same || force) autoFixAttemptRef.current = 0;
     const shouldForceFallback = fallback || currentFiles.length <= 1 || autoFixAttemptRef.current > 0;
 
     const nextAttempt = autoFixAttemptRef.current + 1;
-    if (nextAttempt > MAX_AUTO_FIX_ATTEMPTS) {
+    if (!force && nextAttempt > MAX_AUTO_FIX_ATTEMPTS) {
       autoFixAttemptRef.current = nextAttempt;
       setAutoFixAttempt(MAX_AUTO_FIX_ATTEMPTS);
       setAutoFixStatus("idle");
@@ -749,11 +751,12 @@ Fix requirements:
     setBuilderStatus("fixing");
     startTransition(async () => {
       try {
-        await requestFix({ error: normalized, auto: true, attempt: nextAttempt, fallback: shouldForceFallback, files: currentFiles });
+        await requestFix({ error: normalized, auto: !force, attempt: nextAttempt, fallback: shouldForceFallback, files: currentFiles });
       } catch {
         autoFixPendingRef.current = false;
         setAutoFixStatus("watching");
         setBuilderStatus("validating");
+        setBuildErrorDialog((prev) => (prev && prev.status === "fixing" ? { ...prev, status: "failed" } : prev));
       }
     });
   }, [artifactFiles, autoFixEnabled, requestFix, isPastGenerationBudget]);
@@ -869,6 +872,10 @@ Fix requirements:
         abortControllerRef.current = null;
         setStreamPromise(undefined);
         setBuilderStatus("failed");
+        // Don't leave the build-error dialog stuck at "fixing" (both its
+        // actions are disabled in that state) if the fix's own stream never
+        // even started.
+        setBuildErrorDialog((prev) => (prev && prev.status === "fixing" ? { ...prev, status: "failed" } : prev));
         toast({
           title: "Generation failed",
           description: error instanceof Error ? error.message : "Failed to start generation.",
@@ -901,6 +908,7 @@ Fix requirements:
             isHandlingStreamRef.current = false;
             setStreamPromise(undefined);
             setBuilderStatus("failed");
+            setBuildErrorDialog((prev) => (prev && prev.status === "fixing" ? { ...prev, status: "failed" } : prev));
             toast({
               title: "Generation failed",
               description: error instanceof Error ? error.message : "Stream parsing failed.",
@@ -1064,6 +1072,7 @@ Fix requirements:
         isHandlingStreamRef.current = false;
         setStreamPromise(undefined);
         setBuilderStatus("failed");
+        setBuildErrorDialog((prev) => (prev && prev.status === "fixing" ? { ...prev, status: "failed" } : prev));
       }
     }
     readStream();

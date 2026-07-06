@@ -42,6 +42,7 @@ type VisualPreviewState = {
 
 const VISUAL_PREVIEW_TIMEOUT_MS = 7000;
 const VISUAL_PREVIEW_POLL_MS = 300;
+const BUNDLER_WATCHDOG_MS = 25000;
 
 const previewModes: Array<{
   value: PreviewMode;
@@ -397,12 +398,25 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
   useEffect(() => {
     let readyTimer: number | undefined;
     let visualTimer: number | undefined;
+    let bundlerWatchdog: number | undefined;
     let cancelled = false;
 
     const clearTimers = () => {
       window.clearTimeout(readyTimer);
       window.clearTimeout(visualTimer);
+      window.clearTimeout(bundlerWatchdog);
     };
+
+    // The bundler may never emit a "done" message at all (stuck dependency
+    // install, crashed worker, etc). Without this, the preview waits forever
+    // with no error surfaced and no way for auto-fix to kick in.
+    bundlerWatchdog = window.setTimeout(() => {
+      if (cancelled || readyReportedRef.current) return;
+      const errorText = "Sandbox bundler did not respond in time. It may be stuck installing dependencies or compiling.";
+      setLastRuntimeError(errorText);
+      onLog?.("error", errorText);
+      onPreviewError?.(errorText);
+    }, BUNDLER_WATCHDOG_MS);
 
     const reportReadyWhenVisible = (startedAt: number) => {
       if (cancelled || readyReportedRef.current) return;

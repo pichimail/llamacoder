@@ -47,7 +47,7 @@ const defaults: BuilderSettings = {
   deepThinkingDefault: false,
   canvasDefault: false,
   shadcnDefault: true,
-  styleDefault: "modern-saas",
+  styleDefault: "glassmorphism",
   autoStartGeneration: true,
   autoRepairPreview: true,
   memoryCompression: true,

@@ -1,4 +1,5 @@
 import dedent from "dedent";
+import { DEFAULT_STYLE_ID } from "@/lib/sandbox-theme";
 
 // ============================================================
 // HYPERSPEED PROMPTS v8 - PURE PROMPT-LOCKED GENERATION
@@ -388,8 +389,8 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   more familiar template. Build each stated screen, entity, field, and interaction as written.`;
 
 export function getStyleDirectionBlock(styleId?: string): string {
-  if (!styleId) return STYLE_DIRECTION_BLOCKS["modern-saas"];
-  return STYLE_DIRECTION_BLOCKS[styleId] ?? STYLE_DIRECTION_BLOCKS["modern-saas"];
+  if (!styleId) return STYLE_DIRECTION_BLOCKS[DEFAULT_STYLE_ID];
+  return STYLE_DIRECTION_BLOCKS[styleId] ?? STYLE_DIRECTION_BLOCKS[DEFAULT_STYLE_ID];
 }
 
 /**
