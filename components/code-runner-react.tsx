@@ -365,19 +365,33 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
   const [didCopy, setDidCopy] = useState(false);
   const [lastRuntimeError, setLastRuntimeError] = useState<string>("");
   const readyReportedRef = useRef(false);
+  const lastReportedErrorRef = useRef<{ message: string; at: number } | null>(null);
+
+  const reportPreviewError = useCallback(
+    (message: string, level: ConsoleLog["level"] = "error") => {
+      const normalized = message.trim();
+      if (!normalized) return;
+      const previous = lastReportedErrorRef.current;
+      const now = Date.now();
+      if (previous?.message === normalized && now - previous.at < 2500) return;
+      lastReportedErrorRef.current = { message: normalized, at: now };
+      readyReportedRef.current = false;
+      setLastRuntimeError(normalized);
+      onLog?.(level, normalized);
+      onPreviewError?.(normalized);
+    },
+    [onLog, onPreviewError],
+  );
 
   useEffect(() => {
     if (sandpack.error) {
       const message = sandpack.error.message || "Preview compilation error";
-      readyReportedRef.current = false;
-      setLastRuntimeError(message);
-      onLog?.("error", message);
       // FIXED: Only report critical errors that block rendering
       if (!message.includes("Cannot find module") || message.includes("react")) {
-        onPreviewError?.(message);
+        reportPreviewError(message);
       }
     }
-  }, [sandpack.error, onLog, onPreviewError]);
+  }, [sandpack.error, reportPreviewError]);
 
   useEffect(() => {
     if (!captureConsole || !onLog) return;
@@ -412,10 +426,16 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
     // with no error surfaced and no way for auto-fix to kick in.
     bundlerWatchdog = window.setTimeout(() => {
       if (cancelled || readyReportedRef.current) return;
+      const visualState = inspectSandpackPreview();
+      if (visualState.ready) {
+        clearTimers();
+        readyReportedRef.current = true;
+        setLastRuntimeError("");
+        onPreviewReady?.();
+        return;
+      }
       const errorText = "Sandbox bundler did not respond in time. It may be stuck installing dependencies or compiling.";
-      setLastRuntimeError(errorText);
-      onLog?.("error", errorText);
-      onPreviewError?.(errorText);
+      reportPreviewError(errorText);
     }, BUNDLER_WATCHDOG_MS);
 
     const reportReadyWhenVisible = (startedAt: number) => {
@@ -436,9 +456,7 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
       // Only report error if there's a sandpack error AND no visible content
       if (sandpack.error) {
         const errorText = visualState.reason || "Preview compiled but did not render a visible application.";
-        setLastRuntimeError(errorText);
-        onLog?.("warn", errorText);
-        onPreviewError?.(errorText);
+        reportPreviewError(errorText, "warn");
       } else {
         // No sandpack error but preview not detected - still mark as ready
         readyReportedRef.current = true;
@@ -452,10 +470,7 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
         const compileError = doneMessage.compilationError || doneMessage.compilatonError;
         if (compileError) {
           const errorText = typeof compileError === "string" ? compileError : JSON.stringify(compileError, null, 2);
-          readyReportedRef.current = false;
-          setLastRuntimeError(errorText);
-          onLog?.("error", errorText);
-          onPreviewError?.(errorText);
+          reportPreviewError(errorText);
           clearTimers();
           return;
         }
@@ -473,7 +488,7 @@ function PreviewStatusMonitor({ onRequestFix, onPreviewError, onPreviewReady, on
       clearTimers();
       unsubscribe();
     };
-  }, [listen, onLog, onPreviewError, onPreviewReady, sandpack.error]);
+  }, [listen, onPreviewReady, reportPreviewError, sandpack.error]);
 
   const errorMessage = sandpack.error?.message || lastRuntimeError;
   if (!errorMessage || !useConsoleOverlay) return null;

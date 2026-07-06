@@ -143,9 +143,10 @@ Concrete structure example for SaaS user + admin (follow structure exactly):
 - Avoid generic AI-SaaS/dashboard aesthetics unless explicitly requested.
 - Avoid stacked nested cards, glow-blob heroes, generic feature-card bento pages, fake analytics, overdescriptive copy, and decorative nonfunctional chips.
 - Do not repeat crude generated-control patterns: tiny boxed icon buttons floating without labels, heavy white pill buttons on dark dashboards, random square theme toggles, noisy bordered badges, or disconnected mic/send controls.
-- Buttons must be intentional: primary actions should be clean filled buttons, secondary actions should be subtle outline/ghost buttons, destructive actions must be distinct, and icon-only buttons need aria-labels plus visible tooltips when possible.
-- Forms must use readable labels, clear hit areas, working hover/focus/disabled states, and accessible contrast in both dark and light modes.
-- Use one intentional accent color per app unless the prompt asks for a different art direction.
+  - Buttons must be intentional: primary actions should be clean filled buttons, secondary actions should be subtle outline/ghost buttons, destructive actions must be distinct, and icon-only buttons need aria-labels plus visible tooltips when possible.
+  - Forms must use readable labels, clear hit areas, working hover/focus/disabled states, and accessible contrast in both dark and light modes.
+  - Do not reuse one static Button/Input recipe across themes. The selected STYLE DIRECTION must change control shape, surface, border, and emphasis.
+  - Use one intentional accent color per app unless the prompt asks for a different art direction.
 - Prefer daily-use ergonomics over decorative complexity.
 
 Use TypeScript, React, Tailwind classes, shadcn-style components where useful, lucide icons, GSAP/animejs/framer-motion when useful, and Three.js only when the prompt or visual direction warrants it. The result should render successfully on the first preview.
@@ -369,6 +370,19 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   - No dark-on-dark or low-contrast text. Body text must clear WCAG AA against its surface.
   - Buttons/inputs/cards/tables use the shadcn primitives named below, not bespoke divs styled
     to look like them.
+  - BANNED control template: shadow-md/hover:shadow plus hover:translate-x/y on every Button
+    variant, or bg-foreground text-background as the default primary recipe. This creates the
+    same static UI in every generated app. Use the active style preset's token system instead.
+  - For Glassmorphism only: buttons and inputs should be sleek translucent glass controls
+    (for example bg-card/55 backdrop-blur-xl border-border/60 text-foreground) with crisp
+    focus rings. Outside Glassmorphism, avoid translucent glass controls unless the user asks.
+  - Inputs must be understated and readable: bg-background or bg-card, border-input or
+    border-border, text-foreground, placeholder:text-muted-foreground, focus-visible:ring-ring.
+  - Icon-only buttons and theme toggles must be readable in both modes. Never put white icons on
+    a white/light button or dark icons on a dark button. Prefer bg-secondary text-secondary-foreground,
+    bg-muted text-muted-foreground, or bg-primary text-primary-foreground token pairs.
+  - Theme toggles must actually switch the preview theme by toggling the documentElement light/dark
+    class (or a local theme state bound to that class); do not render a decorative toggle only.
 
   ## MANDATORY SHADCN PRIMITIVES (when COMPONENT LIBRARY is ON)
   For these control types, use the corresponding shadcn/ui primitive rather than a hand-rolled

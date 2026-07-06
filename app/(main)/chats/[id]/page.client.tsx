@@ -59,9 +59,10 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database" | "canvas";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
-const MAX_AUTO_FIX_ATTEMPTS = 2;
+const MAX_AUTO_FIX_ATTEMPTS = 1;
 const FIX_CONTEXT_FILE_LIMIT = 18;
 const FIX_CONTEXT_CHAR_BUDGET = 70000;
+const SANDBOX_BUNDLER_TIMEOUT_RE = /Sandbox bundler did not respond in time/i;
 /** Max automatic "continue where you left off" rounds fired when a response
  * is cut off at the provider's token limit. This is a distinct, faster-firing
  * loop from the general autofix loop above — truncation is a known, mechanical
@@ -111,6 +112,28 @@ function normalizeFile(file: RawGeneratedFile): ArtifactFile {
   const code = typeof file.code === "string" ? file.code : file.content || "";
   const language = file.language || path.split(".").pop() || "tsx";
   return { path, code, language };
+}
+
+function normalizeAutoFixError(error: string) {
+  return error
+    .trim()
+    .replace(/\r\n/g, "\n")
+    .replace(/:\d+:\d+/g, ":line:col")
+    .replace(/\bline\s+\d+\b/gi, "line n")
+    .replace(/\bcolumn\s+\d+\b/gi, "column n")
+    .replace(/\(\d+\)/g, "(n)")
+    .replace(/\s+/g, " ");
+}
+
+function autoFixFingerprint(error: string) {
+  return normalizeAutoFixError(error)
+    .replace(/Generated code validation failed before preview commit\.\s*/i, "")
+    .replace(/Preview error:\s*/i, "")
+    .slice(0, 900);
+}
+
+function isNonFixablePreviewError(error: string) {
+  return SANDBOX_BUNDLER_TIMEOUT_RE.test(error);
 }
 
 function isPlanModeConversation(messages: Message[]) {
@@ -281,6 +304,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const autoFixPendingRef = useRef(false);
   const lastAutoFixErrorRef = useRef("");
   const lastAutoFixAtRef = useRef(0);
+  const autoFixLedgerRef = useRef(new Map<string, number>());
   const hasAutoSwitchedPreviewRef = useRef(false);
   // Identity of the messageId/model that kicked off the current in-flight
   // generation. Populated at every site that starts a stream so a truncated
@@ -523,6 +547,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     setActiveTab("code");
     setBuilderMode("code");
     setMobilePanel("code");
+    autoFixLedgerRef.current.clear();
 
     currentGenerationRef.current = { messageId, model: requestedModel };
     continuationRoundRef.current = 0;
@@ -593,6 +618,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       streamTextRef.current = "";
       setStreamReasoningEnabled(options?.reasoning ?? false);
       autoFixPendingRef.current = false;
+      autoFixLedgerRef.current.clear();
       if (options?.messageId && options?.model) {
         currentGenerationRef.current = { messageId: options.messageId, model: options.model };
         continuationRoundRef.current = 0;
@@ -684,10 +710,32 @@ Fix requirements:
 
   const triggerAutoFix = useCallback(async ({ error, files, fallback = false, force = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean; force?: boolean }) => {
     if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
+    const normalized = error.trim();
+    const currentFiles = files && files.length > 0 ? files : artifactFiles;
+    const fingerprint = autoFixFingerprint(normalized);
+    const ledgerKey = `${chat.id}:${fingerprint}`;
+
+    if (!force && isNonFixablePreviewError(normalized)) {
+      lastAutoFixErrorRef.current = normalized;
+      autoFixPendingRef.current = false;
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      if (autoFixingToastRef.current) {
+        autoFixingToastRef.current.dismiss();
+        autoFixingToastRef.current = null;
+      }
+      toast({
+        title: "Preview build is still starting",
+        description: "The sandbox timed out before reporting a result. Refresh the preview or review the current files; no model fix was started.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // `force` runs a single fix even when auto-fix is globally OFF (the "Fix with
     // ChinnaLLM" button in the build-error dialog) WITHOUT flipping the setting.
     if (!autoFixEnabled && !force) {
-      lastAutoFixErrorRef.current = error.trim();
+      lastAutoFixErrorRef.current = normalized;
       setBuilderStatus("failed");
       return;
     }
@@ -698,38 +746,45 @@ Fix requirements:
     // toward the route's 300s ceiling. A user-initiated fix (`force`) is a new
     // turn and is never blocked here — it resets the budget in requestFix.
     if (!force && isPastGenerationBudget()) {
-      lastAutoFixErrorRef.current = error.trim();
+      lastAutoFixErrorRef.current = normalized;
       autoFixPendingRef.current = false;
       setAutoFixStatus("idle");
       if (autoFixingToastRef.current) {
         autoFixingToastRef.current.dismiss();
         autoFixingToastRef.current = null;
       }
-      // Route through the blocking build-error dialog so the user gets a manual
-      // "Fix with ChinnaLLM" action (which reopens a fresh budget) instead of a
-      // silent dead end. setBuildErrorDialog + failed status mirrors the
-      // auto-fix-OFF branch of presentBuildError.
-      setBuildErrorDialog((prev) =>
-        prev && prev.status === "fixing" ? { error, status: "failed" } : { error, status: "idle" },
-      );
       setBuilderStatus("failed");
       toast({
         title: "Build is taking longer than expected",
-        description:
-          "Paused automatic fixes after the time budget. The latest version is saved — review it, or click Fix to keep going.",
+        description: "Paused automatic fixes after the time budget. The latest version is saved for review.",
         variant: "destructive",
       });
       return;
     }
 
-    const normalized = error.trim();
     const now = Date.now();
-    const same = normalized === lastAutoFixErrorRef.current;
+    const same = fingerprint === autoFixFingerprint(lastAutoFixErrorRef.current);
     // A forced (user-clicked "Fix") request must never silently no-op — the
     // dialog is already showing "fixing" and has no other way out.
     if (!force && same && now - lastAutoFixAtRef.current < 4500) return;
-    const currentFiles = files && files.length > 0 ? files : artifactFiles;
-    if (!same || force) autoFixAttemptRef.current = 0;
+    if (!force && (autoFixLedgerRef.current.get(ledgerKey) ?? 0) >= MAX_AUTO_FIX_ATTEMPTS) {
+      lastAutoFixErrorRef.current = normalized;
+      autoFixPendingRef.current = false;
+      setAutoFixAttempt(MAX_AUTO_FIX_ATTEMPTS);
+      setAutoFixStatus("idle");
+      setBuilderStatus("failed");
+      if (autoFixingToastRef.current) {
+        autoFixingToastRef.current.dismiss();
+        autoFixingToastRef.current = null;
+      }
+      toast({
+        title: "Automatic fix paused",
+        description: "The same issue already triggered an automatic fix. Review the current files or run a manual fix.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (force) autoFixAttemptRef.current = 0;
     const shouldForceFallback = fallback || currentFiles.length <= 1 || autoFixAttemptRef.current > 0;
 
     const nextAttempt = autoFixAttemptRef.current + 1;
@@ -746,6 +801,7 @@ Fix requirements:
     autoFixPendingRef.current = true;
     lastAutoFixErrorRef.current = normalized;
     lastAutoFixAtRef.current = now;
+    if (!force) autoFixLedgerRef.current.set(ledgerKey, (autoFixLedgerRef.current.get(ledgerKey) ?? 0) + 1);
     setAutoFixAttempt(nextAttempt);
     setAutoFixStatus("fixing");
     setBuilderStatus("fixing");
@@ -759,7 +815,7 @@ Fix requirements:
         setBuildErrorDialog((prev) => (prev && prev.status === "fixing" ? { ...prev, status: "failed" } : prev));
       }
     });
-  }, [artifactFiles, autoFixEnabled, requestFix, isPastGenerationBudget]);
+  }, [artifactFiles, autoFixEnabled, chat.id, requestFix, isPastGenerationBudget]);
 
   const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
     setAutoFixEnabled(enabled);
@@ -778,6 +834,10 @@ Fix requirements:
   //        existing pipeline self-heal. Neither branch changes fix logic.
   const presentBuildError = useCallback((error: string) => {
     if (autoFixEnabled) {
+      if (isNonFixablePreviewError(error)) {
+        void triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [] });
+        return;
+      }
       if (!autoFixingToastRef.current) {
         autoFixingToastRef.current = toast({
           title: "Error detected — fixing automatically…",
@@ -787,13 +847,9 @@ Fix requirements:
       void triggerAutoFix({ error, files: activeMessage ? getMessageFiles(activeMessage) : [] });
       return;
     }
-    // OFF → blocking dialog. If already open, refresh its error text but keep
-    // whatever action state it's in unless it had failed.
-    setBuildErrorDialog((prev) =>
-      prev && prev.status === "fixing"
-        ? { error, status: "failed" }
-        : { error, status: prev?.status === "failed" ? "failed" : "idle" },
-    );
+    lastAutoFixErrorRef.current = error.trim();
+    autoFixPendingRef.current = false;
+    setAutoFixStatus("idle");
     setBuilderStatus("failed");
   }, [autoFixEnabled, triggerAutoFix, activeMessage]);
 

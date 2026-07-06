@@ -465,6 +465,61 @@ function detectVisualTokenIssues(
   return issues;
 }
 
+function detectGeneratedControlIssues(path: string, code: string): GeneratedCodeIssue[] {
+  const issues: GeneratedCodeIssue[] = [];
+  if (!isValidatablePath(path) || isThemePresetFile(path)) return issues;
+  const normalizedPath = normalizeArtifactPath(path);
+  const push = (index: number, message: string, excerptSource: string) => {
+    const { line, column } = posToLineCol(code, Math.max(0, index));
+    issues.push({ path, line, column, message, excerpt: excerptSource.trim().slice(0, 200) });
+  };
+
+  if (/components\/ui\/button\.(tsx|jsx|ts|js)$/.test(normalizedPath)) {
+    const staticButtonTemplate =
+      /shadow-md/.test(code) &&
+      /hover:(?:-)?translate-[xy]-/.test(code) &&
+      /bg-foreground\s+text-background/.test(code);
+    if (staticButtonTemplate) {
+      push(
+        code.indexOf("shadow-md"),
+        "Static generated Button template detected: shadow-md + hover translate + bg-foreground/text-background repeats the same control style across every theme. Use style-preset-aware token variants instead.",
+        "shadow-md hover:translate-* bg-foreground text-background",
+      );
+    }
+  }
+
+  if (/components\/ui\/(button|input|textarea)\.(tsx|jsx|ts|js)$/.test(normalizedPath)) {
+    const repeatedHeavyControls = (code.match(/\bshadow-md\b/g) || []).length >= 2 && /hover:shadow/.test(code);
+    if (repeatedHeavyControls) {
+      push(
+        code.indexOf("shadow-md"),
+        "Heavy repeated control shadows detected. Buttons and inputs should use subtle outlines/elevation from the active style preset, not the same shadowed recipe everywhere.",
+        "shadow-md hover:shadow",
+      );
+    }
+  }
+
+  const chunks = extractClassAttributeChunks(code);
+  for (const chunk of chunks) {
+    const tokens = chunk.value.split(/\s+/).filter(Boolean);
+    const hasIconOnlyShape = tokens.some((t) => /^(?:size|h|w)-/.test(t)) && !tokens.some((t) => /^px-|^gap-/.test(t));
+    const hasSameSurfacePair =
+      (tokens.includes("bg-background") && tokens.includes("text-background")) ||
+      (tokens.includes("bg-card") && tokens.includes("text-card")) ||
+      (tokens.includes("bg-muted") && tokens.includes("text-muted")) ||
+      (tokens.includes("bg-primary") && tokens.includes("text-primary"));
+    if (hasIconOnlyShape && hasSameSurfacePair) {
+      push(
+        chunk.index,
+        "Icon-only control uses same-surface background/text tokens, which can make icons disappear. Use paired foreground tokens such as bg-secondary text-secondary-foreground or bg-primary text-primary-foreground.",
+        chunk.value,
+      );
+    }
+  }
+
+  return issues;
+}
+
 export async function validateGeneratedCodeFiles(
   files: Array<{ path: string; code?: string; content?: string }>,
   styleId: string = DEFAULT_STYLE_ID,
@@ -530,6 +585,10 @@ export async function validateGeneratedCodeFiles(
     // feeds the existing autofix pipeline.
     for (const visualIssue of detectVisualTokenIssues(file.path, code, presetTones)) {
       issues.push(visualIssue);
+    }
+
+    for (const controlIssue of detectGeneratedControlIssues(file.path, code)) {
+      issues.push(controlIssue);
     }
 
     tsModule ??= await import("typescript");

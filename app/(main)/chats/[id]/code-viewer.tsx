@@ -551,7 +551,7 @@ export default function CodeViewer({
             <div className="relative min-h-0 flex-1 overflow-hidden">
               <CodeRunner key={`${refresh}-${previewMode}-split`} files={runnerFiles} extraDependencies={extraDeps} onRequestFix={onRequestFix} onPreviewError={onPreviewError} onPreviewReady={onPreviewReady} previewMode={previewMode} onPreviewModeChange={onPreviewModeChange} showDeviceToggle={false} sandpackOptions={sandpackOptions} />
               {builderStatus !== "ready" && builderStatus !== "failed" && (
-                <div className="absolute inset-0 z-10 bg-background"><BuildProgressLoader compact /></div>
+                <PreviewStatusPill status={builderStatus} />
               )}
             </div>
           )}
@@ -765,7 +765,7 @@ export default function CodeViewer({
                     sandpackOptions={sandpackOptions}
                   />
                   {builderStatus !== "ready" && builderStatus !== "failed" && (
-                    <div className="absolute inset-0 z-10 bg-background"><BuildProgressLoader /></div>
+                    <PreviewStatusPill status={builderStatus} />
                   )}
                 </>
               ) : (
@@ -864,11 +864,27 @@ function BuildProgressLoader({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function PreviewStatusPill({ status }: { status: BuilderStatus }) {
+  const labels: Record<Exclude<BuilderStatus, "ready" | "failed">, string> = {
+    generating: "Generating",
+    validating: "Checking preview",
+    fixing: "Fixing",
+    rebuilding: "Rebuilding",
+  };
+  if (status === "ready" || status === "failed") return null;
+  return (
+    <div className="pointer-events-none absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur" role="status" aria-live="polite">
+      <Loader2 className="size-3 animate-spin text-primary" aria-hidden="true" />
+      {labels[status]}
+    </div>
+  );
+}
+
 function AutoFixStatusBadge({ status, attempt }: { status: AutoFixStatus; attempt: number }) {
   if (status === "idle") return null;
   const map = {
     watching: { label: "Watching", cls: "text-muted-foreground", icon: <Eye className="size-3" aria-hidden="true" /> },
-    fixing: { label: `Fixing ${Math.min(attempt, 3)}/3`, cls: "text-amber-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
+    fixing: { label: `Fixing ${Math.min(attempt, 1)}/1`, cls: "text-amber-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
     fallback: { label: "Rebuilding", cls: "text-orange-500", icon: <Loader2 className="size-3 animate-spin" aria-hidden="true" /> },
     ready: { label: "Healthy", cls: "text-emerald-500", icon: <CheckCircle2 className="size-3" aria-hidden="true" /> },
   } as const;
