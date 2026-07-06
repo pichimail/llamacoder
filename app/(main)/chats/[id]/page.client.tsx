@@ -72,6 +72,18 @@ const MAX_CONTINUATION_ROUNDS = 3;
  * model as continuation context. Large enough to show the incomplete last
  * file, small enough to stay well under any model's input budget. */
 const CONTINUATION_TAIL_CHARS = 6000;
+/** Wall-clock budget for a single user-initiated build attempt (prompt →
+ * generate → continuation → auto-fix), measured from the moment the generation
+ * request starts on the client. Once elapsed, the AUTOMATIC auto-fix loop stops
+ * kicking off new fix rounds — the last committed version is kept and the user
+ * is offered a manual "Fix" — so a build can't silently churn through repeated
+ * fix+continuation rounds toward the route's 300s ceiling. Truncation
+ * continuations are deliberately NOT gated on this clock (they finish an
+ * in-flight generation; cutting them off would emit broken code) — they stay
+ * bounded by MAX_CONTINUATION_ROUNDS instead. Frontend-only apps target the
+ * 30-60s window; full-stack apps (backend mode) get the wider 30-120s window. */
+const GENERATION_BUDGET_MS = 60_000;
+const GENERATION_BUDGET_FULLSTACK_MS = 120_000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
@@ -264,6 +276,19 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   // each round runs as a fresh effect invocation with its own local closure.
   // Reset to "" at every genuinely new (non-continuation) generation start.
   const accumulatedGenerationTextRef = useRef("");
+  // Wall-clock deadline (epoch ms) for the current build attempt. Set at every
+  // genuinely-new user turn (initial generation, follow-up message, manual fix)
+  // and read by the automatic auto-fix loop so it stops spawning new rounds once
+  // the SLA window has elapsed. 0 means "no active budget".
+  const generationDeadlineRef = useRef(0);
+  const startGenerationBudget = useCallback(() => {
+    generationDeadlineRef.current =
+      Date.now() + (chat.backendMode ? GENERATION_BUDGET_FULLSTACK_MS : GENERATION_BUDGET_MS);
+  }, [chat.backendMode]);
+  const isPastGenerationBudget = useCallback(
+    () => generationDeadlineRef.current > 0 && Date.now() > generationDeadlineRef.current,
+    [],
+  );
 
   useEffect(() => { streamPromiseRef.current = streamPromise; }, [streamPromise]);
   useEffect(() => { streamTextRef.current = streamText; }, [streamText]);
@@ -470,6 +495,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
     continuationRoundRef.current = 0;
     accumulatedGenerationTextRef.current = "";
     setContinuationStatus("idle");
+    startGenerationBudget();
 
     const nextStreamPromise = fetch("/api/get-next-completion-stream-promise", {
       method: "POST",
@@ -501,7 +527,7 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       window.history.replaceState(null, "", nextUrl);
       setSearchParams(nextParams);
     }
-  }, [chat.model, searchParams]);
+  }, [chat.model, searchParams, startGenerationBudget]);
 
   const workspaceRequest = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     const response = await fetch(`/api/workspace/${chat.id}`, {
@@ -524,6 +550,9 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   }, [workspaceRequest]);
 
   const requestFix = useCallback(async ({ error, auto, attempt, fallback, files }: { error: string; auto: boolean; attempt: number; fallback: boolean; files?: RawGeneratedFile[] }) => {
+    // A user-initiated ("Fix") request is a fresh turn, so it opens a new
+    // wall-clock budget; automatic fixes stay on the current attempt's budget.
+    if (!auto) startGenerationBudget();
     const sourceFiles = files && files.length > 0 ? files : artifactFiles;
     const normalizedFiles = sourceFiles.map(normalizeFile);
     const hasLayout = normalizedFiles.some(f => f.path === "app/layout.tsx" || f.path === "app/layout.ts");
@@ -587,7 +616,7 @@ Fix requirements:
     setBuilderMode("code");
     setMobilePanel("code");
     setChatCollapsed(false);
-  }, [artifactFiles, chat.id, chat.model]);
+  }, [artifactFiles, chat.id, chat.model, startGenerationBudget]);
 
   const triggerAutoFix = useCallback(async ({ error, files, fallback = false, force = false }: { error: string; files?: RawGeneratedFile[]; fallback?: boolean; force?: boolean }) => {
     if (streamPromiseRef.current || streamTextRef.current || autoFixPendingRef.current) return;
@@ -596,6 +625,36 @@ Fix requirements:
     if (!autoFixEnabled && !force) {
       lastAutoFixErrorRef.current = error.trim();
       setBuilderStatus("failed");
+      return;
+    }
+
+    // SLA guard: once the build attempt's wall-clock budget is spent, stop
+    // kicking off new AUTOMATIC fix rounds (each one is a fresh generation that
+    // can itself fan out into continuations) so a build can't churn indefinitely
+    // toward the route's 300s ceiling. A user-initiated fix (`force`) is a new
+    // turn and is never blocked here — it resets the budget in requestFix.
+    if (!force && isPastGenerationBudget()) {
+      lastAutoFixErrorRef.current = error.trim();
+      autoFixPendingRef.current = false;
+      setAutoFixStatus("idle");
+      if (autoFixingToastRef.current) {
+        autoFixingToastRef.current.dismiss();
+        autoFixingToastRef.current = null;
+      }
+      // Route through the blocking build-error dialog so the user gets a manual
+      // "Fix with ChinnaLLM" action (which reopens a fresh budget) instead of a
+      // silent dead end. setBuildErrorDialog + failed status mirrors the
+      // auto-fix-OFF branch of presentBuildError.
+      setBuildErrorDialog((prev) =>
+        prev && prev.status === "fixing" ? { error, status: "failed" } : { error, status: "idle" },
+      );
+      setBuilderStatus("failed");
+      toast({
+        title: "Build is taking longer than expected",
+        description:
+          "Paused automatic fixes after the time budget. The latest version is saved — review it, or click Fix to keep going.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -633,7 +692,7 @@ Fix requirements:
         setBuilderStatus("validating");
       }
     });
-  }, [artifactFiles, autoFixEnabled, requestFix]);
+  }, [artifactFiles, autoFixEnabled, requestFix, isPastGenerationBudget]);
 
   const handleAutoFixEnabledChange = useCallback((enabled: boolean) => {
     setAutoFixEnabled(enabled);
@@ -1408,7 +1467,7 @@ Fix requirements:
                         </Alert>
                       </div>
                     )}
-                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; if (options?.messageId && options?.model) { currentGenerationRef.current = { messageId: options.messageId, model: options.model }; continuationRoundRef.current = 0; accumulatedGenerationTextRef.current = ""; setContinuationStatus("idle"); } setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                    <div className="shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={(promise, options) => { setReasoningText(""); setStreamText(""); streamTextRef.current = ""; setStreamReasoningEnabled(options?.reasoning ?? false); autoFixPendingRef.current = false; if (options?.messageId && options?.model) { currentGenerationRef.current = { messageId: options.messageId, model: options.model }; continuationRoundRef.current = 0; accumulatedGenerationTextRef.current = ""; setContinuationStatus("idle"); } startGenerationBudget(); setStreamPromise(promise); setBuilderStatus("generating"); setBuilderMode("code"); setMobilePanel("code"); setChatCollapsed(false); }} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                   </section>
                 </ResizablePanel>
                 <ResizableHandle withHandle className="hidden md:flex" />
