@@ -24,7 +24,7 @@ import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { MODELS } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI, requiresMcpTools } from "@/lib/ai-detection";
+import { requiresAI } from "@/lib/ai-detection";
 import { toast } from "@/hooks/use-toast";
 import { Context } from "./providers";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Wand2, TestTube2, Save, X } from "lucide-react";
+import { Loader2, Wand2, TestTube2, Save } from "lucide-react";
 
 export type McpServerFormData = {
   id?: string;

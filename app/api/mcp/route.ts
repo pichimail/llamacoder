@@ -7,7 +7,6 @@ import {
   getUserMcpServers,
   updateMcpServer,
   deleteMcpServer,
-  testMcpConnection,
   toPublicMcpServer,
   type McpServerInput,
 } from "@/lib/mcp";

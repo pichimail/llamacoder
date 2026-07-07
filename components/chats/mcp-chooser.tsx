@@ -6,12 +6,11 @@
  * Lets the user pick from their saved MCP servers (or skip).
  */
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Plug, Server, SkipForward, Zap } from "lucide-react";
+import { useCallback, useState, useTransition } from "react";
+import { Loader2, Plug, Server, SkipForward, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
 import type { SelectedMcpServer } from "@/lib/mcp";
 
 export interface McpChooserProps {

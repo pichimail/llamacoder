@@ -2,7 +2,7 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Github, Plug } from "lucide-react";
+import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Plug } from "lucide-react";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { DotFlow } from "@/components/ui/dot-flow";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
