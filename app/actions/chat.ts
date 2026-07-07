@@ -1,6 +1,6 @@
 'use server'
 
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
 import {
@@ -28,6 +28,7 @@ export async function createChat(data: {
   title: string
   prompt: string
   model: string
+  mcpServers?: Array<{ id: string; name: string; url?: string; transport?: string }> | null
 }) {
   const prisma = getPrisma()
   const user = await requireCurrentUser()
@@ -49,6 +50,7 @@ export async function createChat(data: {
       shadcn: false,
       llamaCoderVersion: 'v2',
       projectId: project.id,
+      mcpServers: data.mcpServers && data.mcpServers.length > 0 ? (data.mcpServers as Prisma.InputJsonValue) : Prisma.JsonNull,
     },
   })
 

@@ -37,6 +37,17 @@ const createChatSchema = z.object({
   aiIntegration: z.enum(["chinnallm", "byok", "skip"]).optional().nullable().default(null),
   aiCapabilities: z.array(z.string().max(24)).max(10).optional().default([]),
   backendMode: z.boolean().optional().default(false),
+  mcpServers: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        url: z.string().optional(),
+        transport: z.string().optional(),
+      })
+    )
+    .optional()
+    .default([]),
 });
 
 function attachmentContext(attachments: {
@@ -68,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const user = await requireCurrentUser();
 
-    const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn, styleId, designPresetId, aiIntegration, aiCapabilities, backendMode } = parsed.data;
+    const { prompt, model, quality, screenshotUrl, mode, attachments, shadcn, styleId, designPresetId, aiIntegration, aiCapabilities, backendMode, mcpServers } = parsed.data;
 
     let customDesign: { content: string; instructions?: string } | null = null;
     if (designPresetId) {
@@ -159,6 +170,7 @@ export async function POST(request: NextRequest) {
         project: { connect: { id: project.id } },
         aiIntegration: aiIntegration ?? null,
         backendMode: buildSpec.backendMode,
+        mcpServers: (mcpServers && mcpServers.length > 0) ? (mcpServers as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
 
@@ -185,6 +197,7 @@ export async function POST(request: NextRequest) {
                   aiIntegration,
                   aiCapabilities,
                   customDesign,
+                  mcpServers,
                 )}`,
               position: 0,
             },

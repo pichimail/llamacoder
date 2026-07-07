@@ -12,7 +12,8 @@ import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { patchModeSystemHint } from "@/lib/code-patch";
 import { getPrisma } from "@/lib/prisma";
 import { getChinnaLLMPromptBlock } from "@/lib/prompts";
-import { requiresAI } from "@/lib/ai-detection";
+import { requiresAI, requiresMcpTools } from "@/lib/ai-detection";
+import { getMcpPromptBlock } from "@/lib/prompts";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -293,6 +294,13 @@ export async function POST(req: Request) {
     const detection = requiresAI(access.chat.prompt || latestUserPrompt(messages));
     const aiBlock = getChinnaLLMPromptBlock(chatSettings.aiIntegration, detection.capabilities);
     if (aiBlock) messages = [...messages, { role: "system" as const, content: aiBlock }];
+  }
+
+  const mcpServers = chatSettings.mcpServers;
+  if (mcpServers && Array.isArray(mcpServers) && mcpServers.length > 0) {
+    const mcpDet = requiresMcpTools(access.chat.prompt || latestUserPrompt(messages));
+    const mcpBlock = getMcpPromptBlock(mcpServers, access.chat.prompt || "");
+    if (mcpBlock) messages = [...messages, { role: "system" as const, content: mcpBlock }];
   }
 
   if (chatSettings.backendMode) {

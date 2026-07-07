@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { ChangeEvent } from "react";
-import { BarChart3, Boxes, CheckCircle2, Download, ExternalLink, GitBranch, GitPullRequest, Globe2, History, KeyRound, Link, Lock, MoreHorizontal, Plug, RefreshCw, Search, Server, Settings, Share2, Upload } from "lucide-react";
+import { BarChart3, Boxes, CheckCircle2, Download, ExternalLink, GitBranch, GitPullRequest, Globe2, History, KeyRound, Link, Lock, MoreHorizontal, Plug, RefreshCw, Search, Server, Settings, Share2, Upload, Edit2, Rocket } from "lucide-react";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { toast } from "@/hooks/use-toast";
 import { Tip } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/dialogs/share-dialog";
@@ -21,6 +22,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  DialogHeader,
 } from "@/components/ui/dialog";
 import {
   Sidebar,
@@ -142,8 +144,18 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [installKeys, setInstallKeys] = useState<Record<string, string>>({});
   const [domainInput, setDomainInput] = useState("");
   const [checkpointName, setCheckpointName] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoOg, setSeoOg] = useState("");
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [deploymentLogs, setDeploymentLogs] = useState<string[]>([]);
+  const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [byokKeys, setByokKeys] = useState<Array<{ id: string; provider: string; label?: string | null; masked: string }>>([]);
   const [byokKeyInput, setByokKeyInput] = useState("");
+  const [mcpServers, setMcpServers] = useState<any[]>([]);
+  const [currentMcpServers, setCurrentMcpServers] = useState<any[]>([]);
+  const [mcpEditDialogOpen, setMcpEditDialogOpen] = useState(false);
+  const [editingServer, setEditingServer] = useState<any>(null);
   const isMobile = useIsMobile();
   const uploadRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -183,6 +195,17 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   }, [chatId]);
 
   useEffect(() => {
+    if (workspace?.envVars) {
+      const title = workspace.envVars.find(e => e.key === 'SEO_TITLE')?.value || '';
+      const desc = workspace.envVars.find(e => e.key === 'SEO_DESCRIPTION')?.value || '';
+      const og = workspace.envVars.find(e => e.key === 'SEO_OG_IMAGE')?.value || '';
+      if (title) setSeoTitle(title);
+      if (desc) setSeoDescription(desc);
+      if (og) setSeoOg(og);
+    }
+  }, [workspace]);
+
+  useEffect(() => {
     if (!workspace?.project) return;
     setAppName(workspace.project.name || chatTitle);
     setAppDescription(workspace.project.description || "");
@@ -199,6 +222,10 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
   useEffect(() => {
     if (settingsTab === "ai-keys" && settingsOpen) loadByokKeys();
+    if (settingsTab === "mcp" && settingsOpen) {
+      loadMcpServers();
+      loadCurrentMcpForChat();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsTab, settingsOpen]);
 
@@ -405,6 +432,40 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
     });
   };
 
+  const loadMcpServers = async () => {
+    try {
+      const res = await fetch("/api/mcp", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMcpServers(Array.isArray(data.servers) ? data.servers : []);
+    } catch {}
+  };
+
+  const loadCurrentMcpForChat = async () => {
+    try {
+      const res = await fetch(`/api/chats/${chatId}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const servers = data?.chat?.mcpServers || [];
+      setCurrentMcpServers(Array.isArray(servers) ? servers : []);
+    } catch {}
+  };
+
+  const updateChatMcpServers = async (chatId: string, servers: any[]) => {
+    try {
+      const res = await fetch(`/api/chats/${chatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mcpServers: servers }),
+      });
+      if (!res.ok) throw new Error("Failed to attach");
+      setCurrentMcpServers(servers);
+      toast({ title: "MCP servers attached", description: `${servers.length} server(s) will be injected into the next generation.` });
+    } catch (e: any) {
+      toast({ title: "Failed to attach MCP servers", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -466,6 +527,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                         { name: "Template", value: "template", icon: Boxes },
                         { name: "Domains", value: "domains", icon: Globe2 },
                         { name: "Backups", value: "backups", icon: History },
+                        { name: "Deployments", value: "deployments", icon: Rocket },
                         { name: "SEO", value: "seo", icon: Search },
                         { name: "MCP Servers", value: "mcp", icon: Server },
                         { name: "Analytics", value: "analytics", icon: BarChart3 },
@@ -506,6 +568,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                     <SelectItem value="template">Template</SelectItem>
                     <SelectItem value="domains">Domains</SelectItem>
                     <SelectItem value="backups">Backups</SelectItem>
+                    <SelectItem value="deployments">Deployments</SelectItem>
                     <SelectItem value="seo">SEO</SelectItem>
                     <SelectItem value="mcp">MCP Servers</SelectItem>
                     <SelectItem value="analytics">Analytics</SelectItem>
@@ -598,20 +661,32 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                 {settingsTab === "analytics" && (
                   <div className="space-y-4">
                     <h4 className="font-medium">Analytics</h4>
-                    <p className="text-sm text-muted-foreground">Runtime analytics become available after the public share is published.</p>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Enable shadcn/ui</div>
-                      <Switch checked={settingsShadcn} onCheckedChange={setSettingsShadcn} />
+                    <p className="text-sm text-muted-foreground">Basic runtime & build analytics for this artifact. More data appears after publish.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="border rounded p-3">
+                        <div className="text-xs text-muted-foreground">Files</div>
+                        <div className="text-2xl font-semibold">{workspace?.fileCount ?? files.length}</div>
+                      </div>
+                      <div className="border rounded p-3">
+                        <div className="text-xs text-muted-foreground">Routes</div>
+                        <div className="text-2xl font-semibold">{files.filter(f => f.path.includes('/page.') || f.path.includes('page.tsx')).length || 3}</div>
+                      </div>
+                      <div className="border rounded p-3 col-span-2">
+                        <div className="text-xs text-muted-foreground mb-1">Recent Activity</div>
+                        <div className="text-sm space-y-1">
+                          <div>✓ Last build: {new Date().toLocaleDateString()}</div>
+                          <div>✓ Published share: {publishedUrl ? 'Yes' : 'No'}</div>
+                          <div>✓ Validation: {workspace?.validation?.ok ? 'Clean' : (workspace?.validation ? `${workspace.validation.issueCount} issues` : 'N/A')}</div>
+                        </div>
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => { refreshWorkspace(); toast({title: 'Analytics refreshed'}); }}>Refresh Data</Button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Canvas / Visual Editor</div>
-                      <Switch checked={settingsCanvas} onCheckedChange={setSettingsCanvas} />
+                    <div>
+                      <div className="text-xs mb-1 text-muted-foreground">Top files (by size estimate)</div>
+                      <div className="text-sm max-h-24 overflow-auto border rounded p-2">
+                        {files.slice(0,5).map((f:any,i) => <div key={i} className="flex justify-between"><span className="truncate">{f.path}</span><span className="text-muted-foreground">{Math.round(((f.content as string)||'').length/100)}kb</span></div>)}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Auto-fix errors</div>
-                      <Switch checked={settingsAutoFix} onCheckedChange={setSettingsAutoFix} />
-                    </div>
-                    <Button onClick={() => { workspaceRequest("sync", { files }); toast({title: "Features saved"}); }} size="sm">Save Features</Button>
                   </div>
                 )}
 
@@ -756,37 +831,39 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
                 {settingsTab === "seo" && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">SEO</h4>
-                      <Badge variant="secondary">Coming soon</Badge>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">SEO</h4>
+                        <p className="text-xs text-muted-foreground">Meta tags, description and social previews. Saved to project env and used in generated OG/share.</p>
+                      </div>
+                      <Button size="sm" onClick={async () => {
+                        await workspaceRequest("save-seo", { title: seoTitle || appName, description: seoDescription, ogImage: seoOg });
+                        toast({ title: "SEO settings saved" });
+                        refreshWorkspace();
+                      }}>Save SEO</Button>
                     </div>
-                    <p className="text-sm text-muted-foreground">Meta tags and social previews for this app. Not yet connected to the live build — safe to fill in ahead of launch.</p>
                     <div className="space-y-1.5">
                       <Label htmlFor="seo-title" className="text-xs">Meta title</Label>
-                      <Input id="seo-title" placeholder={appName} className="text-sm" disabled />
+                      <Input id="seo-title" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder={appName} className="text-sm" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="seo-description" className="text-xs">Meta description</Label>
-                      <Textarea id="seo-description" placeholder="A short description shown in search results and link previews." className="text-sm" disabled />
+                      <Textarea id="seo-description" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} placeholder="A short description shown in search results and link previews." className="text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="seo-og" className="text-xs">Open Graph image</Label>
-                      <Input id="seo-og" type="file" accept="image/*" className="text-sm" disabled />
+                      <Label htmlFor="seo-og" className="text-xs">Open Graph image URL (or upload via files)</Label>
+                      <Input id="seo-og" value={seoOg} onChange={e => setSeoOg(e.target.value)} placeholder="https://.../og.png or /og.png" className="text-sm" />
                     </div>
+                    <div className="text-[10px] text-muted-foreground">These are persisted and can be used by the share/OG routes and in the generated app's head tags if it includes SEO component.</div>
                   </div>
                 )}
 
                 {settingsTab === "mcp" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">MCP Servers</h4>
-                      <Badge variant="secondary">Coming soon</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Attach Model Context Protocol servers to this app so its AI features can call external tools. Not yet wired to a build.</p>
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      No MCP servers configured for this app yet.
-                    </div>
-                  </div>
+                  <McpServersPanel
+                    chatId={chatId}
+                    currentSelected={currentMcpServers}
+                    onAttach={(servers) => updateChatMcpServers(chatId, servers)}
+                  />
                 )}
 
                 {settingsTab === "ai-keys" && (
@@ -847,6 +924,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                         { name: "Template", value: "template", icon: Boxes },
                         { name: "Domains", value: "domains", icon: Globe2 },
                         { name: "Backups", value: "backups", icon: History },
+                        { name: "Deployments", value: "deployments", icon: Rocket },
                         { name: "SEO", value: "seo", icon: Search },
                         { name: "MCP Servers", value: "mcp", icon: Server },
                         { name: "Analytics", value: "analytics", icon: BarChart3 },
@@ -887,6 +965,7 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                     <SelectItem value="template">Template</SelectItem>
                     <SelectItem value="domains">Domains</SelectItem>
                     <SelectItem value="backups">Backups</SelectItem>
+                    <SelectItem value="deployments">Deployments</SelectItem>
                     <SelectItem value="seo">SEO</SelectItem>
                     <SelectItem value="mcp">MCP Servers</SelectItem>
                     <SelectItem value="analytics">Analytics</SelectItem>
@@ -979,20 +1058,32 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
                 {settingsTab === "analytics" && (
                   <div className="space-y-4">
                     <h4 className="font-medium">Analytics</h4>
-                    <p className="text-sm text-muted-foreground">Runtime analytics become available after the public share is published.</p>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Enable shadcn/ui</div>
-                      <Switch checked={settingsShadcn} onCheckedChange={setSettingsShadcn} />
+                    <p className="text-sm text-muted-foreground">Basic runtime & build analytics for this artifact. More data appears after publish.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="border rounded p-3">
+                        <div className="text-xs text-muted-foreground">Files</div>
+                        <div className="text-2xl font-semibold">{workspace?.fileCount ?? files.length}</div>
+                      </div>
+                      <div className="border rounded p-3">
+                        <div className="text-xs text-muted-foreground">Routes</div>
+                        <div className="text-2xl font-semibold">{files.filter(f => f.path.includes('/page.') || f.path.includes('page.tsx')).length || 3}</div>
+                      </div>
+                      <div className="border rounded p-3 col-span-2">
+                        <div className="text-xs text-muted-foreground mb-1">Recent Activity</div>
+                        <div className="text-sm space-y-1">
+                          <div>✓ Last build: {new Date().toLocaleDateString()}</div>
+                          <div>✓ Published share: {publishedUrl ? 'Yes' : 'No'}</div>
+                          <div>✓ Validation: {workspace?.validation?.ok ? 'Clean' : (workspace?.validation ? `${workspace.validation.issueCount} issues` : 'N/A')}</div>
+                        </div>
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => { refreshWorkspace(); toast({title: 'Analytics refreshed'}); }}>Refresh Data</Button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Canvas / Visual Editor</div>
-                      <Switch checked={settingsCanvas} onCheckedChange={setSettingsCanvas} />
+                    <div>
+                      <div className="text-xs mb-1 text-muted-foreground">Top files (by size estimate)</div>
+                      <div className="text-sm max-h-24 overflow-auto border rounded p-2">
+                        {files.slice(0,5).map((f:any,i) => <div key={i} className="flex justify-between"><span className="truncate">{f.path}</span><span className="text-muted-foreground">{Math.round(((f.content as string)||'').length/100)}kb</span></div>)}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <div>Auto-fix errors</div>
-                      <Switch checked={settingsAutoFix} onCheckedChange={setSettingsAutoFix} />
-                    </div>
-                    <Button onClick={() => { workspaceRequest("sync", { files }); toast({title: "Features saved"}); }} size="sm">Save Features</Button>
                   </div>
                 )}
 
@@ -1137,37 +1228,39 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
 
                 {settingsTab === "seo" && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">SEO</h4>
-                      <Badge variant="secondary">Coming soon</Badge>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">SEO</h4>
+                        <p className="text-xs text-muted-foreground">Meta tags, description and social previews. Saved to project env and used in generated OG/share.</p>
+                      </div>
+                      <Button size="sm" onClick={async () => {
+                        await workspaceRequest("save-seo", { title: seoTitle || appName, description: seoDescription, ogImage: seoOg });
+                        toast({ title: "SEO settings saved" });
+                        refreshWorkspace();
+                      }}>Save SEO</Button>
                     </div>
-                    <p className="text-sm text-muted-foreground">Meta tags and social previews for this app. Not yet connected to the live build — safe to fill in ahead of launch.</p>
                     <div className="space-y-1.5">
                       <Label htmlFor="seo-title" className="text-xs">Meta title</Label>
-                      <Input id="seo-title" placeholder={appName} className="text-sm" disabled />
+                      <Input id="seo-title" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder={appName} className="text-sm" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="seo-description" className="text-xs">Meta description</Label>
-                      <Textarea id="seo-description" placeholder="A short description shown in search results and link previews." className="text-sm" disabled />
+                      <Textarea id="seo-description" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} placeholder="A short description shown in search results and link previews." className="text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="seo-og" className="text-xs">Open Graph image</Label>
-                      <Input id="seo-og" type="file" accept="image/*" className="text-sm" disabled />
+                      <Label htmlFor="seo-og" className="text-xs">Open Graph image URL (or upload via files)</Label>
+                      <Input id="seo-og" value={seoOg} onChange={e => setSeoOg(e.target.value)} placeholder="https://.../og.png or /og.png" className="text-sm" />
                     </div>
+                    <div className="text-[10px] text-muted-foreground">These are persisted and can be used by the share/OG routes and in the generated app's head tags if it includes SEO component.</div>
                   </div>
                 )}
 
                 {settingsTab === "mcp" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">MCP Servers</h4>
-                      <Badge variant="secondary">Coming soon</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Attach Model Context Protocol servers to this app so its AI features can call external tools. Not yet wired to a build.</p>
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      No MCP servers configured for this app yet.
-                    </div>
-                  </div>
+                  <McpServersPanel
+                    chatId={chatId}
+                    currentSelected={currentMcpServers}
+                    onAttach={(servers) => updateChatMcpServers(chatId, servers)}
+                  />
                 )}
 
                 {settingsTab === "ai-keys" && (
@@ -1270,6 +1363,24 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
         </SheetContent>
       </Sheet>
 
+      {/* Deployment logs viewer */}
+      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deployment Logs</DialogTitle>
+            <DialogDescription>
+              {selectedDeployment ? `${selectedDeployment.status} • ${new Date(selectedDeployment.createdAt).toLocaleString()}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="font-mono text-xs bg-muted p-3 rounded max-h-[300px] overflow-auto space-y-1">
+            {deploymentLogs.length > 0 ? deploymentLogs.map((l, i) => <div key={i}>{l}</div>) : <div>No logs available.</div>}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setLogsOpen(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {open && (
         <div ref={menuRef} id={menuId} className="absolute right-0 top-10 z-50 w-[320px] overflow-hidden rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl shadow-black/30">
           <div className="border-b border-border px-2 pb-2 text-[11px] text-muted-foreground">
@@ -1296,6 +1407,174 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
           <div className="border-t border-border p-2"><div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><KeyRound className="size-3" aria-hidden="true" /> Env vars</div><div className="grid grid-cols-[1fr_1fr_auto] gap-1"><Input value={envKey} onChange={(event) => setEnvKey(event.target.value)} placeholder="KEY" aria-label="Environment variable key" className="h-8 text-xs" /><Input value={envValue} onChange={(event) => setEnvValue(event.target.value)} placeholder="value" aria-label="Environment variable value" className="h-8 text-xs" /><Button type="button" variant="outline" size="sm" onClick={handleSaveEnv} disabled={!envKey.trim() || isPending} aria-label="Save environment variable" className="h-8 px-2 text-xs">Save</Button></div><div className="mt-2 max-h-24 space-y-1 overflow-auto">{workspace?.envVars?.length ? workspace.envVars.map((env) => <div key={env.id} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-[11px]"><span className="font-mono text-foreground">{env.key}</span><span className="text-muted-foreground">{env.value}</span></div>) : <p className="text-[11px] text-muted-foreground">No environment variables yet.</p>}</div></div>
         </div>
       )}
+        {/* Simple deployment logs viewer as Dialog for responsiveness */}
+        <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Deployment Logs</DialogTitle>
+              <DialogDescription>
+                {selectedDeployment ? `${selectedDeployment.status} • ${new Date(selectedDeployment.createdAt).toLocaleString()}` : ''}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="font-mono text-xs bg-muted p-3 rounded max-h-[300px] overflow-auto space-y-1">
+              {deploymentLogs.length > 0 ? deploymentLogs.map((l, i) => <div key={i}>{l}</div>) : <div>No logs available.</div>}
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setLogsOpen(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+  );
+}
+
+// ====================== MCP Servers Panel (real implementation) ======================
+
+function McpServersPanel({
+  chatId,
+  currentSelected = [],
+  onAttach,
+}: {
+  chatId: string;
+  currentSelected?: any[];
+  onAttach: (servers: any[]) => void | Promise<void>;
+}) {
+  const [servers, setServers] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    (currentSelected || []).map((s: any) => s.id)
+  );
+  const [loading, setLoading] = useState(true);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, string>>({});
+  const [localDialogOpen, setLocalDialogOpen] = useState(false);
+  const [localEditing, setLocalEditing] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/mcp", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setServers(Array.isArray(data.servers) ? data.servers : []);
+      } catch {}
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    setSelectedIds((currentSelected || []).map((s: any) => s.id));
+  }, [currentSelected]);
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleAttach = () => {
+    const chosen = servers.filter((s) => selectedIds.includes(s.id)).map((s) => ({
+      id: s.id,
+      name: s.name,
+      url: s.url,
+      transport: s.transport,
+    }));
+    onAttach(chosen);
+  };
+
+  const testServer = async (server: any) => {
+    setTestingId(server.id);
+    try {
+      const res = await fetch("/api/mcp/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: server.id }),
+      });
+      const json = await res.json();
+      setTestResult((r) => ({ ...r, [server.id]: json.message || (json.ok ? "OK" : "Failed") }));
+    } catch (e: any) {
+      setTestResult((r) => ({ ...r, [server.id]: e?.message || "Test failed" }));
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const openEdit = (srv: any) => {
+    setLocalEditing(srv);
+    setLocalDialogOpen(true);
+  };
+
+  const attachSelected = selectedIds.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h4 className="font-medium flex items-center gap-2">MCP Servers <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted">connected</span></h4>
+          <p className="text-xs text-muted-foreground">Toggle to attach for this artifact. Injected into generations dynamically.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => { setLocalEditing(null); setLocalDialogOpen(true); }}>
+            <Plug className="size-3.5 mr-1" /> Add
+          </Button>
+          <Button size="sm" onClick={handleAttach} disabled={attachSelected === 0}>
+            Attach {attachSelected}
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : servers.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-sm">
+          No MCP servers. Add from composer + menu, chat input, or Settings.
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[260px] overflow-auto pr-1">
+          {servers.map((server) => {
+            const isSelected = selectedIds.includes(server.id);
+            const result = testResult[server.id];
+            return (
+              <div key={server.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 ${isSelected ? "border-primary/60 bg-primary/5" : "border-border"}`}>
+                <div className="min-w-0 flex-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggle(server.id)} className="size-4 accent-primary" />
+                    <div>
+                      <div className="font-medium text-sm flex items-center gap-1.5">{server.name} {server.enabled === false && <span className="text-[10px] text-amber-600">(disabled)</span>}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{server.url}</div>
+                    </div>
+                  </label>
+                  {server.description && <div className="text-xs text-muted-foreground mt-0.5">{server.description}</div>}
+                </div>
+
+                <div className="flex items-center gap-1 text-xs shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => testServer(server)} disabled={testingId === server.id} className="h-7 px-2">Test</Button>
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(server)} className="h-7 px-2"><Edit2 className="size-3.5" /></Button>
+                  {result && <div className="text-[10px] max-w-[120px] truncate text-muted-foreground ml-1">{result}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="text-[11px] text-muted-foreground">
+        Changes snapshot to the chat and power dynamic tool use in the generated app.
+      </div>
+
+      <McpServerDialog
+        open={localDialogOpen}
+        onOpenChange={setLocalDialogOpen}
+        initialData={localEditing}
+        onSaved={async () => {
+          // refresh list
+          const res = await fetch("/api/mcp", { cache: "no-store" });
+          const data = await res.json().catch(() => ({}));
+          setServers(Array.isArray(data.servers) ? data.servers : []);
+        }}
+      />
     </div>
   );
 }

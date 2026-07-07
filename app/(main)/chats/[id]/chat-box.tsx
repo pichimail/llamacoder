@@ -2,7 +2,8 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Github } from "lucide-react";
+import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Github, Plug } from "lucide-react";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { DotFlow } from "@/components/ui/dot-flow";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
@@ -78,6 +79,7 @@ export default function ChatBox({
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
@@ -434,6 +436,12 @@ export default function ChatBox({
           </Suggestions>
         )}
 
+        <div className="px-1 pb-1 flex gap-1">
+          <button type="button" onClick={() => setMcpDialogOpen(true)} className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-0.5 text-[11px] hover:bg-muted text-muted-foreground hover:text-foreground">
+            <Plug className="size-3.5" /> MCP
+          </button>
+        </div>
+
         <InputBar
           value={prompt}
           onChange={setPrompt}
@@ -591,6 +599,12 @@ export default function ChatBox({
           }
         />
       </div>
+
+      <McpServerDialog
+        open={mcpDialogOpen}
+        onOpenChange={setMcpDialogOpen}
+        onSaved={() => toast({ title: "MCP server saved", description: "Available for this chat and future generations." })}
+      />
     </TooltipProvider>
   );
 }

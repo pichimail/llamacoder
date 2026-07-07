@@ -18,14 +18,26 @@ export function CanvasMode({ files, onRequestChange, isStreaming }: CanvasModePr
   const [nodes, setNodes] = useState<FlowNode[]>(() => generateNodesFromFiles(files));
   const [edges, setEdges] = useState<FlowEdge[]>(() => generateEdgesFromFiles(files));
 
+  const handleNodeClick = (event: any, node: FlowNode) => {
+    if (onRequestChange && node.data?.path) {
+      onRequestChange(`Improve or edit the file at ${node.data.path} with better layout, accessibility and modern styling.`);
+    }
+  };
+
   return (
     <div className="relative h-full w-full bg-background">
-      <Canvas nodes={nodes} edges={edges} onNodesChange={setNodes as any} onEdgesChange={setEdges as any}>
+      <Canvas 
+        nodes={nodes} 
+        edges={edges} 
+        onNodesChange={setNodes as any} 
+        onEdgesChange={setEdges as any}
+        onNodeClick={handleNodeClick}
+      >
         <Controls />
         <Panel position="top-left">
-          <div className="rounded-lg border border-border/70 bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+          <div className="rounded-lg border border-border/70 bg-card/95 p-4 shadow-lg backdrop-blur-sm max-w-[220px]">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Canvas Overview
+              Canvas / Visual Overview
             </div>
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-4">
@@ -41,7 +53,11 @@ export function CanvasMode({ files, onRequestChange, isStreaming }: CanvasModePr
                 <span className="font-medium text-foreground">{files.length}</span>
               </div>
             </div>
+            <div className="mt-3 text-[10px] text-muted-foreground">Click a node to request AI edit on that file.</div>
           </div>
+        </Panel>
+        <Panel position="bottom-right">
+          <div className="text-[10px] bg-background/80 px-2 py-1 rounded border">Drag nodes • Click to edit via AI</div>
         </Panel>
       </Canvas>
     </div>

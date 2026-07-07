@@ -27,6 +27,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlagDef[] = [
   { key: "ai-chooser", label: "AI integration chooser", description: "In-chat chooser when AI capabilities are detected", category: "ai", enabled: true },
   { key: "byok", label: "Bring your own key", description: "User-stored encrypted API keys", category: "ai", enabled: true },
   { key: "credit-indicator", label: "Credit indicator", description: "Live credit pill in the chat header", category: "ai", enabled: true },
+  { key: "mcp-support", label: "MCP servers support", description: "Attach MCP servers for tool calling in generated apps + chooser", category: "ai", enabled: true },
   { key: "credits-page", label: "Credits page", description: "User credits + BYOK management page", category: "ai", enabled: true },
   // Chat workspace
   { key: "auto-fix", label: "Auto-fix", description: "Agent self-correction after preview validation", category: "chat", enabled: true },

@@ -27,8 +27,9 @@ import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
 import { ModeDatabase } from "@/components/chats/mode-database";
 import { AIIntegrationChooser } from "@/components/chats/ai-integration-chooser";
+import { McpChooser } from "@/components/chats/mcp-chooser";
 import { CreditIndicator } from "@/components/chats/credit-indicator";
-import { requiresAI, type AICapability } from "@/lib/ai-detection";
+import { requiresAI, requiresMcpTools, type AICapability } from "@/lib/ai-detection";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 
 import {
@@ -291,6 +292,12 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
   const [aiChooserPending, setAiChooserPending] = useState(false);
   const [aiChooserCapabilities, setAiChooserCapabilities] = useState<AICapability[]>([]);
   const [pendingGenerateCallback, setPendingGenerateCallback] = useState<(() => void) | null>(null);
+
+  // MCP chooser state (parallel to AI chooser)
+  const [mcpChooserPending, setMcpChooserPending] = useState(false);
+  const [mcpDetectedNeeds, setMcpDetectedNeeds] = useState<string[]>([]);
+  const [mcpAvailableServers, setMcpAvailableServers] = useState<any[]>([]);
+  const mcpChooserStorageKey = useMemo(() => `mcp-chooser:${chat.id}`, [chat.id]);
   const chatAiIntegration = (chat as any).aiIntegration as string | null | undefined;
   const aiChooserStorageKey = useMemo(() => `ai-chooser:${chat.id}`, [chat.id]);
   const [activeMessage, setActiveMessage] = useState<Message | undefined>(
@@ -381,6 +388,36 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
       if (typeof window !== "undefined") window.location.reload();
     });
   }, [aiChooserStorageKey, chat.prompt, chatAiIntegration, flagEnabled]);
+
+  // MCP chooser detection (similar pattern)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const currentMcp = (chat as any).mcpServers;
+    if (currentMcp && Array.isArray(currentMcp) && currentMcp.length > 0) {
+      window.sessionStorage.removeItem(mcpChooserStorageKey);
+      setMcpChooserPending(false);
+      return;
+    }
+    if (window.sessionStorage.getItem(mcpChooserStorageKey) !== "pending") return;
+    if (!flagEnabled("mcp-support")) return; // optional flag, default to showing if not set
+
+    const mcpDet = requiresMcpTools(chat.prompt || "");
+    if (!mcpDet.detected) {
+      window.sessionStorage.removeItem(mcpChooserStorageKey);
+      return;
+    }
+
+    setMcpDetectedNeeds(mcpDet.needs);
+    // Load user's saved MCP servers
+    fetch("/api/mcp", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : { servers: [] })
+      .then(d => setMcpAvailableServers(d.servers || []))
+      .catch(() => setMcpAvailableServers([]));
+    setMcpChooserPending(true);
+    setPendingGenerateCallback(() => () => {
+      if (typeof window !== "undefined") window.location.reload();
+    });
+  }, [mcpChooserStorageKey, chat.prompt, flagEnabled]);
 
   useEffect(() => {
     if (searchParams.get("preview") !== "1") return;
@@ -560,6 +597,24 @@ export default function PageClient({ chat, sidebarChats = [] }: { chat: Chat; si
           }
         });
         return; // pause — chooser will resume
+      }
+    }
+
+    // MCP chooser trigger on initial generation
+    const currentMcp = (chat as any).mcpServers;
+    if ((!currentMcp || (Array.isArray(currentMcp) && currentMcp.length === 0)) && chat.messages.length <= 2) {
+      const mcpDet = requiresMcpTools(chat.prompt || "");
+      if (mcpDet.detected && !mcpChooserPending && flagEnabled("mcp-support")) {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(mcpChooserStorageKey, "pending");
+        }
+        setMcpDetectedNeeds(mcpDet.needs);
+        fetch("/api/mcp", { cache: "no-store" }).then(r => r.ok ? r.json() : {servers:[]}).then(d => setMcpAvailableServers(d.servers || [])).catch(() => {});
+        setMcpChooserPending(true);
+        setPendingGenerateCallback(() => () => {
+          if (typeof window !== "undefined") window.location.reload();
+        });
+        return;
       }
     }
 
@@ -1823,7 +1878,25 @@ Fix requirements:
             ) : null}
 
             <ResizablePanel id="builder-panel" minSize="45%" className={`${mobilePanel === "chat" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-transparent md:flex`}>
-              {aiChooserPending ? (
+              {mcpChooserPending ? (
+                <section className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-y-auto p-4" aria-label="MCP servers chooser">
+                  <McpChooser
+                    chatId={chat.id}
+                    detectedNeeds={mcpDetectedNeeds}
+                    availableServers={mcpAvailableServers}
+                    onSelect={(selected) => {
+                      if (typeof window !== "undefined") {
+                        window.sessionStorage.removeItem(mcpChooserStorageKey);
+                      }
+                      setMcpChooserPending(false);
+                      if (pendingGenerateCallback) {
+                        pendingGenerateCallback();
+                        setPendingGenerateCallback(null);
+                      }
+                    }}
+                  />
+                </section>
+              ) : aiChooserPending ? (
                 <section className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-y-auto p-4" aria-label="AI integration chooser">
                   <AIIntegrationChooser
                     chatId={chat.id}

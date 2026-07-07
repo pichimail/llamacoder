@@ -440,6 +440,7 @@ export function getMainCodingPrompt(
   aiIntegration?: string | null,
   aiCapabilities?: string[],
   customDesign?: { content: string; instructions?: string } | null,
+  mcpServers?: Array<{ id: string; name: string; url?: string; transport?: string }> | null,
 ): string {
   if (mode === "agent") {
     let p = agentSystemPrompt;
@@ -491,6 +492,10 @@ export function getMainCodingPrompt(
     // Phase 3: AI integration prompt injection (additive).
     const aiBlock = getChinnaLLMPromptBlock(aiIntegration, aiCapabilities);
     if (aiBlock) p += "\n\n" + aiBlock;
+
+    // MCP / External Tools integration (additive, Phase MCP)
+    const mcpBlock = getMcpPromptBlock(mcpServers, userPrompt);
+    if (mcpBlock) p += "\n\n" + mcpBlock;
 
     return dedent(p);
   }
@@ -652,4 +657,65 @@ export async function generateText(prompt: string): Promise<string> {
   }
 
   return "";
+}
+
+/* ============================================================
+ * MCP SERVERS PROMPT INJECTION — ADDITIVE ONLY.
+ * Instructs the generator to wire real (or preview-safe) MCP clients
+ * into the generated app when the user selected MCP servers via the composer.
+ * Secrets and auth are resolved server-side; generated code uses a safe client.
+ * ============================================================ */
+
+export function getMcpPromptBlock(
+  mcpServers: Array<{ id: string; name: string; url?: string; transport?: string }> | null | undefined,
+  originalPrompt: string = "",
+): string {
+  if (!mcpServers || mcpServers.length === 0) return "";
+
+  const serverList = mcpServers
+    .map((s, i) => `${i + 1}. **${s.name}** — ${s.url || "user-configured MCP server"} (${s.transport || "http"})`)
+    .join("\n");
+
+  return dedent`
+## MCP SERVERS / EXTERNAL TOOLS INTEGRATION
+
+The user explicitly attached the following MCP (Model Context Protocol) servers to power real external tools and context in this app:
+
+${serverList}
+
+**Generation requirements:**
+
+1. **Create a client file** — generate \`lib/mcp.ts\` (or \`lib/mcp-client.ts\`) that provides a clean typed client:
+   \`\`\`ts
+   // lib/mcp.ts
+   export const mcp = {
+     // One method per attached server or a generic callTool(serverId, toolName, args)
+     async call(serverName: string, toolName: string, args?: any) { ... }
+   };
+   \`\`\`
+   The client MUST call your platform proxy route \`/api/mcp-proxy\` (or per-server routes) so that secrets never live in the generated client.
+
+2. **Proxy route (recommended)** — if backend scaffolding is appropriate, also generate a server route \`app/api/mcp/[server]/route.ts\` (or \`app/api/mcp-proxy/route.ts\`) that:
+   - Looks up the MCP server config (passed at generation time or via env placeholders).
+   - Performs authenticated calls to the real MCP server.
+   - Returns only safe results.
+
+3. **Wire into the UI** — use the MCP client in relevant places the prompt describes:
+   - Example: if the app needs data from a database MCP, use \`mcp.call("Postgres", "query", { sql: "..." })\`.
+   - Always show loading + error states.
+   - Provide a small "Connected Tools" or settings panel listing the active MCP servers and allowing manual tool invocation for debugging.
+
+4. **Preview compatibility** — the Sandpack preview is client-only. For preview:
+   - Provide mock implementations or local state fallbacks when the real proxy is not reachable.
+   - Clearly mark real-MCP calls vs preview mocks.
+   - Never embed raw secrets.
+
+5. **Config & docs** — generate a \`mcp.config.ts\` (or comments) showing the attached servers. Include instructions for self-hosters: "Set MCP_SERVER_X_URL and tokens via environment variables."
+
+6. **Use real tool semantics** — call the actual tool names and schemas discovered from the MCP servers (if provided during generation). Do not invent fake tool names.
+
+The original user request was: "${originalPrompt.slice(0, 300)}"
+
+Prioritize making the attached MCP servers feel first-class and useful inside the generated product.
+`;
 }

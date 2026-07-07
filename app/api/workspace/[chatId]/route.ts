@@ -296,7 +296,39 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       update: { value: encrypted },
       create: { projectId: project.id, key, value: encrypted },
     });
-    await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } });
+    await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } }); 
+  }
+
+  if (action === "save-seo") {
+    const { title, description, ogImage } = body;
+    const upserts = [];
+    if (title) {
+      const enc = encryptEnvValue(String(title));
+      upserts.push(prisma.environmentVariable.upsert({
+        where: { projectId_key: { projectId: project.id, key: 'SEO_TITLE' } },
+        update: { value: enc },
+        create: { projectId: project.id, key: 'SEO_TITLE', value: enc },
+      }));
+    }
+    if (description) {
+      const enc = encryptEnvValue(String(description));
+      upserts.push(prisma.environmentVariable.upsert({
+        where: { projectId_key: { projectId: project.id, key: 'SEO_DESCRIPTION' } },
+        update: { value: enc },
+        create: { projectId: project.id, key: 'SEO_DESCRIPTION', value: enc },
+      }));
+    }
+    if (ogImage) {
+      const enc = encryptEnvValue(String(ogImage));
+      upserts.push(prisma.environmentVariable.upsert({
+        where: { projectId_key: { projectId: project.id, key: 'SEO_OG_IMAGE' } },
+        update: { value: enc },
+        create: { projectId: project.id, key: 'SEO_OG_IMAGE', value: enc },
+      }));
+    }
+    if (upserts.length) await Promise.all(upserts);
+    await logAudit({ userId: accessUser.id, action: "save-seo", resource: "project", resourceId: project.id });
+    return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 

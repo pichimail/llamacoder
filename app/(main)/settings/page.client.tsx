@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Github, Loader2, RotateCcw, Save, Settings2, SlidersHorizontal, UploadCloud, Zap } from "lucide-react";
+import { Check, Github, Loader2, RotateCcw, Save, Settings2, SlidersHorizontal, UploadCloud, Zap, Plug, Trash2, Edit2, TestTube2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { MODELS } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 
 type BuilderSettings = {
   defaultModel: string;
@@ -104,6 +105,12 @@ export default function SettingsPageClient() {
   const [saved, setSaved] = useState(false);
   const visibleModels = useMemo(() => MODELS.filter((model) => !model.hidden), []);
 
+  // MCP Servers management
+  const [mcpServers, setMcpServers] = useState<any[]>([]);
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+  const [editingMcp, setEditingMcp] = useState<any>(null);
+  const [mcpLoading, setMcpLoading] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -119,8 +126,19 @@ export default function SettingsPageClient() {
       }
     }
     load();
+    loadMcpServers();
     return () => { cancelled = true; };
   }, []);
+
+  async function loadMcpServers() {
+    try {
+      const res = await fetch("/api/mcp", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setMcpServers(data.servers || []);
+      }
+    } catch {}
+  }
 
   function update<K extends keyof BuilderSettings>(key: K, value: BuilderSettings[K]) {
     setSaved(false);
@@ -244,9 +262,90 @@ export default function SettingsPageClient() {
                 <SettingSwitch title="Generate OG images" description="Create preview/social images for saved or published generated apps." checked={settings.generateOgImages} onChange={(value) => update("generateOgImages", value)} />
               </div>
             </Section>
+
+            {/* MCP Servers - full management */}
+            <Section icon={<Plug className="size-4" />} title="MCP Servers" description="Connect Model Context Protocol servers. These are available across your prompt inputs and attached to generated apps/artifacts for tool calling and external context.">
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-sm text-muted-foreground">Your saved MCP connectors ({mcpServers.length})</div>
+                <Button size="sm" onClick={() => { setEditingMcp(null); setMcpDialogOpen(true); }} className="rounded-xl">
+                  <Plug className="size-4 mr-1" /> Add MCP Server
+                </Button>
+              </div>
+
+              {mcpServers.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No MCP servers yet. Add one to use in generations and chats.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {mcpServers.map((srv) => (
+                    <div key={srv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium flex items-center gap-2">
+                          {srv.name}
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted">{srv.transport}</span>
+                          {srv.hasSecret && <span className="text-[10px] text-emerald-600">auth</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{srv.url}</div>
+                        {srv.description && <div className="text-xs mt-0.5 text-muted-foreground/80">{srv.description}</div>}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1 text-xs">
+                          <Switch checked={srv.enabled} onCheckedChange={async (v) => {
+                            setMcpLoading(true);
+                            try {
+                              await fetch("/api/mcp", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: srv.id, enabled: v }) });
+                              await loadMcpServers();
+                            } finally { setMcpLoading(false); }
+                          }} />
+                          <span className="text-muted-foreground">On</span>
+                        </div>
+
+                        <Button variant="outline" size="sm" onClick={() => runMcpTest(srv.id)} disabled={mcpLoading}>
+                          <TestTube2 className="size-3.5" />
+                        </Button>
+
+                        <Button variant="outline" size="sm" onClick={() => { setEditingMcp(srv); setMcpDialogOpen(true); }}>
+                          <Edit2 className="size-3.5" />
+                        </Button>
+
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          if (!confirm(`Delete ${srv.name}?`)) return;
+                          setMcpLoading(true);
+                          await fetch(`/api/mcp?id=${srv.id}`, { method: "DELETE" });
+                          await loadMcpServers();
+                          setMcpLoading(false);
+                        }}>
+                          <Trash2 className="size-3.5 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <McpServerDialog
+                open={mcpDialogOpen}
+                onOpenChange={(o) => { setMcpDialogOpen(o); if (!o) setEditingMcp(null); }}
+                initialData={editingMcp}
+                mode={editingMcp ? "edit" : "add"}
+                onSaved={async () => { await loadMcpServers(); }}
+              />
+            </Section>
           </div>
         )}
       </div>
     </main>
   );
+}
+
+async function runMcpTest(id: string) {
+  try {
+    const res = await fetch("/api/mcp/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const j = await res.json();
+    toast({ title: j.ok ? "Connected" : "Test result", description: j.message });
+  } catch (e: any) {
+    toast({ title: "Test failed", description: e.message, variant: "destructive" });
+  }
 }

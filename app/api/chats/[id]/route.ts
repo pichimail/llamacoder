@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -16,6 +17,12 @@ const patchSchema = z.object({
   projectId: z.string().min(1).nullable().optional(),
   aiIntegration: z.enum(["chinnallm", "byok", "skip"]).optional().nullable(),
   backendMode: z.boolean().optional(),
+  mcpServers: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    url: z.string().optional(),
+    transport: z.string().optional(),
+  })).optional().nullable(),
 });
 
 export async function PATCH(
@@ -44,13 +51,18 @@ export async function PATCH(
     if (parsed.data.projectId !== undefined) {
       result = await moveChatToProject(id, parsed.data.projectId);
     }
-    if (parsed.data.aiIntegration !== undefined || parsed.data.backendMode !== undefined) {
+    if (
+      parsed.data.aiIntegration !== undefined ||
+      parsed.data.backendMode !== undefined ||
+      parsed.data.mcpServers !== undefined
+    ) {
       const prisma = getPrisma();
       result = await prisma.chat.update({
         where: { id },
         data: {
           ...(parsed.data.aiIntegration !== undefined ? { aiIntegration: parsed.data.aiIntegration } : {}),
           ...(parsed.data.backendMode !== undefined ? { backendMode: parsed.data.backendMode } : {}),
+          ...(parsed.data.mcpServers !== undefined ? { mcpServers: (parsed.data.mcpServers && parsed.data.mcpServers.length > 0 ? (parsed.data.mcpServers as Prisma.InputJsonValue) : Prisma.JsonNull) } : {}),
         },
       });
     }

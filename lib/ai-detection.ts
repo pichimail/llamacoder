@@ -71,3 +71,88 @@ export function requiresAI(prompt: string): AIDetectionResult {
   }
   return { detected: capabilities.length > 0, capabilities };
 }
+
+// ====================== MCP / External Tools Detection ======================
+
+export type McpNeed = "database" | "api" | "webhook" | "search" | "realtime" | "file" | "auth" | "notification" | "calendar" | "generic";
+
+export interface McpDetectionResult {
+  detected: boolean;
+  needs: McpNeed[];
+  suggestedServerTypes: string[];
+}
+
+const MCP_PATTERNS: Array<{ need: McpNeed; patterns: RegExp[] }> = [
+  {
+    need: "database",
+    patterns: [
+      /\b(database|db|postgres|mysql|sqlite|sql|prisma|supabase|neon|query data|persist data|save to db)\b/i,
+    ],
+  },
+  {
+    need: "api",
+    patterns: [
+      /\b(api|rest|graphql|fetch data|external service|third.party|integrate with)\b/i,
+    ],
+  },
+  {
+    need: "search",
+    patterns: [
+      /\b(search|web search|semantic search|find|lookup|query external)\b/i,
+    ],
+  },
+  {
+    need: "realtime",
+    patterns: [
+      /\b(realtime|live|websocket|streaming|real.time|live updates)\b/i,
+    ],
+  },
+  {
+    need: "notification",
+    patterns: [
+      /\b(notification|notify|slack|email|webhook|alert|push)\b/i,
+    ],
+  },
+  {
+    need: "calendar",
+    patterns: [
+      /\b(calendar|booking|schedule|availability|event)\b/i,
+    ],
+  },
+  {
+    need: "file",
+    patterns: [
+      /\b(file system|upload|storage|blob|s3|document|pdf)\b/i,
+    ],
+  },
+  {
+    need: "generic",
+    patterns: [
+      /\b(mcp|tool|tools|external tool|context protocol|use server|connect to my|my (api|db|service))\b/i,
+    ],
+  },
+];
+
+export function requiresMcpTools(prompt: string): McpDetectionResult {
+  const needs: McpNeed[] = [];
+  for (const { need, patterns } of MCP_PATTERNS) {
+    if (patterns.some((p) => p.test(prompt))) {
+      needs.push(need);
+    }
+  }
+  const detected = needs.length > 0;
+
+  const suggested = needs.map((n) => {
+    if (n === "database") return "postgres-mcp or database MCP";
+    if (n === "api") return "generic API MCP or http MCP";
+    if (n === "search") return "web-search or brave/search MCP";
+    if (n === "notification") return "slack or email MCP";
+    return "community MCP server";
+  });
+
+  return {
+    detected,
+    needs,
+    suggestedServerTypes: Array.from(new Set(suggested)),
+  };
+}

@@ -17,32 +17,33 @@ model GeneratedApp {
 }
 
 model Chat {
-  id                String        @id @default(nanoid(16))
+  id                String             @id @default(nanoid(16))
   model             String
   quality           String
   prompt            String
   title             String
-  llamaCoderVersion String        @default("v2")
+  llamaCoderVersion String             @default("v2")
   shadcn            Boolean
-  styleId           String        @default("modern-saas")
-  aiIntegration     String?       // "chinnallm" | "byok" | "skip" | null
-  backendMode       Boolean       @default(false)
+  styleId           String             @default("modern-saas")
+  aiIntegration     String? // "chinnallm" | "byok" | "skip" | null
+  backendMode       Boolean            @default(false)
+  mcpServers        Json? // selected MCP servers snapshot for generation: [{ id, name, url, transport?, authType? }]  (secrets resolved server-side)
   messages          Message[]
   projectId         String?
-  project           Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  isPinned          Boolean       @default(false)
-  isArchived        Boolean       @default(false)
-  isHidden          Boolean       @default(false) // admin moderation: hidden from public surfaces
-  moderationNote    String?       // admin reason for hide/removal
-  moderatedById     String?       // admin user id who last moderated
+  project           Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  isPinned          Boolean            @default(false)
+  isArchived        Boolean            @default(false)
+  isHidden          Boolean            @default(false) // admin moderation: hidden from public surfaces
+  moderationNote    String? // admin reason for hide/removal
+  moderatedById     String? // admin user id who last moderated
   moderatedAt       DateTime?
   historySummary    String?
   historySummaryKey String?
   historySummaryAt  DateTime?
   fileUploads       FileUpload[]
   designCheckpoints DesignCheckpoint[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([createdAt])
   @@index([projectId])
@@ -52,16 +53,16 @@ model Chat {
 }
 
 model Message {
-  id               String        @id @default(nanoid(16))
-  role             String
-  content          String
-  files            Json?
-  previewImageUrl  String?
-  chatId           String
-  chat             Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  fileUploads      FileUpload[]
-  position         Int
-  createdAt        DateTime      @default(now())
+  id              String       @id @default(nanoid(16))
+  role            String
+  content         String
+  files           Json?
+  previewImageUrl String?
+  chatId          String
+  chat            Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  fileUploads     FileUpload[]
+  position        Int
+  createdAt       DateTime     @default(now())
 
   @@index([chatId])
   @@index([chatId, createdAt])
@@ -69,21 +70,22 @@ model Message {
 
 // ===== New Models for Project/Workspace =====
 model Project {
-  id              String       @id @default(nanoid(12))
-  name            String
-  description     String?
-  userId          String
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chats           Chat[]
-  deployments     Deployment[]
-  integrations    Integration[]
-  domains         Domain[]
-  envVars         EnvironmentVariable[]
-  files           ProjectFile[]
-  shareLinks      ShareLink[]
-  members         ProjectMember[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id           String                @id @default(nanoid(12))
+  name         String
+  description  String?
+  userId       String
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats        Chat[]
+  deployments  Deployment[]
+  integrations Integration[]
+  domains      Domain[]
+  envVars      EnvironmentVariable[]
+  files        ProjectFile[]
+  shareLinks   ShareLink[]
+  members      ProjectMember[]
+  mcpServers   McpServer[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   @@index([userId])
   @@index([createdAt])
@@ -111,8 +113,8 @@ model Integration {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
   @@unique([projectId, type])
+  @@index([projectId])
 }
 
 model Domain {
@@ -123,8 +125,8 @@ model Domain {
   verified  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  @@index([projectId])
   @@unique([projectId, domain])
+  @@index([projectId])
 }
 
 model EnvironmentVariable {
@@ -136,8 +138,8 @@ model EnvironmentVariable {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
   @@unique([projectId, key])
+  @@index([projectId])
 }
 
 model ProjectFile {
@@ -149,8 +151,8 @@ model ProjectFile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
   @@unique([projectId, path])
+  @@index([projectId])
 }
 
 model ShareLink {
@@ -173,9 +175,9 @@ model ProjectMember {
   role      String   @default("editor")
   createdAt DateTime @default(now())
 
+  @@unique([projectId, userId])
   @@index([projectId])
   @@index([userId])
-  @@unique([projectId, userId])
 }
 
 // ===== Admin-curated featured gallery pins =====
@@ -201,45 +203,48 @@ model Setting {
 }
 
 // ===== Auth.js (NextAuth) models for SaaS mode =====
-/** A user-saved custom design system, created via the "Start with your
+/**
+ * A user-saved custom design system, created via the "Start with your
  * design" flow (pasted/uploaded DESIGN.md, GitHub repo, or website scan).
  * Distinct from the 12 built-in SandboxStyleId presets in lib/sandbox-theme.ts
  * — this stores a user's own design language so it can be reused across
- * future builds without re-uploading it every time. */
+ * future builds without re-uploading it every time.
+ */
 model DesignPreset {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  source      String   // "paste" | "upload" | "github" | "website"
-  sourceRef   String?  // repo URL or website URL, if applicable
-  content     String   @db.Text // the DESIGN.md content or extracted description
-  instructions String? @db.Text // "Additional instructions" free text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  source       String // "paste" | "upload" | "github" | "website"
+  sourceRef    String? // repo URL or website URL, if applicable
+  content      String   @db.Text // the DESIGN.md content or extracted description
+  instructions String?  @db.Text // "Additional instructions" free text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([userId])
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  plan          String    @default("free")
-  role          String    @default("user")
-  accounts      Account[]
-  sessions      Session[]
-  projects      Project[]
-  projectMembers ProjectMember[]
-  fileUploads   FileUpload[]
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String?             @unique
+  emailVerified      DateTime?
+  image              String?
+  plan               String              @default("free")
+  role               String              @default("user")
+  accounts           Account[]
+  sessions           Session[]
+  projects           Project[]
+  projectMembers     ProjectMember[]
+  fileUploads        FileUpload[]
   promptLibraryItems PromptLibraryItem[]
-  auditLogs     AuditLog[]
-  credits       UserCredits?
-  apiKeys       ApiKeyStore[]
-  designPresets DesignPreset[]
-  createdAt     DateTime  @default(now())
+  auditLogs          AuditLog[]
+  credits            UserCredits?
+  apiKeys            ApiKeyStore[]
+  designPresets      DesignPreset[]
+  mcpServers         McpServer[]
+  createdAt          DateTime            @default(now())
 }
 
 model Account {
@@ -300,13 +305,13 @@ model FileUpload {
 
 // ===== Rate Limiting =====
 model RateLimit {
-  id        String   @id @default(nanoid(12))
-  userId    String
-  route     String
-  count     Int      @default(1)
+  id          String   @id @default(nanoid(12))
+  userId      String
+  route       String
+  count       Int      @default(1)
   windowStart DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([userId, route, windowStart])
   @@index([userId])
@@ -316,15 +321,15 @@ model RateLimit {
 
 // ===== Audit Log for sensitive actions =====
 model AuditLog {
-  id        String   @id @default(nanoid(12))
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action    String
-  resource  String?
+  id         String   @id @default(nanoid(12))
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  resource   String?
   resourceId String?
-  metadata  Json?
-  ip        String?
-  createdAt DateTime @default(now())
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
 
   @@index([userId])
   @@index([action])
@@ -349,20 +354,20 @@ model DesignCheckpoint {
 }
 
 model PromptLibraryItem {
-  id          String   @id @default(nanoid(12))
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  body        String
-  category    String   @default("General")
-  tone        String   @default("Balanced")
-  tags        Json?
-  variables   Json?
-  visibility  String   @default("private")
-  shareToken  String?  @unique
-  useCount    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(nanoid(12))
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  category   String   @default("General")
+  tone       String   @default("Balanced")
+  tags       Json?
+  variables  Json?
+  visibility String   @default("private")
+  shareToken String?  @unique
+  useCount   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([userId])
   @@index([category])
@@ -373,32 +378,32 @@ model PromptLibraryItem {
 // ============ ChinnaLLM (Phase 2) ============
 
 model ChinnaLLMModel {
-  id             String   @id @default(cuid())
-  displayName    String   @unique // "ChinnaLLM Flagship" — user-visible
-  openRouterId   String   // admin-only, never exposed to users
-  tier           String   // budget|coding|flagship|reasoning|vision|image|video|music|code|free|auto
-  costPerKTokens Int      @default(1) // credits per 1k tokens
-  enabled        Boolean  @default(true)
-  sortOrder      Int      @default(0)
+  id             String           @id @default(cuid())
+  displayName    String           @unique // "ChinnaLLM Flagship" — user-visible
+  openRouterId   String // admin-only, never exposed to users
+  tier           String // budget|coding|flagship|reasoning|vision|image|video|music|code|free|auto
+  costPerKTokens Int              @default(1) // credits per 1k tokens
+  enabled        Boolean          @default(true)
+  sortOrder      Int              @default(0)
   description    String?
-  capabilities   String[] @default([])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  capabilities   String[]         @default([])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   usageRecords   ChinnaLLMUsage[]
 
   @@index([tier, enabled, sortOrder])
 }
 
 model UserCredits {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planTier       String   @default("free") // free|pro|enterprise
-  totalGranted   Int      @default(100)
-  totalUsed      Int      @default(0)
-  monthlyResetAt DateTime @default(now())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id             String              @id @default(cuid())
+  userId         String              @unique
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planTier       String              @default("free") // free|pro|enterprise
+  totalGranted   Int                 @default(100)
+  totalUsed      Int                 @default(0)
+  monthlyResetAt DateTime            @default(now())
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
   transactions   CreditTransaction[]
 }
 
@@ -406,8 +411,8 @@ model CreditTransaction {
   id            String      @id @default(cuid())
   userId        String
   userCredits   UserCredits @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  amount        Int         // positive = grant, negative = deduct
-  type          String      // grant|deduct|topup|refund|monthly_reset
+  amount        Int // positive = grant, negative = deduct
+  type          String // grant|deduct|topup|refund|monthly_reset
   reason        String?
   relatedChatId String?
   createdAt     DateTime    @default(now())
@@ -438,13 +443,38 @@ model ApiKeyStore {
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider     String   @default("openrouter") // openrouter|openai|anthropic|xai|google|together|nvidia
-  encryptedKey String   // AES-256-GCM encrypted
-  iv           String   // initialization vector
+  encryptedKey String // AES-256-GCM encrypted
+  iv           String // initialization vector
   label        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, provider])
+}
+
+// ============ MCP Servers (Model Context Protocol for tool calling / external context) ============
+
+model McpServer {
+  id              String   @id @default(nanoid(12))
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name            String
+  url             String
+  transport       String   @default("http") // http | sse | stdio (future support)
+  authType        String   @default("bearer") // none | bearer | header | basic | token
+  encryptedSecret String? // AES encrypted token/key
+  iv              String? // IV for encryption
+  enabled         Boolean  @default(true)
+  description     String?
+  toolSchema      Json? // [{ name, description, inputSchema: {...} }, ...]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([enabled])
 }
 
 // ============ Feature Flags (Phase 4) ============

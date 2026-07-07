@@ -3,7 +3,7 @@
 import { HomeShell } from "@/components/home/home-shell";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,9 +24,10 @@ import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { MODELS } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI } from "@/lib/ai-detection";
+import { requiresAI, requiresMcpTools } from "@/lib/ai-detection";
 import { toast } from "@/hooks/use-toast";
 import { Context } from "./providers";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 
 type Mode = "ask" | "plan" | "agent";
 type Attachment = { kind: "image" | "file"; filename: string; url?: string; size?: number };
@@ -454,7 +455,7 @@ function PresetChipsScroller({ onSelect }: { onSelect: (prompt: string) => void 
   );
 }
 
-function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabled, model, onModelChange, models, buildMode, onBuildModeChange, shadcnEnabled, onShadcnChange, webSearchEnabled, onWebSearchChange, deepThinkingEnabled, onDeepThinkingChange, canvasEnabled, onCanvasChange, backendEnabled, onBackendChange, styleId, onStyleIdChange, savedDesigns, onOpenDesignDialog, onSelectSavedDesign, selectedSavedDesignId, onAttach, attachmentReady, onImportGithub, savedPrompts, onSavePrompt, onUseSavedPrompt, flagEnabled }: { value: string; onValueChange: (value: string) => void; onSend: (value: string) => void; isLoading: boolean; disabled: boolean; model: string; onModelChange: (model: string) => void; models: any[]; buildMode: Mode; onBuildModeChange: (mode: Mode) => void; shadcnEnabled: boolean; onShadcnChange: (value: boolean) => void; webSearchEnabled: boolean; onWebSearchChange: (value: boolean) => void; deepThinkingEnabled: boolean; onDeepThinkingChange: (value: boolean) => void; canvasEnabled: boolean; onCanvasChange: (value: boolean) => void; backendEnabled: boolean; onBackendChange: (value: boolean) => void; styleId: SandboxStyleId; onStyleIdChange: (id: SandboxStyleId) => void; savedDesigns: SavedDesign[]; onOpenDesignDialog: () => void; onSelectSavedDesign: (design: SavedDesign) => void; selectedSavedDesignId?: string | null; onAttach: () => void; attachmentReady?: boolean; onImportGithub: () => void; savedPrompts: SavedPrompt[]; onSavePrompt: () => void; onUseSavedPrompt: (prompt: SavedPrompt) => void; flagEnabled: (key: string) => boolean }) {
+function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabled, model, onModelChange, models, buildMode, onBuildModeChange, shadcnEnabled, onShadcnChange, webSearchEnabled, onWebSearchChange, deepThinkingEnabled, onDeepThinkingChange, canvasEnabled, onCanvasChange, backendEnabled, onBackendChange, styleId, onStyleIdChange, savedDesigns, onOpenDesignDialog, onSelectSavedDesign, selectedSavedDesignId, onAttach, attachmentReady, onImportGithub, savedPrompts, onSavePrompt, onUseSavedPrompt, flagEnabled, selectedMcpServers = [], onMcpChange, onMcpOpenDialog }: { value: string; onValueChange: (value: string) => void; onSend: (value: string) => void; isLoading: boolean; disabled: boolean; model: string; onModelChange: (model: string) => void; models: any[]; buildMode: Mode; onBuildModeChange: (mode: Mode) => void; shadcnEnabled: boolean; onShadcnChange: (value: boolean) => void; webSearchEnabled: boolean; onWebSearchChange: (value: boolean) => void; deepThinkingEnabled: boolean; onDeepThinkingChange: (value: boolean) => void; canvasEnabled: boolean; onCanvasChange: (value: boolean) => void; backendEnabled: boolean; onBackendChange: (value: boolean) => void; styleId: SandboxStyleId; onStyleIdChange: (id: SandboxStyleId) => void; savedDesigns: SavedDesign[]; onOpenDesignDialog: () => void; onSelectSavedDesign: (design: SavedDesign) => void; selectedSavedDesignId?: string | null; onAttach: () => void; attachmentReady?: boolean; onImportGithub: () => void; savedPrompts: SavedPrompt[]; onSavePrompt: () => void; onUseSavedPrompt: (prompt: SavedPrompt) => void; flagEnabled: (key: string) => boolean; selectedMcpServers?: any[]; onMcpChange?: (servers: any[]) => void; onMcpOpenDialog?: () => void }) {
   /* Phase 4 refresh: clean, quiet composer — single hairline border, no glow,
    * every optional feature gated by admin feature flags. */
   const hasValue = value.trim().length > 0 || attachmentReady;
@@ -479,6 +480,17 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
           className="min-h-[96px] w-full resize-none rounded-t-2xl bg-transparent px-5 pb-3 pt-5 text-base leading-relaxed text-stone-950 outline-none placeholder:text-stone-500 disabled:opacity-60 dark:text-white dark:placeholder:text-zinc-500"
         />
         {attachmentReady ? <div className="mx-5 mb-2 inline-flex rounded-full border border-stone-300 bg-stone-100/80 px-3 py-1 text-xs text-stone-700 dark:border-white/15 dark:bg-white/[0.04] dark:text-zinc-300">Attachment ready</div> : null}
+        {(selectedMcpServers || []).length > 0 && (
+          <div className="mx-5 mb-1 flex flex-wrap gap-1.5">
+            {(selectedMcpServers || []).map((m: any, idx: number) => (
+              <span key={idx} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300">
+                <Plug className="size-3" /> {m.name}
+                <button type="button" onClick={() => onMcpChange && onMcpChange((selectedMcpServers || []).filter((_: any, i: number) => i !== idx))} className="ml-0.5 hover:text-red-500">×</button>
+              </span>
+            ))}
+            <button type="button" onClick={() => onMcpOpenDialog && onMcpOpenDialog()} className="text-[10px] text-emerald-600 underline">manage</button>
+          </div>
+        )}
         {variableCount > 0 ? <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1.5 text-xs text-stone-500 dark:text-zinc-500"><span className="rounded-full bg-stone-900/[0.06] px-2.5 py-1 text-stone-600 dark:bg-white/[0.06] dark:text-zinc-400">{variableCount} variables</span></div> : null}
         {promptLibraryOn && savedPrompts.length > 0 ? (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -505,6 +517,7 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
               <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem>
               {flagEnabled("github-import") ? <DropdownMenuItem onClick={onImportGithub} className="gap-3"><Github className="size-4" />Import from GitHub</DropdownMenuItem> : null}
+              <DropdownMenuItem onClick={() => onMcpOpenDialog && onMcpOpenDialog()} className="gap-3"><Plug className="size-4" />Connect MCP Server</DropdownMenuItem>
               <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
               <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Mode</DropdownMenuLabel>
               <ModeItem mode="agent" current={buildMode} label="Agent" description="Build the app, write files, validate preview, then self-correct once if needed." icon={<Bot className="size-4" />} onSelect={onBuildModeChange} />
@@ -696,6 +709,8 @@ export default function HomePageClient() {
   const [deepThinkingEnabled, setDeepThinkingEnabled] = useState(false);
   const [canvasEnabled, setCanvasEnabled] = useState(false);
   const [backendEnabled, setBackendEnabled] = useState(false);
+  const [selectedMcpServers, setSelectedMcpServers] = useState<any[]>([]);
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   const [appTypeHint, setAppTypeHint] = useState("");
   const handleAppTypeChange = (id: string) => {
     setAppTypeHint(id);
@@ -781,6 +796,7 @@ export default function HomePageClient() {
             attachments,
             aiCapabilities: aiDetection.capabilities,
             backendMode: backendEnabled,
+            mcpServers: selectedMcpServers,
           }),
         });
         const data = await response.json().catch(() => null);
@@ -873,13 +889,32 @@ export default function HomePageClient() {
                   Describe any product. Get a working, premium, multi-page app with a live preview — in one prompt.
                 </motion.p>
                 <motion.div id="prompt-composer" className="relative w-full" {...heroWordAnimation} transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.62, ease: [0.21, 0.47, 0.32, 0.98] }}>
-                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} buildMode={buildMode} onBuildModeChange={setBuildMode} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} backendEnabled={backendEnabled} onBackendChange={setBackendEnabled} styleId={styleId} onStyleIdChange={(id) => { setStyleId(id); setSelectedDesignPresetId(null); }} savedDesigns={savedDesigns} onOpenDesignDialog={() => setDesignDialogOpen(true)} onSelectSavedDesign={(design) => setSelectedDesignPresetId(design.id)} selectedSavedDesignId={selectedDesignPresetId} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} savedPrompts={savedPrompts} onSavePrompt={saveCurrentPrompt} onUseSavedPrompt={(item) => setPrompt(item.body)} flagEnabled={flagEnabled} />
+                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} buildMode={buildMode} onBuildModeChange={setBuildMode} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} backendEnabled={backendEnabled} onBackendChange={setBackendEnabled} styleId={styleId} onStyleIdChange={(id) => { setStyleId(id); setSelectedDesignPresetId(null); }} savedDesigns={savedDesigns} onOpenDesignDialog={() => setDesignDialogOpen(true)} onSelectSavedDesign={(design) => setSelectedDesignPresetId(design.id)} selectedSavedDesignId={selectedDesignPresetId} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} savedPrompts={savedPrompts} onSavePrompt={saveCurrentPrompt} onUseSavedPrompt={(item) => setPrompt(item.body)} flagEnabled={flagEnabled} selectedMcpServers={selectedMcpServers} onMcpChange={setSelectedMcpServers} onMcpOpenDialog={() => setMcpDialogOpen(true)} />
                   <DesignSystemDialog
                     open={designDialogOpen}
                     onOpenChange={setDesignDialogOpen}
                     onSaved={(design) => {
                       setSavedDesigns((prev) => [design, ...prev]);
                       setSelectedDesignPresetId(design.id);
+                    }}
+                  />
+
+                  <McpServerDialog
+                    open={mcpDialogOpen}
+                    onOpenChange={setMcpDialogOpen}
+                    onSaved={(server) => {
+                      // quick connect: add to selected for this generation
+                      setSelectedMcpServers((prev) => {
+                        if (prev.some((s) => s.id === server.id)) return prev;
+                        return [...prev, { id: server.id, name: server.name, url: server.url, transport: server.transport }];
+                      });
+                      toast({ title: "MCP attached for this build", description: server.name });
+                    }}
+                    onAttachToGeneration={(server) => {
+                      setSelectedMcpServers((prev) => {
+                        if (prev.some((s) => s.id === server.id)) return prev;
+                        return [...prev, { id: server.id, name: server.name, url: server.url, transport: server.transport }];
+                      });
                     }}
                   />
                   <AppTypeChips value={appTypeHint} onChange={handleAppTypeChange} flagEnabled={flagEnabled} disabled={isSubmitting || isGithubImporting} />
