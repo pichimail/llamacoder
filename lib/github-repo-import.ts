@@ -1,3 +1,5 @@
+import { detectStack, getBootstrapScript, getRunMarkdown, type StackInfo } from "./stack-detector";
+
 export type GithubFileSpec = {
   owner: string;
   repo: string;
@@ -17,6 +19,19 @@ export type ImportedRepoFile = {
   path: string;
   code: string;
   language: string;
+};
+
+export type ImportedRepoResult = {
+  files: ImportedRepoFile[];
+  ref: string;
+  defaultBranch: string;
+  readme?: string;
+  packageJson?: Record<string, unknown>;
+  repoUrl: string;
+  /** New: dynamic stack detection */
+  stack?: StackInfo;
+  bootstrapScript?: string;
+  runMarkdown?: string;
 };
 
 const SKIP_DIR_SEGMENTS = new Set([
@@ -173,14 +188,7 @@ async function githubJson<T>(url: string, token?: string): Promise<T> {
 export async function fetchGithubRepoFiles(
   spec: GithubRepoSpec,
   options?: { accessToken?: string },
-): Promise<{
-  files: ImportedRepoFile[];
-  ref: string;
-  defaultBranch: string;
-  readme?: string;
-  packageJson?: Record<string, unknown>;
-  repoUrl: string;
-}> {
+): Promise<ImportedRepoResult> {
   const token = options?.accessToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   const apiBase = `https://api.github.com/repos/${spec.owner}/${spec.repo}`;
 
@@ -263,6 +271,32 @@ export async function fetchGithubRepoFiles(
     }
   }
 
+  // === Dynamic stack detection + auto bootstrap artifacts (cost saver + any-stack support) ===
+  let stack: StackInfo | undefined;
+  let bootstrapScript: string | undefined;
+  let runMarkdown: string | undefined;
+
+  try {
+    const snapshotFiles = [
+      ...files.map(f => ({ path: f.path, content: f.code })),
+      // also include package if present
+    ];
+    if (packageJson) {
+      // already have it
+    }
+    stack = detectStack({
+      files: snapshotFiles,
+      packageJson: packageJson as any,
+      readme: readmeFile?.code,
+    });
+
+    const fullRepoUrl = `https://github.com/${spec.owner}/${spec.repo}`;
+    bootstrapScript = getBootstrapScript(stack, fullRepoUrl);
+    runMarkdown = getRunMarkdown(stack, fullRepoUrl);
+  } catch (e) {
+    console.warn("[stack-detector] failed on import", e);
+  }
+
   return {
     files,
     ref,
@@ -270,6 +304,9 @@ export async function fetchGithubRepoFiles(
     readme: readmeFile?.code,
     packageJson,
     repoUrl: `https://github.com/${spec.owner}/${spec.repo}`,
+    stack,
+    bootstrapScript,
+    runMarkdown,
   };
 }
 

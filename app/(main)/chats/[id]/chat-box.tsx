@@ -2,7 +2,7 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2 } from "lucide-react";
+import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Github } from "lucide-react";
 import { DotFlow } from "@/components/ui/dot-flow";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
@@ -243,10 +243,41 @@ export default function ChatBox({
     return "Apply the following change as a precise, minimal patch to the existing app (only output files that actually need to change):";
   };
 
+  // Dynamic Git clone trigger — auto bootstrap any OSS repo (big cost saver)
+  const isGitHubUrl = (text: string) => /^https?:\/\/github\.com\/[\w.-]+\/[\w.-]+/.test(text.trim());
+
+  const handleGitImport = async (url: string) => {
+    if (!chat?.id) return;
+    try {
+      const res = await fetch(`/api/workspace/${chat.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import-git", url }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast({ title: "Repo imported", description: `${data.imported?.fileCount} files • ${data.imported?.stack?.stack || "stack detected"}` });
+        // Force a soft reload of the chat view so new files appear
+        if (typeof window !== "undefined") window.location.reload();
+      } else {
+        throw new Error(data.error || "Import failed");
+      }
+    } catch (e: any) {
+      toast({ title: "Git import failed", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleSend = async ({ content }: { role: "user"; content: string }) => {
     if (isStreaming) return;
     const trimmed = content.trim();
     if (!trimmed && !screenshotUrl) return;
+
+    // Auto-trigger dynamic git clone + bootstrap (no heavy LLM needed for base)
+    if (isGitHubUrl(trimmed) && variant === "full") {
+      await handleGitImport(trimmed);
+      setPrompt("");
+      return;
+    }
 
     startTransition(async () => {
       const modePrefix = buildModePrefix();

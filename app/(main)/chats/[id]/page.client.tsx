@@ -21,7 +21,7 @@ import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewe
 import type { Chat, Message, SidebarChat } from "./page";
 import { Context } from "../../providers";
 import ThemeToggle from "@/components/theme-toggle";
-import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2, X } from "lucide-react";
+import { AlertCircle, Archive, ChevronDown, Code2, Copy, Database, Download, ExternalLink, Eye, GitPullRequest, Github, Image as ImageIcon, Layers, Loader2, Maximize2, MessageSquare, Monitor, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Share2, Smartphone, Sparkles, Star, Trash2, X } from "lucide-react";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { ChatsContextMenu } from "@/components/chats/chats-context-menu";
 import { DesignWorkspace } from "@/components/chats/design-workspace";
@@ -1624,6 +1624,20 @@ Fix requirements:
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent("open-artifact-settings"))}>
                       <Settings className="mr-2 size-4" /> Workspace settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        // Dynamic any-stack git import trigger — focuses composer with hint
+                        const composer = document.querySelector('textarea[placeholder*="change"], textarea[placeholder*="message"]') as HTMLTextAreaElement | null;
+                        if (composer) {
+                          composer.focus();
+                          composer.placeholder = "Paste GitHub URL here for instant clone + bootstrap (any stack)";
+                        }
+                        toast({ title: "Paste a GitHub URL in the chat input", description: "Works for Next.js, Python, Flutter, Java, Go, etc. Auto-generates bootstrap.sh + RUN.md" });
+                      }}
+                    >
+                      <Github className="mr-2 size-4" /> Import Git repo (dynamic)
                     </DropdownMenuItem>
                     {assistantVersions.length > 0 && (
                       <>

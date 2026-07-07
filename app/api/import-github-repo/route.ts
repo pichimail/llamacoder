@@ -72,7 +72,18 @@ export async function POST(request: NextRequest) {
         : "",
     ].join(" ");
 
-    const markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
+    let markdown = `${assistantIntro}\n\n${filesToImportMarkdown(imported.files)}`;
+
+    // Inject auto-generated dynamic bootstrap artifacts for any stack
+    if (imported.bootstrapScript) {
+      markdown += `\n\n\`\`\`bash{path=bootstrap.sh}\n${imported.bootstrapScript}\n\`\`\``;
+    }
+    if (imported.runMarkdown) {
+      markdown += `\n\n\`\`\`md{path=RUN.md}\n${imported.runMarkdown}\n\`\`\``;
+    }
+    if (imported.stack) {
+      markdown += `\n\n<!-- Detected stack: ${imported.stack.stack} (${imported.stack.language}) -->`;
+    }
 
     const prisma = getPrisma();
     const project = await prisma.project.create({
@@ -131,6 +142,9 @@ export async function POST(request: NextRequest) {
       repoUrl: imported.repoUrl,
       dependencies: previewDependencies,
       hasReadme: Boolean(imported.readme),
+      // Rich dynamic data
+      stack: imported.stack,
+      hasBootstrap: !!imported.bootstrapScript,
     });
   } catch (error: any) {
     if (error?.status === 401) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

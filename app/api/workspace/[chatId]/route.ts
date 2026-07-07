@@ -7,6 +7,10 @@ import {
   validateGeneratedCodeFiles,
 } from "@/lib/generated-code-validation";
 import {
+  fetchGithubRepoFiles,
+  parseGithubRepoUrl,
+} from "@/lib/github-repo-import";
+import {
   authErrorResponse,
   requireChatAccess,
   type AccessLevel,
@@ -226,6 +230,54 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       ok: true,
       fileCount: result.count,
       validation: result.validation,
+      workspace: await serializeWorkspace(chatId),
+    });
+  }
+
+  // === Dynamic Git import inside existing chat (clone-type feature) ===
+  // This is the key for "any stack" + auto bootstrap without always regenerating via LLM.
+  if (action === "import-git") {
+    const url = String(body.url || "").trim();
+    const spec = parseGithubRepoUrl(url);
+    if (!spec) {
+      return NextResponse.json({ error: "Invalid GitHub repository URL" }, { status: 400 });
+    }
+
+    const imported = await fetchGithubRepoFiles(spec).catch((e: any) => {
+      throw new Error(e?.message || "Failed to fetch repository");
+    });
+
+    // Merge files into the workspace (non-destructive for overlapping paths — last wins)
+    const filesToSync = imported.files.map((f) => ({ path: f.path, content: f.code }));
+    const syncResult = await syncFiles(chatId, filesToSync);
+
+    // Also write the magic bootstrap artifacts
+    const extraFiles: any[] = [];
+    if (imported.bootstrapScript) {
+      extraFiles.push({ path: "bootstrap.sh", content: imported.bootstrapScript });
+    }
+    if (imported.runMarkdown) {
+      extraFiles.push({ path: "RUN.md", content: imported.runMarkdown });
+    }
+    if (imported.stack) {
+      extraFiles.push({
+        path: ".chinnacoder/stack.json",
+        content: JSON.stringify(imported.stack, null, 2),
+      });
+    }
+    if (extraFiles.length > 0) {
+      await syncFiles(chatId, extraFiles);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      imported: {
+        fileCount: imported.files.length,
+        stack: imported.stack,
+        repoUrl: imported.repoUrl,
+        ref: imported.ref,
+      },
+      hasBootstrap: !!imported.bootstrapScript,
       workspace: await serializeWorkspace(chatId),
     });
   }

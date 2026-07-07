@@ -176,6 +176,45 @@ export default function BuilderTerminal({
         print(`wrote ${args[gt + 1]}`);
         break;
       }
+      case "import-git":
+      case "clone": {
+        const url = args[0];
+        if (!url) return print("usage: import-git <github-url>", "err");
+        print(`Importing ${url} into workspace... (this may take a moment)`);
+        // Call workspace API
+        (async () => {
+          try {
+            // chatId is typically the last path segment when on /chats/[id]
+            const chatId = window.location.pathname.split("/").filter(Boolean).pop();
+            const res = await fetch(`/api/workspace/${chatId}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "import-git", url }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+              print(`✓ Imported ${data.imported?.fileCount || "?"} files. Stack: ${data.imported?.stack?.stack || "unknown"}`);
+              print("bootstrap.sh and RUN.md have been added to the workspace.");
+              print("Refresh the preview or type `ls` to see files.");
+              // In real usage the parent would reload files
+            } else {
+              print(`Import failed: ${data.error || "unknown"}`, "err");
+            }
+          } catch (e: any) {
+            print(`Import error: ${e.message}`, "err");
+          }
+        })();
+        break;
+      }
+
+      case "bootstrap": {
+        print("Running bootstrap steps (where possible in this sandbox)...");
+        print("For full fidelity download bootstrap.sh or RUN.md and run locally.");
+        // Future: trigger real sandbox commands
+        print("Tip: Use the Import Git button or paste a GitHub URL in chat for full auto setup.");
+        break;
+      }
+
       case "npm":
       case "pnpm":
       case "yarn": {
