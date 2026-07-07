@@ -21,15 +21,26 @@ const DEFAULTS: Record<string, string> = {
   autoFixDefault: "on",
 };
 
+let settingsCache: { value: Record<string, string>; ts: number } | null = null;
+const SETTINGS_CACHE_TTL = 60_000; // 60s - these change rarely
+
 export async function getSettings(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (settingsCache && now - settingsCache.ts < SETTINGS_CACHE_TTL) {
+    return settingsCache.value;
+  }
+
   const prisma = getPrisma();
   try {
     const rows = await prisma.setting.findMany();
     const map: Record<string, string> = { ...DEFAULTS };
     for (const r of rows) map[r.key] = r.value;
+    settingsCache = { value: map, ts: now };
     return map;
   } catch {
-    return { ...DEFAULTS };
+    const fallback = { ...DEFAULTS };
+    settingsCache = { value: fallback, ts: now };
+    return fallback;
   }
 }
 

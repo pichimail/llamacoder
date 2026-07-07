@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { AuthzError, requireCurrentUser } from '@/lib/authz'
+import { AuthzError, getCurrentUserOrNull, requireCurrentUser } from '@/lib/authz'
 import { getPrisma } from '@/lib/prisma'
 
 const promptSchema = z.object({
@@ -35,13 +35,13 @@ async function requirePromptOwner(promptId: string) {
 
 export async function getPromptLibrary(options: { query?: string; category?: string; limit?: number } = {}) {
   const prisma = getPrisma()
-  const user = await requireCurrentUser()
+  const user = await getCurrentUserOrNull()  // allow unauthenticated (home page calls this)
   const query = options.query?.trim()
   const category = options.category?.trim()
 
   const prompts = await prisma.promptLibraryItem.findMany({
     where: {
-      userId: user.id,
+      ...(user ? { userId: user.id } : { visibility: { in: ['public', 'team'] } }),
       ...(category && category !== 'all' ? { category } : {}),
       ...(query
         ? {

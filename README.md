@@ -40,8 +40,11 @@ This app deploys easily to Vercel but requires some environment variables to be 
 3. Trigger a new deployment. The build will now succeed (we fixed the `prisma migrate deploy` step which was failing without `DATABASE_URL`).
 4. **Run Prisma migrations** (required for the database tables to exist):
    - After setting `DATABASE_URL`, run locally: `pnpm prisma migrate deploy`
-   - Or pull env with Vercel CLI and run it.
+   - Or pull env with Vercel CLI: `vercel env pull .env.local && npx prisma migrate deploy`
+   - Direct CLI if .env not auto-loaded: `DATABASE_URL="your-url" npx prisma migrate deploy`
    - Do this whenever you change the Prisma schema (`prisma/schema.prisma`).
+
+   > Tip: If you see "Connection url is empty", make sure `DATABASE_URL` is in `.env.local` (or `.env`) and export it for the command.
 
 > **Why we changed the build script**: `prisma migrate deploy` was removed from `package.json` build command. It requires `DATABASE_URL` at build time (which isn't always configured immediately in Vercel) and running migrations on every deploy isn't ideal. Migrations are now a manual/one-time step.
 
