@@ -19,12 +19,19 @@ export async function GET() {
   try {
     const user = await requireCurrentUser();
     const prisma = getPrisma();
-    const presets = await prisma.designPreset.findMany({
-      where: { userId: user.id },
-      orderBy: { updatedAt: "desc" },
-      select: { id: true, name: true, source: true, sourceRef: true, createdAt: true, updatedAt: true },
-      take: 50,
-    });
+    let presets: any[] = [];
+    try {
+      presets = await prisma.designPreset.findMany({
+        where: { userId: user.id },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, name: true, source: true, sourceRef: true, createdAt: true, updatedAt: true },
+        take: 50,
+      });
+    } catch (dbErr) {
+      // Table may not exist yet (migration pending) — degrade gracefully
+      console.warn("design-presets table missing or query failed (migration needed?):", dbErr);
+      presets = [];
+    }
     return NextResponse.json({ presets });
   } catch (error) {
     const handled = authErrorResponse(error);

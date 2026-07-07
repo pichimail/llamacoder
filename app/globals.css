@@ -8,6 +8,7 @@
   src: url("/Aeonik/Aeonik-Regular.ttf");
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -15,6 +16,7 @@
   src: url("/Aeonik/Aeonik-Medium.ttf");
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -22,6 +24,7 @@
   src: url("/Aeonik/Aeonik-Bold.ttf");
   font-weight: 700;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -29,6 +32,7 @@
   src: url("/Aeonik/AeonikMono-Regular.otf");
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @layer base {

@@ -83,11 +83,15 @@ export async function POST(request: NextRequest) {
 
     let customDesign: { content: string; instructions?: string } | null = null;
     if (designPresetId) {
-      const preset = await getPrisma().designPreset.findFirst({
-        where: { id: designPresetId, userId: user.id },
-        select: { content: true, instructions: true },
-      });
-      if (preset) customDesign = { content: preset.content, instructions: preset.instructions ?? undefined };
+      try {
+        const preset = await getPrisma().designPreset.findFirst({
+          where: { id: designPresetId, userId: user.id },
+          select: { content: true, instructions: true },
+        });
+        if (preset) customDesign = { content: preset.content, instructions: preset.instructions ?? undefined };
+      } catch (e) {
+        console.warn("designPreset lookup failed (table may be missing migration):", e);
+      }
     }
 
     let resolvedModel: string;
@@ -170,7 +174,8 @@ export async function POST(request: NextRequest) {
         project: { connect: { id: project.id } },
         aiIntegration: aiIntegration ?? null,
         backendMode: buildSpec.backendMode,
-        mcpServers: (mcpServers && mcpServers.length > 0) ? (mcpServers as Prisma.InputJsonValue) : Prisma.JsonNull,
+        // mcpServers added via migration; include only if provided to avoid column errors on old DBs
+        ...( (mcpServers && mcpServers.length > 0) ? { mcpServers: mcpServers as Prisma.InputJsonValue } : {} ),
       },
     });
 
