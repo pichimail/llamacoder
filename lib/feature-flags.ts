@@ -1,6 +1,7 @@
 /** Feature flags (Phase 4). Every feature shipped in P1–P4 is dynamically
  * controllable from the admin panel. DB rows override these defaults;
  * unknown/missing flags default to enabled so the platform fails open. */
+import { unstable_cache, revalidateTag } from "next/cache";
 import { getPrisma } from "@/lib/prisma";
 
 export type FeatureFlagDef = {
@@ -40,28 +41,24 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlagDef[] = [
 
 export type FeatureFlagMap = Record<string, boolean>;
 
-let flagsCache: { value: FeatureFlagMap; ts: number } | null = null;
-const FLAGS_CACHE_TTL = 60_000; // 60s
+const FLAGS_TAG = "feature-flags";
 
 /** Server-side: defaults overlaid with DB rows. Fails open on DB errors. */
-export async function getFeatureFlags(): Promise<FeatureFlagMap> {
-  const now = Date.now();
-  if (flagsCache && now - flagsCache.ts < FLAGS_CACHE_TTL) {
-    return flagsCache.value;
-  }
-
-  const map: FeatureFlagMap = Object.fromEntries(DEFAULT_FEATURE_FLAGS.map((f) => [f.key, f.enabled]));
-  try {
-    const prisma = getPrisma();
-    const rows = await prisma.featureFlag.findMany({ select: { key: true, enabled: true } });
-    for (const row of rows) map[row.key] = row.enabled;
-    flagsCache = { value: map, ts: now };
-  } catch {
-    // fail open with defaults
-    flagsCache = { value: map, ts: now };
-  }
-  return map;
-}
+export const getFeatureFlags = unstable_cache(
+  async (): Promise<FeatureFlagMap> => {
+    const map: FeatureFlagMap = Object.fromEntries(DEFAULT_FEATURE_FLAGS.map((f) => [f.key, f.enabled]));
+    try {
+      const prisma = getPrisma();
+      const rows = await prisma.featureFlag.findMany({ select: { key: true, enabled: true } });
+      for (const row of rows) map[row.key] = row.enabled;
+    } catch {
+      // fail open with defaults
+    }
+    return map;
+  },
+  ["feature-flags"],
+  { revalidate: 300, tags: [FLAGS_TAG] }
+);
 
 export function isFlagEnabled(map: FeatureFlagMap, key: string): boolean {
   return map[key] !== false; // unknown keys => enabled

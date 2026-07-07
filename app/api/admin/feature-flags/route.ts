@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { revalidateTag } from "next/cache";
 import { requireAdmin, adminErrorResponse } from "@/lib/admin-guard";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { getPrisma } from "@/lib/prisma";
 import { DEFAULT_FEATURE_FLAGS } from "@/lib/feature-flags";
+
+const FLAGS_TAG = "feature-flags";
 
 /** Admin: full flag list (defaults merged with DB state) + toggle. */
 export async function GET() {
@@ -44,6 +47,7 @@ export async function PATCH(request: NextRequest) {
       create: { key: def.key, label: def.label, description: def.description, category: def.category, enabled: parsed.data.enabled },
       update: { enabled: parsed.data.enabled },
     });
+    revalidateTag(FLAGS_TAG);
     return NextResponse.json({ flag });
   } catch (error) {
     const handled = adminErrorResponse(error);
