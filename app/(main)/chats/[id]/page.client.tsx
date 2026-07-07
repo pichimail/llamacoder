@@ -1869,7 +1869,7 @@ Fix requirements:
                         className="hs-composer-swap min-h-0 flex-1 overflow-y-auto border-t border-border/70"
                       />
                     ) : (
-                      <div key="chat-composer" className="hs-composer-swap shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                      <div key="chat-composer" className="hs-composer-swap relative shrink-0 bg-gradient-to-t from-background via-background/85 to-transparent p-3 pt-4"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                     )}
                   </section>
                 </ResizablePanel>
@@ -1927,7 +1927,7 @@ Fix requirements:
               instead, so "chat" is always reachable regardless of layout. */}
           {effectiveChatCollapsed && (
             <div className="hs-composer-swap pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-              <div className={`pointer-events-auto w-full rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/30 backdrop-blur ${floatingComposerExpanded ? "max-w-xl" : "max-w-md"}`}>
+              <div className={`pointer-events-auto w-full rounded-3xl border border-border/60 bg-background/90 shadow-[0_12px_48px_-12px] shadow-primary/25 ring-1 ring-border/50 backdrop-blur-xl transition-[max-width] duration-300 ${floatingComposerExpanded ? "max-w-xl" : "max-w-md"}`}>
                 <ChatBox
                   chat={chat}
                   variant={floatingComposerExpanded ? "full" : "minimal"}

@@ -20,6 +20,8 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import { BrailleLoader } from "@/components/ui/braille-loader";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { isPlanResponse, PlanResponseCard } from "@/components/plan-mode-panel";
 import {
   EnvironmentVariable,
@@ -106,9 +108,39 @@ export default function ChatLog({
                 speed="normal"
                 fontSize={24}
                 label="Processing your request"
-                className="text-fuchsia-300"
+                className="text-primary"
               />
-              <span className="text-sm text-zinc-400">Processing your request</span>
+              <Shimmer as="span" duration={1.6} className="text-sm">
+                Processing your request
+              </Shimmer>
+            </MessageContent>
+          </AIMessage>
+        ) : null}
+
+        {/* Inline chain-of-thought: a collapsible "Thinking" block that streams
+            the model's reasoning above the answer, v0/Claude style. */}
+        {reasoningText ? (
+          <AIMessage from="assistant">
+            <MessageContent className="w-full max-w-full">
+              <Reasoning
+                isStreaming={isReasoningStreaming}
+                defaultOpen={isReasoningStreaming}
+                className="rounded-xl border border-border/60 bg-card/50 px-3 py-2"
+              >
+                <ReasoningTrigger
+                  className="text-xs"
+                  getThinkingMessage={(streaming, duration) =>
+                    streaming ? (
+                      <Shimmer as="span" duration={1.4}>Thinking…</Shimmer>
+                    ) : (
+                      <span>Reasoned for {duration ?? "a few"} seconds</span>
+                    )
+                  }
+                />
+                <ReasoningContent className="mt-2 max-h-64 overflow-auto rounded-lg border border-border/40 bg-background/50 p-3 text-xs leading-5 text-muted-foreground">
+                  {reasoningText}
+                </ReasoningContent>
+              </Reasoning>
             </MessageContent>
           </AIMessage>
         ) : null}
@@ -322,7 +354,7 @@ function AssistantMessage({
               <button
                 type="button"
                 onClick={() => onMessageClick(message)}
-                className="inline-flex w-full items-center justify-center rounded-lg border border-border/70 bg-transparent px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-fuchsia-400/30 hover:text-foreground"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-border/70 bg-transparent px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
               >
                 Restore checkpoint {version}
               </button>
