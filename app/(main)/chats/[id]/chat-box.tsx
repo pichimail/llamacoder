@@ -256,9 +256,15 @@ export default function ChatBox({
       });
       const data = await res.json();
       if (data.ok) {
-        toast({ title: "Repo imported", description: `${data.imported?.fileCount} files • ${data.imported?.stack?.stack || "stack detected"}` });
-        // Force a soft reload of the chat view so new files appear
-        if (typeof window !== "undefined") window.location.reload();
+        toast({ 
+          title: "Dynamic Git import + bootstrap ready", 
+          description: `${data.imported?.fileCount || 0} files • ${data.imported?.stack?.stack || 'stack'} • .sh/.md generated. Use terminal 'bootstrap' or preview.` 
+        });
+        // Soft refresh to load new files + dynamic preview renderer for the stack
+        if (typeof window !== "undefined") {
+          // Use soft reload to pick up workspace files in preview and shell
+          window.location.reload();
+        }
       } else {
         throw new Error(data.error || "Import failed");
       }

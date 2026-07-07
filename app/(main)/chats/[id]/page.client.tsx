@@ -51,6 +51,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
+import { getStackFromFiles } from "@/lib/artifact-runtime";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
   ResizableHandle,
@@ -1324,6 +1325,32 @@ Fix requirements:
     }
   }, [artifactFiles, workspaceRequest]);
 
+  // Full dynamic Git import handler - auto clone equivalent via GitHub API + stack detect + bootstrap files
+  const handleDynamicGitImport = useCallback(async (url?: string) => {
+    const targetUrl = url || window.prompt("Paste any GitHub (or public git) repo URL for dynamic import + auto bootstrap:", "https://github.com/");
+    if (!targetUrl || !targetUrl.includes("github.com")) {
+      toast({ title: "Enter a valid GitHub URL", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/workspace/${chat.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import-git", url: targetUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data?.error || "Import failed");
+      toast({ 
+        title: "Dynamic import complete", 
+        description: `${data.imported?.fileCount || 0} files • Stack: ${data.imported?.stack?.stack || 'detected'} • bootstrap.sh + RUN.md added` 
+      });
+      // Trigger preview update by refreshing workspace files into UI
+      refreshPage(); // ensures activeMessage / workspace syncs into preview + terminal
+    } catch (e: any) {
+      toast({ title: "Git import failed", description: e.message, variant: "destructive" });
+    }
+  }, [chat.id]);
+
   const handleWorkspaceContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (window.innerWidth < 768) return;
     event.preventDefault();
@@ -1639,6 +1666,9 @@ Fix requirements:
                     >
                       <Github className="mr-2 size-4" /> Import Git repo (dynamic)
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDynamicGitImport()}>
+                      <Github className="mr-2 size-4" /> Import Git URL (with auto-run)
+                    </DropdownMenuItem>
                     {assistantVersions.length > 0 && (
                       <>
                         <DropdownMenuSeparator />
@@ -1686,6 +1716,21 @@ Fix requirements:
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
                   <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
                     {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+                    {/* Dynamic stack + auto commands banner for Git imports */}
+                    {(() => {
+                      const currentFiles = artifactFiles.length ? artifactFiles : (activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : []);
+                      const stk = currentFiles.length > 0 ? getStackFromFiles(currentFiles as any) : null;
+                      if (!stk) return null;
+                      return (
+                        <div className="flex items-center gap-2 border-b border-border/50 bg-muted/10 px-4 py-1 text-[11px]">
+                          <span className="text-emerald-400">Stack:</span> <span className="font-medium">{stk.stack}</span>
+                          {stk.framework && <span className="text-muted-foreground">({stk.framework})</span>}
+                          <span className="mx-1 text-muted-foreground/50">•</span>
+                          <span className="font-mono text-amber-400 truncate max-w-[280px]" title={stk.devCommand}>{stk.devCommand}</span>
+                          <button onClick={() => handleDynamicGitImport()} className="ml-auto text-[10px] underline text-muted-foreground hover:text-foreground">Re-import / change repo</button>
+                        </div>
+                      );
+                    })()}
                     {chat.backendMode ? (
                       <BackendSetupPanel
                         envKeys={backendSetupKeys}

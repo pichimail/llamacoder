@@ -23,9 +23,11 @@ function parseStreamlitPreview(code: string) {
 export default function PythonArtifactRunner({
   files,
   runtime,
+  stack,
 }: {
   files: ArtifactFile[];
   runtime: ArtifactRuntime;
+  stack?: any;
 }) {
   const primary = files.find((file) => file.path.endsWith(".py")) ?? files[0];
   const preview = useMemo(
@@ -44,6 +46,7 @@ export default function PythonArtifactRunner({
       <div className="flex min-h-[280px] flex-1 flex-col bg-background p-5">
         <div className="mb-3 text-xs text-muted-foreground">
           {runtime === "streamlit" ? "Streamlit preview (simulated)" : "Python artifact"}
+          {stack && <span className="ml-2 text-[10px] opacity-60">• {stack.stack}</span>}
         </div>
         {runtime === "streamlit" && preview ? (
           <div className="space-y-4 rounded-xl border border-border/70 bg-card p-5">
@@ -82,9 +85,10 @@ export default function PythonArtifactRunner({
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 p-5 text-sm text-muted-foreground">
-            Python scripts run outside the React sandbox. Deploy or share this artifact to execute on a server runtime.
+            Python scripts run outside the React sandbox. Use the generated <strong>bootstrap.sh</strong> or <strong>RUN.md</strong> (auto-created on Git import) for the exact commands (pip install, uvicorn, etc). Paste Git URL to auto-detect + generate.
           </div>
         )}
+        {stack?.devCommand && <div className="text-[10px] mt-1 font-mono opacity-70">Detected: {stack.devCommand}</div>}
         <p className="mt-auto pt-4 text-[11px] text-muted-foreground">
           Tip: ask the agent for a Streamlit dashboard with `st.title`, `st.metric`, and `st.button` widgets.
         </p>

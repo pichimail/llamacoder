@@ -53,15 +53,23 @@ const SKIP_DIR_SEGMENTS = new Set([
 ]);
 
 const ALLOWED_EXTENSIONS = new Set([
-  ".tsx",
-  ".ts",
-  ".jsx",
-  ".js",
-  ".css",
-  ".json",
-  ".md",
-  ".mjs",
-  ".cjs",
+  ".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs",
+  ".css", ".scss", ".less",
+  ".json", ".yaml", ".yml", ".toml", ".xml",
+  ".md", ".txt",
+  ".py", ".pyi",
+  ".dart",
+  ".java", ".kt", ".kts", ".gradle",
+  ".go",
+  ".rs",
+  ".rb",
+  ".php",
+  ".vue", ".svelte",
+  ".html",
+  "Dockerfile", ".dockerignore",
+  ".env", ".env.example", ".env.local",
+  "Makefile", "makefile",
+  ".sh", ".bash",
 ]);
 
 const MAX_REPO_FILES = 120;
@@ -149,11 +157,24 @@ function githubApiHeaders(token?: string) {
 
 function languageFromPath(path: string) {
   const ext = path.split(".").pop()?.toLowerCase() || "txt";
-  if (ext === "tsx" || ext === "ts") return ext;
-  if (ext === "jsx" || ext === "js" || ext === "mjs" || ext === "cjs") return ext;
-  if (ext === "css") return "css";
+  const base = path.split("/").pop()?.toLowerCase() || "";
+  if (["tsx", "ts"].includes(ext)) return ext;
+  if (["jsx", "js", "mjs", "cjs"].includes(ext)) return ext;
+  if (ext === "css" || ext === "scss") return "css";
   if (ext === "json") return "json";
   if (ext === "md") return "md";
+  if (ext === "py" || ext === "pyi") return "python";
+  if (ext === "dart") return "dart";
+  if (["java", "kt", "kts"].includes(ext)) return "java";
+  if (ext === "go") return "go";
+  if (ext === "rs") return "rust";
+  if (ext === "rb") return "ruby";
+  if (ext === "php") return "php";
+  if (ext === "vue") return "vue";
+  if (ext === "svelte") return "svelte";
+  if (["yml", "yaml"].includes(ext)) return "yaml";
+  if (["sh", "bash"].includes(ext) || base === "dockerfile") return "shell";
+  if (ext === "xml" || ext === "gradle") return ext;
   return ext;
 }
 
@@ -161,19 +182,27 @@ function shouldIncludeRepoPath(path: string) {
   const normalized = path.replace(/^\/+/, "");
   const segments = normalized.split("/");
   if (segments.some((segment) => SKIP_DIR_SEGMENTS.has(segment))) return false;
-  if (segments.some((segment) => segment.startsWith(".") && segment !== ".")) return false;
+  if (segments.some((segment) => segment.startsWith(".") && segment !== "." && !segment.startsWith(".env") && segment !== ".github")) return false;
 
   const lower = normalized.toLowerCase();
   const ext = `.${lower.split(".").pop() || ""}`;
-  if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+  const basename = lower.split("/").pop() || "";
 
-  if (ext === ".json" && !lower.endsWith("package.json") && !lower.endsWith("tsconfig.json")) {
-    return false;
+  // Always include key files
+  const alwaysInclude = ["package.json", "requirements.txt", "pyproject.toml", "pubspec.yaml", "pom.xml", "build.gradle", "build.gradle.kts", "go.mod", "cargo.toml", "gemfile", "composer.json", "dockerfile", "makefile", "readme.md", "app.json", "metro.config.js"];
+  if (alwaysInclude.some(k => basename === k || lower.endsWith(k))) return true;
+
+  if (ALLOWED_EXTENSIONS.has(ext) || ALLOWED_EXTENSIONS.has(basename)) {
+    // For json, only key ones or allow more now
+    if (ext === ".json" && !lower.includes("package") && !lower.includes("tsconfig") && !lower.includes("pubspec") && !lower.includes("app") && !lower.includes("composer")) {
+      // still allow some like .eslintrc etc? but to limit size, be selective
+      return false;
+    }
+    if (ext === ".md" && !lower.endsWith("readme.md")) return false;
+    return true;
   }
 
-  if (ext === ".md" && !lower.endsWith("readme.md")) return false;
-
-  return true;
+  return false;
 }
 
 async function githubJson<T>(url: string, token?: string): Promise<T> {
@@ -297,8 +326,17 @@ export async function fetchGithubRepoFiles(
     console.warn("[stack-detector] failed on import", e);
   }
 
+  // Inject the auto-generated .sh and .md directly into files list so they appear in preview/workspace immediately
+  const augmentedFiles = [...files];
+  if (bootstrapScript) {
+    augmentedFiles.push({ path: "bootstrap.sh", code: bootstrapScript, language: "shell" });
+  }
+  if (runMarkdown) {
+    augmentedFiles.push({ path: "RUN.md", code: runMarkdown, language: "md" });
+  }
+
   return {
-    files,
+    files: augmentedFiles,
     ref,
     defaultBranch: repoMeta.default_branch,
     readme: readmeFile?.code,

@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { detectArtifactRuntime } from "@/lib/artifact-runtime";
+import { detectArtifactRuntime, getStackFromFiles } from "@/lib/artifact-runtime";
 import { withArtifactRuntimeCompat } from "@/lib/artifact-runtime-compat";
 import CodeRunnerReact from "./code-runner-react";
 import type { PreviewMode } from "./code-runner-react";
+import { DotFlow } from "@/components/ui/dot-flow";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 
 const PythonArtifactRunner = dynamic(
@@ -125,8 +126,19 @@ export default function CodeRunner({
   }
   
   const runtime = detectArtifactRuntime(actualFiles);
+  const stack = getStackFromFiles(actualFiles);
+
   if (runtime === "python" || runtime === "streamlit") {
-    return <PythonArtifactRunner files={actualFiles} runtime={runtime} />;
+    return <PythonArtifactRunner files={actualFiles} runtime={runtime} stack={stack} />;
+  }
+
+  if (runtime === "flutter") {
+    return <FlutterWebPreview files={actualFiles} stack={stack} />;
+  }
+
+  if (stack && !["react", "nextjs", "vite-react"].some(s => stack.stack.includes(s)) && runtime !== "react") {
+    // For other stacks, show rich instructions + files preview + run commands
+    return <GenericStackPreview files={actualFiles} stack={stack} />;
   }
 
   const previewFiles = ensureSandpackEntry(withArtifactRuntimeCompat(actualFiles));
@@ -146,5 +158,70 @@ export default function CodeRunner({
       sandpackOptions={sandpackOptions}
       hiddenValidation={hiddenValidation}
     />
+  );
+}
+
+// Dynamic preview for Flutter (web capable)
+function FlutterWebPreview({ files, stack }: { files: any[]; stack?: any }) {
+  const mainDart = files.find(f => f.path.endsWith('.dart')) || files[0];
+  return (
+    <div className="flex h-full flex-col bg-background p-6">
+      <div className="mb-4 flex items-center gap-2 text-sm">
+        <span className="font-medium">Flutter Project</span>
+        {stack && <span className="text-xs text-muted-foreground">({stack.stack})</span>}
+      </div>
+      <div className="flex-1 overflow-auto rounded border border-border/70 bg-zinc-950 p-4 font-mono text-xs text-emerald-300">
+        <pre>{mainDart?.content || mainDart?.code || 'No Dart source'}</pre>
+      </div>
+      <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-950/20 p-4 text-xs">
+        <div className="font-medium text-amber-400">To preview live:</div>
+        <div className="mt-1 text-amber-300/80">flutter pub get && flutter run -d chrome</div>
+        <div className="mt-1 text-[10px] text-muted-foreground">Or use bootstrap.sh from workspace. Web preview requires local Flutter SDK.</div>
+      </div>
+    </div>
+  );
+}
+
+// Generic stack preview with dynamic run commands from detection + bootstrap
+function GenericStackPreview({ files, stack }: { files: any[]; stack?: any }) {
+  const commands = stack ? [
+    stack.installCommand,
+    stack.devCommand,
+    stack.buildCommand,
+  ].filter(Boolean) : ["See RUN.md or bootstrap.sh in workspace"];
+
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <div className="border-b border-border/70 bg-muted/20 px-4 py-3 text-sm font-medium flex items-center gap-2">
+        Dynamic Stack Preview: <span className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">{stack?.stack || 'generic'}</span>
+        {stack?.framework && <span className="text-muted-foreground">({stack.framework})</span>}
+      </div>
+
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Auto-detected run commands</div>
+          <div className="rounded bg-zinc-950 p-3 font-mono text-sm text-foreground space-y-1">
+            {commands.map((cmd, i) => <div key={i} className="text-emerald-400">{cmd}</div>)}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Key files ({files.length})</div>
+          <div className="grid grid-cols-1 gap-1 text-xs max-h-48 overflow-auto">
+            {files.slice(0, 12).map((f, idx) => (
+              <div key={idx} className="flex justify-between border-b border-border/40 py-0.5 font-mono">
+                <span>{f.path}</span>
+                <span className="text-muted-foreground">{(f.content || f.code || '').length} chars</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-xs text-muted-foreground border-t pt-3">
+          Full live preview not available for this stack in-browser. Use the <strong>terminal</strong> or download <code>bootstrap.sh</code> / <code>RUN.md</code> from workspace files to run locally with correct commands.
+          Paste Git URL again or type <code>import-git &lt;url&gt;</code> / <code>bootstrap</code> in the workspace shell.
+        </div>
+      </div>
+    </div>
   );
 }
