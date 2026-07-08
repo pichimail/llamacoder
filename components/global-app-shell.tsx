@@ -28,7 +28,6 @@ import AuthButton from "@/components/auth-button";
 import ThemeToggle from "@/components/theme-toggle";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
 import { CookieBanner } from "@/components/cookie-banner";
-import { RichFooter } from "@/components/rich-footer";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { cn } from "@/lib/utils";
 
@@ -170,9 +169,23 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   const [immersiveFullscreen, setImmersiveFullscreen] = useState(false);
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/features" ||
+    pathname === "/about" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/pricing" ||
+    pathname === "/gallery" ||
+    pathname.startsWith("/docs") ||
+    pathname.startsWith("/share") ||
+    pathname.startsWith("/id/") ||
+    pathname.startsWith("/featured");
 
-  const { isAuthenticated: isAuthedGlobal, authEnabled: authOnGlobal } = useHomeSidebarData();
-  const showSidebar = !immersiveFullscreen && !isAdminRoute && (!authOnGlobal || isAuthedGlobal);
+  const { isAuthenticated: isAuthedGlobal, authEnabled: authOnGlobal, loading: authLoading } = useHomeSidebarData();
+  const showSidebar = !immersiveFullscreen && !isAdminRoute && !isPublicRoute && isAuthedGlobal;
+  const shouldGateWorkspace = !isAdminRoute && !isPublicRoute && authOnGlobal && !authLoading && !isAuthedGlobal;
 
   useEffect(() => {
     const onChange = (event: Event) => {
@@ -185,6 +198,34 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   if (isAdminRoute) {
     // Admin routes render their own layout + sidebar.
     return <>{children}</>;
+  }
+
+  if (shouldGateWorkspace) {
+    return (
+      <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#070806] px-5 py-12 text-stone-100">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,100,0.14),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(251,191,36,0.10),transparent_28%),linear-gradient(rgba(255,255,255,0.026)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.026)_1px,transparent_1px)] bg-[size:auto,auto,44px_44px,44px_44px]" />
+        <div className="relative w-full max-w-md">
+          <div aria-hidden="true" className="absolute -inset-[1px] rounded-2xl bg-[linear-gradient(145deg,rgba(190,242,100,0.42),rgba(251,191,36,0.15),rgba(255,255,255,0.05))] blur-sm" />
+          <section className="relative rounded-2xl border border-lime-300/18 bg-[#0d0f0a]/95 p-6 text-center shadow-2xl shadow-black/45">
+            <div className="mx-auto grid size-12 place-items-center rounded-xl border border-lime-300/20 bg-lime-300/10 text-lime-100">
+              <Rocket className="size-5" aria-hidden="true" />
+            </div>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/80">Workspace locked</p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-stone-50">Sign in to continue building</h1>
+            <p className="mt-3 text-sm leading-6 text-stone-400">
+              Chats, dashboard, credits, settings, and project workspace tools are available after authentication.
+            </p>
+            <Link href="/api/auth/signin/google" className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg bg-lime-200 px-4 text-sm font-medium text-stone-950 transition hover:bg-lime-100">
+              Continue with Google
+            </Link>
+            <Link href="/" className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg border border-lime-300/20 text-sm text-lime-100 transition hover:bg-lime-300/10">
+              Back to public site
+            </Link>
+          </section>
+        </div>
+        <CookieBanner />
+      </div>
+    );
   }
 
   // IMPORTANT: `children` must stay at the same structural depth/position in
@@ -229,8 +270,6 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-      {children}
-      <RichFooter />
       <CookieBanner />
     </div>
   );

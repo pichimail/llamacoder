@@ -1,643 +1,891 @@
 "use client";
 
-import { HomeShell } from "@/components/home/home-shell";
-import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
-import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, LogIn, MessageSquare, Palette, Plus, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Plug } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { transcriptJoin } from "@/components/voice-input-button";
-import { SpeechInput } from "@/components/ai-elements/speech-input";
 import Link from "next/link";
+import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Header from "@/components/header";
-import { OptionDropdown } from "@/components/option-dropdown";
-import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { RichFooter } from "@/components/rich-footer";
-import { MODELS } from "@/lib/constants";
-import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI } from "@/lib/ai-detection";
-import { toast } from "@/hooks/use-toast";
-import { Context } from "./providers";
-import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import {
+  ArrowRight,
+  BrainCircuit,
+  Bot,
+  Box,
+  Cable,
+  Code2,
+  Database,
+  ExternalLink,
+  FileCode2,
+  FolderArchive,
+  Github,
+  Image as ImageIcon,
+  KeyRound,
+  Layers,
+  Loader2,
+  Lock,
+  LogIn,
+  Mic,
+  Paperclip,
+  Plus,
+  Search,
+  Send,
+  ServerCog,
+  ShieldCheck,
+  Sparkles,
+  TerminalSquare,
+  UploadCloud,
+} from "lucide-react";
+
 import { continueWithGoogle } from "@/app/login/actions";
+import { Context } from "./providers";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
+import { RichFooter } from "@/components/rich-footer";
+import { Textarea } from "@/components/ui/textarea";
+import { MODELS, type ModelConfig } from "@/lib/constants";
+import { DEFAULT_STYLE_ID, SANDBOX_STYLE_PRESETS, type SandboxStyleId } from "@/lib/sandbox-theme";
+import { requiresAI } from "@/lib/ai-detection";
+import { BYOK_PROVIDERS, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
+import { toast } from "@/hooks/use-toast";
 
-type Mode = "ask" | "plan" | "agent";
 type Attachment = { kind: "image" | "file"; filename: string; url?: string; size?: number };
-type SavedPrompt = { id: string; title: string; body: string; category: string; tone: string };
-type SavedDesign = { id: string; name: string; source: string; sourceRef?: string | null };
+type Mode = "ask" | "plan" | "agent";
+type AttachedMcpServer = { id: string; name: string; url?: string; transport?: string };
 
-const PROMPT_CHIP_GROUPS = [
-  { title: "Dashboards", prompt: "Build a polished SaaS dashboard with project cards, clean tables, filters, empty states, settings, and responsive mobile navigation." },
-  { title: "Auth screens", prompt: "Build a premium authentication flow with sign in, sign up, password reset, verification state, and accessible responsive forms." },
-  { title: "Admin panels", prompt: "Build a production-style admin panel with users, roles, content moderation, audit logs, settings, and server-ready CRUD screens." },
-  { title: "AI apps", prompt: "Build a refined AI app with prompt input, generated result states, history, settings, and a clean consumer UI." },
-  { title: "AI chat UI", prompt: "Build a mobile-first chat interface with thread history, attachments, streaming state, message actions, and a clean artifact preview flow." },
-  { title: "E-commerce", prompt: "Build a premium e-commerce storefront with product grid, filters, product detail, cart drawer, checkout states, and responsive mobile UX." },
-  { title: "Booking app", prompt: "Build a booking app with availability calendar, service details, customer form, confirmation flow, and admin-ready booking management." },
-  { title: "CRM", prompt: "Build a CRM workspace with contacts, pipeline stages, deal detail views, activity timeline, filters, and editable forms." },
-  { title: "Analytics", prompt: "Build an analytics dashboard with KPI cards, charts, date filters, drill-down tables, alerts, and export-ready actions." },
-  { title: "Marketplace", prompt: "Build a marketplace app with listings, seller profiles, saved items, search filters, checkout intent, and trust/safety states." },
-  { title: "Project hub", prompt: "Build a project management hub with boards, tasks, timeline, team members, comments, files, and notification states." },
-  { title: "Settings", prompt: "Build a polished settings center with account, billing, team, security, notifications, integrations, and danger-zone flows." },
+const appTypeHints = [
+  { id: "prototype", label: "Prototype", icon: Sparkles },
+  { id: "web-app", label: "Web app", icon: Layers },
+  { id: "3d-webgl", label: "WebGL", icon: Box },
+  { id: "backend", label: "Backend", icon: Database },
 ] as const;
 
-const TYPEWRITER_PROMPTS = [
-  "Build a project tracker with kanban boards and a timeline view...",
-  "Build a 3D solar system viewer with Three.js and orbit controls...",
-  "Build a booking app with an availability calendar and admin panel...",
-  "Build an analytics dashboard with KPI cards and drill-down tables...",
-  "Build a premium blog with an editorial dark theme...",
+const quickPresetPrompts = [
+  "Build a polished SaaS dashboard with analytics, filters, and admin states.",
+  "Create a premium landing page with strong product imagery, pricing, and docs links.",
+  "Build an auth flow with sign in, sign up, reset password, verification, and responsive forms.",
+  "Create a 3D/WebGL product viewer with orbit controls and responsive layout.",
+  "Build a backend-ready app with Prisma models, API routes, settings, and admin controls.",
+] as const;
+
+const modelCategoryDefinitions = [
+  {
+    title: "Fast and cost-efficient",
+    description: "Default for short iterations, fixes, and lightweight prototypes.",
+    values: [
+      "openrouter/openrouter/free",
+      "openrouter/qwen/qwen3-coder-flash",
+      "openrouter/deepseek/deepseek-v4-flash",
+      "openrouter/minimax/minimax-m3",
+      "openrouter/z-ai/glm-5.1",
+      "zai-org/GLM-5.1",
+    ],
+  },
+  {
+    title: "Best UI/UX and full Responsive Prototypes",
+    description: "Stronger visual systems, app shells, responsive states, and polished components.",
+    values: [
+      "zai-org/GLM-5.2",
+      "openrouter/z-ai/glm-5.2",
+      "openrouter/anthropic/claude-sonnet-5",
+      "openrouter/qwen/qwen3-coder-plus",
+      "openrouter/moonshotai/kimi-k2.7-code",
+      "openrouter/deepseek/deepseek-v4-pro",
+    ],
+  },
+  {
+    title: "Versatile and highly intelligent",
+    description: "Balanced choices for multi-page products, planning, and uncertain prompts.",
+    values: [
+      "openrouter/auto",
+      "openrouter/openrouter/fusion",
+      "openrouter/qwen/qwen3.7-plus",
+      "openrouter/qwen/qwen3.7-max",
+      "openrouter/moonshotai/kimi-k2-thinking",
+      "openrouter/deepseek/deepseek-v3.2",
+    ],
+  },
+  {
+    title: "Best for building 3D, GL, GSAP",
+    description: "Use for WebGL scenes, motion-heavy landing pages, and animation systems.",
+    values: [
+      "openrouter/anthropic/claude-sonnet-5",
+      "openrouter/qwen/qwen3-coder-plus",
+      "openrouter/moonshotai/kimi-k2.7-code",
+      "openrouter/z-ai/glm-5.2",
+      "openrouter/deepseek/deepseek-v4-pro",
+    ],
+  },
+  {
+    title: "Most powerful at complex tasks",
+    description: "Architecture-heavy, backend-heavy, or large refactor builds.",
+    values: [
+      "openrouter/anthropic/claude-opus-4.8",
+      "openrouter/anthropic/claude-opus-4.8-fast",
+      "openrouter/anthropic/claude-sonnet-5",
+      "openrouter/openrouter/pareto-code",
+      "openrouter/qwen/qwen3-max-thinking",
+      "openrouter/sakana/fugu-ultra",
+    ],
+  },
+] as const;
+
+const providerUsageGoals = [
+  "Chat and app assistants",
+  "Code generation",
+  "Vision or image workflows",
+  "Video, music, or large media tasks",
+  "Embeddings, search, and retrieval",
+] as const;
+
+const categorizedModelValues = new Set<string>(
+  modelCategoryDefinitions.flatMap((category) => [...category.values]),
+);
+
+const sections = [
+  {
+    eyebrow: "01 / Agent workflow",
+    title: "The build is visible while it happens.",
+    body: "Queue, plan, terminal, reasoning summary, checkpoints, confirmations, and environment variables stay close to the composer so each app request feels inspectable.",
+    icon: Bot,
+  },
+  {
+    eyebrow: "02 / Product shape",
+    title: "Prompts become routes, not one-screen demos.",
+    body: "Dashboards, admin panels, marketing pages, tools, CRMs, and 3D scenes are treated as product structures with real navigation and responsive states.",
+    icon: FileCode2,
+  },
+  {
+    eyebrow: "03 / Backend-ready",
+    title: "When data matters, the output plans for it.",
+    body: "Backend mode can guide Prisma schemas, API routes, env variables, storage, MCP tools, and ChinnaLLM calls through platform-safe seams.",
+    icon: Database,
+  },
+  {
+    eyebrow: "04 / Design direction",
+    title: "The UI adapts to the requested style.",
+    body: "Buttons, inputs, surfaces, and motion patterns shift with the selected design direction instead of repeating the same static generated recipe.",
+    icon: Layers,
+  },
+  {
+    eyebrow: "05 / Preview loop",
+    title: "Every iteration stays attached to the artifact.",
+    body: "Continue from chat, inspect files, restore checkpoints, attach screenshots, and let the builder patch only what needs to change.",
+    icon: TerminalSquare,
+  },
+  {
+    eyebrow: "06 / Guardrails",
+    title: "Public site is open. Workspace is authenticated.",
+    body: "Marketing, docs, privacy, and terms stay public; chats, dashboard, credits, settings, and project workspace access require sign-in.",
+    icon: ShieldCheck,
+  },
 ];
 
-function useTypewriterPlaceholder(active: boolean) {
-  const [text, setText] = useState("Describe what to build");
-  const prefersReducedMotion = useReducedMotion();
-  useEffect(() => {
-    if (!active) return;
-    if (prefersReducedMotion) { setText(TYPEWRITER_PROMPTS[0]); return; }
-    let phraseIndex = 0;
-    let charIndex = 0;
-    let deleting = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      const phrase = TYPEWRITER_PROMPTS[phraseIndex];
-      if (!deleting) {
-        charIndex += 1;
-        setText(phrase.slice(0, charIndex));
-        if (charIndex >= phrase.length) { deleting = true; timer = setTimeout(tick, 2200); return; }
-        timer = setTimeout(tick, 34);
-      } else {
-        charIndex -= 2;
-        if (charIndex <= 0) { charIndex = 0; deleting = false; phraseIndex = (phraseIndex + 1) % TYPEWRITER_PROMPTS.length; }
-        setText(phrase.slice(0, Math.max(charIndex, 0)) || "Describe what to build");
-        timer = setTimeout(tick, deleting ? 14 : 300);
-      }
-    };
-    timer = setTimeout(tick, 700);
-    return () => clearTimeout(timer);
-  }, [active, prefersReducedMotion]);
-  return text;
+function ScrambleText({ children }: { children: string }) {
+  const [text, setText] = useState(children);
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  function scramble() {
+    let frame = 0;
+    const total = 12;
+    const timer = window.setInterval(() => {
+      frame += 1;
+      setText(
+        children
+          .split("")
+          .map((char, index) => {
+            if (char === " ") return " ";
+            if (frame > total || index < frame / 1.4) return children[index];
+            return alphabet[Math.floor(Math.random() * alphabet.length)];
+          })
+          .join(""),
+      );
+      if (frame > total) window.clearInterval(timer);
+    }, 28);
+  }
+
+  return <span onMouseEnter={scramble}>{text}</span>;
 }
 
-function ToggleItem({ label, icon, checked, onChange }: { label: string; icon: ReactNode; checked: boolean; onChange: (value: boolean) => void }) {
-  return <DropdownMenuItem onClick={() => onChange(!checked)} className="flex justify-between gap-3"><span className="flex items-center gap-2">{icon}{label}</span><span aria-hidden="true" className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-zinc-950 dark:bg-white" : "bg-stone-300 dark:bg-zinc-700"}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full transition ${checked ? "left-[18px] bg-white dark:bg-zinc-950" : "left-0.5 bg-white dark:bg-white"}`} /></span></DropdownMenuItem>;
-}
-
-function ModeItem({ mode, current, label, description, icon, onSelect }: { mode: Mode; current: Mode; label: string; description: string; icon: ReactNode; onSelect: (mode: Mode) => void }) {
-  return <DropdownMenuItem onClick={() => onSelect(mode)} className="items-start gap-3"><span className="mt-0.5 text-stone-500 dark:text-zinc-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-sm text-stone-950 dark:text-white">{label}{current === mode ? <Check className="size-3.5 text-emerald-600 dark:text-emerald-300" /> : null}</span><span className="mt-0.5 block text-xs leading-4 text-stone-500 dark:text-zinc-400">{description}</span></span></DropdownMenuItem>;
-}
-
-/* Phase 1 (B6): style preset chip selector. Same pattern as the mode toggles. */
-function DesignPicker({
-  value,
-  onChange,
-  disabled,
-  savedDesigns,
-  onOpenDesignDialog,
-  onSelectSavedDesign,
-  selectedSavedDesignId,
-}: {
-  value: SandboxStyleId;
-  onChange: (id: SandboxStyleId) => void;
-  disabled?: boolean;
-  savedDesigns: SavedDesign[];
-  onOpenDesignDialog: () => void;
-  onSelectSavedDesign: (design: SavedDesign) => void;
-  selectedSavedDesignId?: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const activePreset = SANDBOX_STYLE_PRESETS.find((p) => p.id === value);
+function AuthenticatedSiteNav() {
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          title={selectedSavedDesignId ? "Custom design active" : activePreset?.description}
-          aria-label="Choose a design style"
-          className="inline-flex size-10 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-900/[0.06] hover:text-stone-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/25 disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300 dark:focus-visible:ring-white/30"
-        >
-          <Palette className="size-5" style={selectedSavedDesignId ? undefined : { color: activePreset?.swatch }} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 rounded-xl border-stone-200/80 bg-[#fffaf2] p-0 text-stone-950 shadow-xl shadow-stone-950/10 dark:border-white/10 dark:bg-zinc-900 dark:text-white">
-        <button
-          type="button"
-          onClick={() => { setOpen(false); onOpenDesignDialog(); }}
-          className="flex w-full items-center gap-2.5 border-b border-stone-200 px-3.5 py-3 text-left text-sm font-medium text-stone-950 transition-colors hover:bg-stone-900/[0.05] dark:border-white/10 dark:text-white dark:hover:bg-white/[0.06]"
-        >
-          <Plus className="size-4" />
-          Start with your design
-        </button>
-        <ScrollArea className="max-h-80">
-          <div className="p-1.5">
-            {savedDesigns.length > 0 ? (
-              <>
-                <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-stone-500 dark:text-zinc-500">Your designs</div>
-                {savedDesigns.map((design) => (
-                  <button
-                    key={design.id}
-                    type="button"
-                    onClick={() => { onSelectSavedDesign(design); setOpen(false); }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-stone-900/[0.05] dark:hover:bg-white/[0.06] ${selectedSavedDesignId === design.id ? "bg-stone-900/10 text-stone-950 dark:bg-white/10 dark:text-white" : "text-stone-700 dark:text-zinc-300"}`}
-                  >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-stone-400 to-stone-700 text-[10px] font-semibold uppercase text-white">{design.name.slice(0, 1)}</span>
-                    <span className="truncate">{design.name}</span>
-                    {selectedSavedDesignId === design.id ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
-                  </button>
-                ))}
-                <div className="my-1 h-px bg-white/10" />
-              </>
-            ) : null}
-            <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-stone-500 dark:text-zinc-500">Design styles</div>
-            {SANDBOX_STYLE_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => { onChange(preset.id); setOpen(false); }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-stone-900/[0.05] dark:hover:bg-white/[0.06] ${!selectedSavedDesignId && value === preset.id ? "bg-stone-900/10 text-stone-950 dark:bg-white/10 dark:text-white" : "text-stone-700 dark:text-zinc-300"}`}
-              >
-                <span aria-hidden="true" className="size-4 shrink-0 rounded-full" style={{ backgroundColor: preset.swatch }} />
-                <span className="flex flex-col">
-                  <span>{preset.label}</span>
-                  <span className="text-[11px] text-stone-500 dark:text-zinc-500">{preset.description}</span>
-                </span>
-                {!selectedSavedDesignId && value === preset.id ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </PopoverContent>
-    </Popover>
+    <header className="sticky top-0 z-40 border-b border-lime-300/10 bg-[#070806]/70 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
+        <Link href="/" className="flex items-center gap-3 text-stone-50">
+          <span className="grid size-9 place-items-center rounded-lg border border-lime-300/20 bg-lime-300/10 text-sm font-semibold text-lime-200 shadow-[0_0_32px_rgba(190,242,100,0.12)]">C</span>
+          <span className="hidden text-sm font-semibold tracking-tight sm:inline">Chinna-Coder</span>
+        </Link>
+        <nav className="hidden items-center gap-5 text-sm text-stone-400 md:flex">
+          <Link href="/features" className="hover:text-lime-100"><ScrambleText>Features</ScrambleText></Link>
+          <Link href="/docs" className="hover:text-lime-100"><ScrambleText>Docs</ScrambleText></Link>
+          <Link href="/about" className="hover:text-lime-100"><ScrambleText>About</ScrambleText></Link>
+          <Link href="/pricing" className="hover:text-lime-100"><ScrambleText>Pricing</ScrambleText></Link>
+        </nav>
+        <Link href="/dashboard" className="rounded-lg border border-lime-300/20 px-3 py-2 text-sm font-medium text-lime-100 transition hover:bg-lime-300/10">
+          Dashboard
+        </Link>
+      </div>
+    </header>
   );
 }
 
-function DesignSystemDialog({
+function ModelPickerDialog({
   open,
   onOpenChange,
-  onSaved,
+  selectedModel,
+  onSelect,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: (design: SavedDesign, fullContent: string, instructions?: string) => void;
+  selectedModel: string;
+  onSelect: (value: string) => void;
 }) {
-  const [pasted, setPasted] = useState("");
-  const [name, setName] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploadedContent, setUploadedContent] = useState<{ filename: string; text: string } | null>(null);
+  const [query, setQuery] = useState("");
+  const visibleModels = MODELS.filter((item) => !item.hidden);
+  const modelMap = new Map(visibleModels.map((item) => [item.value, item]));
+  const normalizedQuery = query.trim().toLowerCase();
+  const selected = visibleModels.find((item) => item.value === selectedModel);
 
-  const reset = () => {
-    setPasted(""); setName(""); setGithubUrl(""); setWebsiteUrl(""); setInstructions(""); setUploadedContent(null);
-  };
-
-  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text().catch(() => "");
-    setUploadedContent({ filename: file.name, text });
-    if (!name) setName(file.name.replace(/\.(md|txt)$/i, ""));
-  };
-
-  const canContinue = (pasted.trim() || uploadedContent || githubUrl.trim() || websiteUrl.trim()) && !isSaving;
-
-  const handleContinue = async () => {
-    if (!canContinue) return;
-    setIsSaving(true);
-    try {
-      let content = "";
-      let source: "paste" | "upload" | "github" | "website" = "paste";
-      let sourceRef: string | undefined;
-
-      if (uploadedContent) {
-        content = uploadedContent.text;
-        source = "upload";
-      } else if (pasted.trim()) {
-        content = pasted.trim();
-        source = "paste";
-      } else if (githubUrl.trim()) {
-        // Honest limitation: repo content extraction isn't implemented in this
-        // pass. We store the URL and instructions as the design signal rather
-        // than silently pretending to have scanned the repo's actual styles.
-        content = `Design reference: GitHub repository ${githubUrl.trim()}. No automated style extraction was run — apply the additional instructions below as the primary guidance, and use common conventions from a typical project at this URL only as a loose fallback.`;
-        source = "github";
-        sourceRef = githubUrl.trim();
-      } else if (websiteUrl.trim()) {
-        content = `Design reference: website ${websiteUrl.trim()}. No automated style extraction was run — apply the additional instructions below as the primary guidance.`;
-        source = "website";
-        sourceRef = websiteUrl.trim();
-      }
-
-      const finalName = name.trim() || uploadedContent?.filename.replace(/\.(md|txt)$/i, "") || `Custom design ${new Date().toLocaleDateString()}`;
-
-      const response = await fetch("/api/design-presets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: finalName, source, sourceRef, content, instructions: instructions.trim() || undefined }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.preset) throw new Error(data?.error || "Could not save this design.");
-
-      onSaved(data.preset, content, instructions.trim() || undefined);
-      toast({ title: "Design saved", description: "It's ready to use now and saved for future builds." });
-      reset();
-      onOpenChange(false);
-    } catch (error) {
-      toast({ title: "Could not save design", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const uncategorized = visibleModels.filter((item) => !categorizedModelValues.has(item.value));
+  const categories = [
+    ...modelCategoryDefinitions.map((category) => ({
+      ...category,
+      models: category.values.map((value) => modelMap.get(value)).filter((item): item is ModelConfig => Boolean(item)),
+    })),
+    {
+      title: "All other available models",
+      description: "Visible fallback and provider-specific models that are currently configured.",
+      values: uncategorized.map((item) => item.value),
+      models: uncategorized,
+    },
+  ].map((category) => ({
+    ...category,
+    models: category.models.filter((item) => {
+      if (!item) return false;
+      if (!normalizedQuery) return true;
+      return [item.label, item.value, item.nativeModel, item.description]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+    }),
+  })).filter((category) => category.models.length > 0);
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!isSaving) { onOpenChange(next); if (!next) reset(); } }}>
-      <DialogContent className="max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
-        <DialogHeader className="border-b border-border/70 px-6 pb-4 pt-6 text-left">
-          <DialogTitle className="text-xl">Start with your design</DialogTitle>
-          <DialogDescription>
-            DESIGN.md describes the look and feel you want. Paste one, upload files, or point at a reference — Chinna-Coder will follow it strictly for this build and save it for reuse.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5 px-6 py-5">
-          <div className="space-y-1.5">
-            <Label htmlFor="design-name" className="text-sm">Name this design</Label>
-            <Input id="design-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme brand system" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="design-paste" className="text-sm">Paste existing DESIGN.md</Label>
-            <Textarea id="design-paste" value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste a DESIGN.md file here..." className="min-h-28 font-mono text-xs" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-            >
-              <Upload className="size-5" />
-              {uploadedContent ? uploadedContent.filename : "Upload a DESIGN.md or .txt file"}
-            </button>
-            <input ref={fileRef} type="file" accept=".md,.txt" className="hidden" onChange={handleFileUpload} aria-label="Upload DESIGN.md file" />
-            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground opacity-60">
-              <ImageIcon className="size-5" />
-              Upload images/fonts/logos
-              <Badge variant="secondary" className="text-[10px]">Coming soon</Badge>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[86dvh] max-w-3xl overflow-hidden rounded-[28px] border-white/12 bg-[#0c0d0b] p-0 text-stone-100 shadow-2xl shadow-black/70">
+        <div className="relative">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_26%_0%,rgba(190,242,100,0.20),transparent_60%),radial-gradient(circle_at_78%_8%,rgba(251,191,36,0.16),transparent_55%)]" />
+          <div className="relative border-b border-white/10 p-5 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-2xl tracking-tight text-stone-50">Choose the build model</DialogTitle>
+              <DialogDescription className="text-stone-400">
+                Search live configured models, then pick by task type. Current model: {selected?.label ?? selectedModel}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 focus-within:border-lime-300/45">
+              <Search className="size-4 text-stone-500" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search models, providers, or use cases..."
+                className="min-w-0 flex-1 bg-transparent text-sm text-stone-100 placeholder:text-stone-500 outline-none"
+              />
             </div>
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="design-github" className="text-sm">Public GitHub repository</Label>
-            <Input id="design-github" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/owner/repo" />
+          <div className="max-h-[58dvh] space-y-5 overflow-y-auto p-4 sm:p-6">
+            {categories.map((category) => (
+              <section key={category.title} className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-lime-100">{category.title}</h3>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">{category.description}</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {category.models.map((item) => (
+                    <button
+                      key={`${category.title}-${item.value}`}
+                      type="button"
+                      onClick={() => {
+                        onSelect(item.value);
+                        onOpenChange(false);
+                      }}
+                      className={`group rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-200/50 ${
+                        selectedModel === item.value
+                          ? "border-lime-300/55 bg-lime-300/[0.10] shadow-[0_0_34px_rgba(190,242,100,0.10)]"
+                          : "border-white/10 bg-white/[0.035] hover:border-amber-200/35 hover:bg-amber-200/[0.055]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-stone-50">{item.label}</p>
+                          <p className="mt-1 text-xs text-stone-500">{item.nativeModel}</p>
+                        </div>
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-stone-400">
+                          {item.provider}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs leading-5 text-stone-400">{item.description ?? "Available through the configured provider route."}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="design-website" className="text-sm">Reference website</Label>
-            <Input id="design-website" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="design-instructions" className="text-sm">Additional instructions</Label>
-            <Textarea id="design-instructions" value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. Favor dark mode. Buttons should be pill-shaped." className="min-h-20" />
-          </div>
-
-          {(githubUrl.trim() || websiteUrl.trim()) && !pasted.trim() && !uploadedContent ? (
-            <p className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
-              Automated style extraction from a repo or website isn't implemented yet — your additional
-              instructions above will carry the design intent for now. Pasting or uploading a DESIGN.md
-              gives the most accurate results today.
-            </p>
-          ) : null}
         </div>
-        <DialogFooter className="border-t border-border/70 px-6 py-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
-          <Button type="button" onClick={handleContinue} disabled={!canContinue}>
-            {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-            {isSaving ? "Saving..." : "Continue"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-const APP_TYPE_OPTIONS: Array<{ id: string; label: string; icon: ReactNode; premiumFlag?: string; hint: string }> = [
-  { id: "prototype", label: "Prototype", icon: <Wand2 className="size-3.5" />, hint: "Fast, exploratory build — fewer states, quick to iterate." },
-  { id: "backend", label: "Backend", icon: <Database className="size-3.5" />, hint: "Generate Neon/Postgres, Prisma, and API routes alongside the UI." },
-  { id: "web-app", label: "Web app", icon: <Layers className="size-3.5" />, hint: "A complete multi-page web application." },
-  { id: "mobile-app", label: "Mobile app", icon: <Smartphone className="size-3.5" />, premiumFlag: "app-type-mobile", hint: "Mobile-first layout tuned for a native-app feel." },
-  { id: "3d-webgl", label: "3D/WebGL", icon: <Box className="size-3.5" />, premiumFlag: "app-type-3d", hint: "Interactive Three.js scenes." },
-  { id: "image", label: "Image", icon: <ImageIcon className="size-3.5" />, premiumFlag: "app-type-image", hint: "Generate imagery as part of the build." },
-  { id: "video", label: "Video", icon: <Video className="size-3.5" />, premiumFlag: "app-type-video", hint: "Generate video content as part of the build." },
-  { id: "app-stores", label: "App stores", icon: <Store className="size-3.5" />, premiumFlag: "app-type-stores", hint: "Package for iOS/Android app store submission." },
-];
-
-function AppTypeChips({
-  value,
-  onChange,
-  flagEnabled,
-  disabled,
+function AIIntegrationDialog({
+  open,
+  onOpenChange,
+  onApply,
 }: {
-  value: string;
-  onChange: (id: string) => void;
-  flagEnabled: (key: string) => boolean;
-  disabled?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApply: (integration: { provider: BYOKProviderId | "chinnallm"; model: string; goal: string }) => void;
 }) {
+  const [providerId, setProviderId] = useState<BYOKProviderId | "chinnallm">("chinnallm");
+  const [apiKey, setApiKey] = useState("");
+  const [goal, setGoal] = useState<(typeof providerUsageGoals)[number]>(providerUsageGoals[0]);
+  const [modelValue, setModelValue] = useState("openrouter/auto");
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const selectedProvider = BYOK_PROVIDERS.find((provider) => provider.id === providerId);
+  const needsKey = providerId !== "chinnallm";
+
+  async function testKey() {
+    if (!needsKey) {
+      setResult({ ok: true, message: "ChinnaLLM will use OpenRouter free/auto fallback. No user key required." });
+      return;
+    }
+    setTesting(true);
+    setResult(null);
+    try {
+      const response = await fetch("/api/chinnallm/byok/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: providerId, key: apiKey.trim() }),
+      });
+      const data = await response.json().catch(() => null);
+      setResult({
+        ok: response.ok && data?.ok,
+        message: data?.message || data?.error || "Could not test this key.",
+      });
+    } catch {
+      setResult({ ok: false, message: "Could not reach the provider key test endpoint." });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function saveAndApply() {
+    setSaving(true);
+    setResult(null);
+    try {
+      if (needsKey) {
+        const response = await fetch("/api/chinnallm/byok", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: providerId,
+            key: apiKey.trim(),
+            label: `${selectedProvider?.shortName ?? providerId} build key`,
+          }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "Could not store this provider key.");
+      }
+      onApply({ provider: providerId, model: modelValue, goal });
+      onOpenChange(false);
+    } catch (error) {
+      setResult({ ok: false, message: error instanceof Error ? error.message : "Could not save this integration." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="mx-auto mt-3 flex w-full max-w-[880px] flex-wrap items-center justify-center gap-2">
-      {APP_TYPE_OPTIONS.map((option) => {
-        const locked = option.premiumFlag ? !flagEnabled(option.premiumFlag) : false;
-        const selected = value === option.id;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            title={option.hint}
-            disabled={disabled}
-            onClick={() => {
-              if (locked) {
-                toast({ title: "Upgrade to unlock", description: `${option.label} builds are available on paid plans.` });
-                return;
-              }
-              onChange(selected ? "" : option.id);
-            }}
-            className={`inline-flex min-h-[34px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 disabled:opacity-40 ${
-              selected
-                ? "border-white/60 bg-white/15 text-white"
-                : locked
-                  ? "border-white/10 text-zinc-600"
-                  : "border-white/10 text-zinc-400 hover:border-white/25 hover:text-zinc-200"
-            }`}
-          >
-            {option.icon}
-            {option.label}
-            {locked ? <Lock className="size-3 opacity-70" /> : null}
-          </button>
-        );
-      })}
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88dvh] max-w-3xl overflow-hidden rounded-[28px] border-white/12 bg-[#0c0d0b] p-0 text-stone-100 shadow-2xl shadow-black/70">
+        <div className="relative">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_22%_0%,rgba(190,242,100,0.18),transparent_58%),radial-gradient(circle_at_80%_4%,rgba(251,191,36,0.16),transparent_56%)]" />
+          <div className="relative border-b border-white/10 p-5 sm:p-6">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
+              <KeyRound className="size-3.5" />
+              Provider keys are tested server-side
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl tracking-tight text-stone-50">Add AI integration</DialogTitle>
+              <DialogDescription className="text-stone-400">
+                Choose ChinnaLLM fallback or bring a provider key. The app will only wire the provider you choose.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[58dvh] space-y-5 overflow-y-auto p-5 sm:p-6">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setProviderId("chinnallm");
+                  setModelValue("openrouter/auto");
+                  setResult(null);
+                }}
+                className={`rounded-2xl border p-3 text-left transition ${providerId === "chinnallm" ? "border-lime-300/50 bg-lime-300/10" : "border-white/10 bg-white/[0.035] hover:border-lime-300/30"}`}
+              >
+                <span className="grid size-9 place-items-center rounded-xl border border-lime-300/25 bg-lime-300/10 text-sm font-bold text-lime-100">C</span>
+                <span className="mt-3 block text-sm font-semibold text-stone-50">ChinnaLLM</span>
+                <span className="mt-1 block text-xs text-stone-500">OpenRouter free/auto fallback</span>
+              </button>
+              {BYOK_PROVIDERS.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => {
+                    setProviderId(provider.id);
+                    setModelValue(provider.defaultModel);
+                    setResult(null);
+                  }}
+                  className={`rounded-2xl border p-3 text-left transition ${providerId === provider.id ? "border-lime-300/50 bg-lime-300/10" : "border-white/10 bg-white/[0.035] hover:border-lime-300/30"}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={provider.logoUrl} alt="" className="size-9 rounded-xl border border-white/10 bg-white/90 p-1" />
+                  <span className="mt-3 block text-sm font-semibold text-stone-50">{provider.shortName}</span>
+                  <span className="mt-1 block text-xs text-stone-500">{provider.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">Usage goal</label>
+                <select value={goal} onChange={(event) => setGoal(event.target.value as (typeof providerUsageGoals)[number])} className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/35 px-3 text-sm text-stone-100 outline-none focus:border-lime-300/45">
+                  {providerUsageGoals.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">Preferred model route</label>
+                <select value={modelValue} onChange={(event) => setModelValue(event.target.value)} className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/35 px-3 text-sm text-stone-100 outline-none focus:border-lime-300/45">
+                  <option value="openrouter/auto">OpenRouter Auto</option>
+                  <option value="openrouter/openrouter/free">OpenRouter Free</option>
+                  <option value="openrouter/anthropic/claude-sonnet-5">Claude Sonnet 5</option>
+                  <option value="openrouter/qwen/qwen3-coder-plus">Qwen 3 Coder Plus</option>
+                  <option value="openrouter/sakana/fugu-ultra">Sakana Fugu Ultra</option>
+                  {selectedProvider ? <option value={selectedProvider.defaultModel}>{selectedProvider.defaultModel}</option> : null}
+                </select>
+              </div>
+            </div>
+
+            {needsKey ? (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="provider-api-key" className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">API key</label>
+                  {selectedProvider ? (
+                    <a href={selectedProvider.apiKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-amber-100 hover:text-amber-50">
+                      Get {selectedProvider.shortName} key <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <Input
+                  id="provider-api-key"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  type="password"
+                  placeholder={selectedProvider?.placeholder ?? "Provider API key"}
+                  className="mt-2 h-12 rounded-2xl border-white/10 bg-black/35 text-stone-100 placeholder:text-stone-600 focus-visible:ring-lime-200/35"
+                />
+                <p className="mt-2 text-xs leading-5 text-stone-500">Keys are stored encrypted through the existing ChinnaLLM BYOK route after you apply.</p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-lime-300/18 bg-lime-300/[0.07] p-4 text-sm leading-6 text-lime-50">
+                ChinnaLLM mode uses OpenRouter free for lightweight replies and OpenRouter auto as fallback. Bigger tasks can still route to stronger OpenRouter models from the model picker.
+              </div>
+            )}
+
+            {result ? (
+              <p className={`rounded-2xl border px-4 py-3 text-sm ${result.ok ? "border-lime-300/25 bg-lime-300/10 text-lime-50" : "border-red-400/25 bg-red-400/10 text-red-100"}`}>
+                {result.message}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-2 border-t border-white/10 p-5 sm:grid-cols-[1fr_auto_auto] sm:p-6">
+            <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/12 bg-transparent text-stone-200 hover:bg-white/5" onClick={() => onOpenChange(false)} disabled={saving || testing}>
+              Skip
+            </Button>
+            <Button type="button" variant="outline" className="h-11 rounded-2xl border-lime-300/20 bg-transparent text-lime-100 hover:bg-lime-300/10" onClick={testKey} disabled={testing || (needsKey && apiKey.trim().length < 8)}>
+              {testing ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+              Test key
+            </Button>
+            <Button type="button" className="h-11 rounded-2xl bg-lime-200 text-stone-950 hover:bg-lime-100" onClick={saveAndApply} disabled={saving || (needsKey && apiKey.trim().length < 8)}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />}
+              Use integration
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
+function ProjectImportDialog({
+  open,
+  onOpenChange,
+  onImportZip,
+  onImportGit,
+  importing,
+  error,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImportZip: (file: File) => void;
+  onImportGit: (input: { url: string; accessToken?: string }) => void;
+  importing: boolean;
+  error: string | null;
+}) {
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [gitUrl, setGitUrl] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [dragging, setDragging] = useState(false);
 
-/* Sleek horizontal preset chips — compact, 6px-radius, drag-to-swipe with
- * edge-fade masks. Pointer drag works on desktop; native momentum on touch. */
-function PresetChipsScroller({ onSelect }: { onSelect: (prompt: string) => void }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ active: boolean; startX: number; startLeft: number; moved: boolean }>({
-    active: false,
-    startX: 0,
-    startLeft: 0,
-    moved: false,
-  });
-
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    drag.current = { active: true, startX: event.clientX, startLeft: el.scrollLeft, moved: false };
-  };
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const el = scrollerRef.current;
-    if (!el || !drag.current.active) return;
-    const delta = event.clientX - drag.current.startX;
-    if (Math.abs(delta) > 4) drag.current.moved = true;
-    el.scrollLeft = drag.current.startLeft - delta;
-  };
-  const endDrag = () => {
-    drag.current.active = false;
-  };
+  function chooseFile(file?: File | null) {
+    if (!file) return;
+    setZipFile(file);
+  }
 
   return (
-    <div className="mx-auto mt-3.5 w-full max-w-[880px] px-0.5">
-      <div
-        ref={scrollerRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerLeave={endDrag}
-        onPointerCancel={endDrag}
-        className="flex cursor-grab snap-x gap-1.5 overflow-x-auto pb-0.5 select-none active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{
-          WebkitMaskImage:
-            "linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent)",
-          maskImage:
-            "linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent)",
-        }}
-        role="group"
-        aria-label="Prompt presets"
-      >
-        {PROMPT_CHIP_GROUPS.map((group) => (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88dvh] max-w-3xl overflow-hidden rounded-[28px] border-white/12 bg-[#0c0d0b] p-0 text-stone-100 shadow-2xl shadow-black/70">
+        <div className="relative">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,0.17),transparent_58%),radial-gradient(circle_at_82%_10%,rgba(190,242,100,0.16),transparent_56%)]" />
+          <div className="relative border-b border-white/10 p-5 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-2xl tracking-tight text-stone-50">Import an existing project</DialogTitle>
+              <DialogDescription className="text-stone-400">
+                Drop a project zip or paste a GitHub URL. Chinna-Coder creates a chat workspace, detects dependencies, and asks for missing env values.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <label
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                chooseFile(event.dataTransfer.files?.[0]);
+              }}
+              className={`flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed p-6 text-center transition ${dragging ? "border-lime-300/65 bg-lime-300/10" : "border-white/14 bg-white/[0.035] hover:border-lime-300/35"}`}
+            >
+              <UploadCloud className="size-10 text-lime-100" />
+              <span className="mt-4 text-base font-semibold text-stone-50">Drop project .zip here</span>
+              <span className="mt-2 max-w-xs text-sm leading-6 text-stone-500">Supports source/config files up to 24 MB. Skips node_modules, build output, and generated folders.</span>
+              <span className="mt-4 rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-300">{zipFile ? zipFile.name : "Choose zip file"}</span>
+              <input type="file" accept=".zip,application/zip" className="hidden" onChange={(event) => chooseFile(event.target.files?.[0])} />
+            </label>
+
+            <div className="space-y-4">
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-stone-50">
+                  <Github className="size-4 text-amber-100" />
+                  Import from Git URL
+                </div>
+                <Input
+                  value={gitUrl}
+                  onChange={(event) => setGitUrl(event.target.value)}
+                  placeholder="https://github.com/owner/repo"
+                  className="mt-4 h-11 rounded-2xl border-white/10 bg-black/35 text-stone-100 placeholder:text-stone-600 focus-visible:ring-lime-200/35"
+                />
+                <Input
+                  value={accessToken}
+                  onChange={(event) => setAccessToken(event.target.value)}
+                  type="password"
+                  placeholder="Optional access token"
+                  className="mt-3 h-11 rounded-2xl border-white/10 bg-black/35 text-stone-100 placeholder:text-stone-600 focus-visible:ring-lime-200/35"
+                />
+                <Button type="button" variant="outline" className="mt-4 h-11 w-full rounded-2xl border-amber-200/20 bg-transparent text-amber-100 hover:bg-amber-200/10" disabled={!gitUrl.trim() || importing} onClick={() => onImportGit({ url: gitUrl.trim(), accessToken: accessToken.trim() })}>
+                  {importing ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
+                  Import Git repository
+                </Button>
+              </div>
+              <div className="rounded-[24px] border border-lime-300/15 bg-lime-300/[0.06] p-4 text-sm leading-6 text-lime-50">
+                After import, the chat opens with the files loaded. If the app needs `DATABASE_URL`, API keys, or other secrets, the composer environment panel will ask for them before the agent runs provider-dependent features.
+              </div>
+              {error ? <p className="rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</p> : null}
+            </div>
+          </div>
+          <div className="grid gap-2 border-t border-white/10 p-5 sm:grid-cols-[1fr_auto] sm:p-6">
+            <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/12 bg-transparent text-stone-200 hover:bg-white/5" onClick={() => onOpenChange(false)} disabled={importing}>
+              Cancel
+            </Button>
+            <Button type="button" className="h-11 rounded-2xl bg-lime-200 px-5 text-stone-950 hover:bg-lime-100" disabled={!zipFile || importing} onClick={() => zipFile && onImportZip(zipFile)}>
+              {importing ? <Loader2 className="size-4 animate-spin" /> : <FolderArchive className="size-4" />}
+              Import zip project
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PromptComposer({
+  prompt,
+  setPrompt,
+  onSend,
+  isSubmitting,
+  model,
+  setModel,
+  mode,
+  setMode,
+  styleId,
+  setStyleId,
+  backendEnabled,
+  setBackendEnabled,
+  selectedType,
+  setSelectedType,
+  attachments,
+  mcpServers,
+  onAttach,
+  onOpenGithubImport,
+  onOpenProjectImport,
+  onOpenAIIntegration,
+  onOpenMcpConnect,
+}: {
+  prompt: string;
+  setPrompt: (value: string) => void;
+  onSend: () => void;
+  isSubmitting: boolean;
+  model: string;
+  setModel: (value: string) => void;
+  mode: Mode;
+  setMode: (value: Mode) => void;
+  styleId: SandboxStyleId;
+  setStyleId: (value: SandboxStyleId) => void;
+  backendEnabled: boolean;
+  setBackendEnabled: (value: boolean) => void;
+  selectedType: string;
+  setSelectedType: (value: string) => void;
+  attachments: Attachment[];
+  mcpServers: AttachedMcpServer[];
+  onAttach: () => void;
+  onOpenGithubImport: () => void;
+  onOpenProjectImport: () => void;
+  onOpenAIIntegration: () => void;
+  onOpenMcpConnect: () => void;
+}) {
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const activeStyle = SANDBOX_STYLE_PRESETS.find((style) => style.id === styleId);
+  const selectedModel = MODELS.find((item) => item.value === model);
+  const canSend = prompt.trim().length > 0 || attachments.length > 0;
+  const selectedTypeLabel = appTypeHints.find((item) => item.id === selectedType)?.label ?? "Web app";
+
+  function appendPrompt(text: string) {
+    const next = prompt.trim() ? `${prompt.trim()}\n\n${text}` : text;
+    setPrompt(next);
+  }
+
+  function chooseBuildType(type: string, text?: string) {
+    setSelectedType(type);
+    if (type === "backend") setBackendEnabled(true);
+    if (text) appendPrompt(text);
+  }
+
+  return (
+    <div className="relative mx-auto w-full max-w-5xl space-y-4" id="prompt-composer">
+      <div aria-hidden="true" className="absolute -inset-8 -z-10 rounded-[40px] bg-[radial-gradient(circle_at_16%_20%,rgba(190,242,100,0.18),transparent_38%),radial-gradient(circle_at_88%_45%,rgba(251,191,36,0.13),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:auto,auto,56px_56px,56px_56px] opacity-80 blur-[0.2px]" />
+      <div className="relative rounded-[28px] p-px shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
+        <div aria-hidden="true" className="absolute inset-0 rounded-[28px] bg-[linear-gradient(135deg,rgba(255,255,255,0.20),rgba(190,242,100,0.28),rgba(251,191,36,0.14),rgba(255,255,255,0.08))] opacity-75" />
+        <div className="relative overflow-hidden rounded-[27px] border border-white/10 bg-[#0a0b0d]/88 backdrop-blur-2xl">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),transparent)]" />
+        <Textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder="Build a 3D solar system viewer with Three.js and orbit controls..."
+          className="relative min-h-[168px] resize-none border-0 bg-transparent p-5 text-base leading-7 text-stone-100 placeholder:text-stone-500 focus-visible:ring-0 sm:p-7 sm:text-lg"
+        />
+        <div className="border-t border-white/12 bg-black/20 p-3 sm:p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-stone-300 transition hover:border-lime-300/45 hover:bg-lime-300/10 hover:text-lime-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-200/40"
+                    aria-label="Open prompt actions"
+                  >
+                    <Plus className="size-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-80 rounded-2xl border-white/12 bg-[#0c0d0b] p-2 text-stone-100 shadow-2xl shadow-black/60">
+                  <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">
+                    Build actions
+                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={onAttach}>
+                      <Paperclip className="size-4" />
+                      Attach file or screenshot
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={onOpenProjectImport}>
+                      <FolderArchive className="size-4" />
+                      Import project zip or URL
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={onOpenGithubImport}>
+                      <Github className="size-4" />
+                      Import from GitHub
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={onOpenMcpConnect}>
+                      <Cable className="size-4" />
+                      Connect MCP server
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={onOpenAIIntegration}>
+                      <BrainCircuit className="size-4" />
+                      Add AI integration
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={() => chooseBuildType("backend", "Include backend logic with database schema, API routes, environment variables, and admin settings where needed.")}>
+                      <Database className="size-4" />
+                      Backend scaffold
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={() => chooseBuildType("3d-webgl", "Include an interactive Three.js/WebGL scene with responsive controls and non-blank canvas verification.")}>
+                      <Box className="size-4" />
+                      3D/WebGL scene
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={() => chooseBuildType("prototype", "Build this as a fast prototype with polished visible states and working interactions.")}>
+                      <Sparkles className="size-4" />
+                      Prototype mode
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={() => appendPrompt("Generate image/video-ready UI states and ask for required media provider keys only when needed.")}>
+                      <ImageIcon className="size-4" />
+                      Image or video app
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <button
+                type="button"
+                onClick={() => setModelPickerOpen(true)}
+                className="inline-flex h-11 min-w-0 max-w-[13rem] items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 transition hover:border-lime-300/40 hover:text-lime-100 sm:max-w-none"
+              >
+                <BrainCircuit className="size-4 text-lime-200" />
+                <span className="truncate">{selectedModel?.label ?? model}</span>
+              </button>
+              <select value={mode} onChange={(event) => setMode(event.target.value as Mode)} className="h-11 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 outline-none transition hover:border-lime-300/35 focus:border-lime-300/50">
+                <option value="agent">Agent</option>
+                <option value="plan">Plan</option>
+                <option value="ask">Ask</option>
+              </select>
+              <select value={styleId} onChange={(event) => setStyleId(event.target.value as SandboxStyleId)} className="h-11 max-w-[11rem] rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 outline-none transition hover:border-lime-300/35 focus:border-lime-300/50 sm:max-w-none">
+                {SANDBOX_STYLE_PRESETS.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
+              </select>
+              <button type="button" onClick={() => setBackendEnabled(!backendEnabled)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-300 transition hover:border-lime-300/40 hover:text-lime-100">
+                <Code2 className="size-3.5" />
+                {backendEnabled ? "Backend on" : "Backend off"}
+              </button>
+              <button type="button" className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-stone-400 transition hover:border-amber-200/35 hover:text-amber-100" aria-label="Voice input">
+                <Mic className="size-4" />
+              </button>
+              <span className="hidden text-xs text-stone-500 2xl:inline">
+                {selectedTypeLabel} · {activeStyle?.label ?? "Style"} · {attachments.length ? `${attachments.length} attached` : "No files"} · {mcpServers.length ? `${mcpServers.length} MCP` : "No MCP"}
+              </span>
+            </div>
+
+            <Button disabled={!canSend || isSubmitting} onClick={onSend} className="h-12 rounded-2xl bg-lime-200 px-5 text-stone-950 shadow-[0_0_48px_rgba(190,242,100,0.22)] hover:bg-lime-100 md:min-w-32">
+              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              <span className="hidden sm:inline">Build now</span>
+            </Button>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      <div className="relative flex flex-wrap justify-center gap-2 sm:gap-3">
+        {appTypeHints.map((item) => (
           <button
-            key={group.title}
+            key={item.id}
             type="button"
-            onClick={() => {
-              if (drag.current.moved) return; // ignore click that ended a drag
-              onSelect(group.prompt);
-            }}
-            className="hs-home-preset-chip shrink-0 snap-start rounded-[6px] border border-stone-300/90 bg-[#fffaf2]/70 px-3 py-1.5 text-[13px] font-medium whitespace-nowrap text-stone-600 backdrop-blur-md transition-colors duration-150 hover:border-stone-400 hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/30 dark:!border-white/10 dark:!bg-white/[0.04] dark:!text-zinc-400 dark:hover:!border-white/20 dark:hover:!bg-white/[0.08] dark:hover:!text-white dark:focus-visible:ring-white/40"
+            onClick={() => chooseBuildType(item.id)}
+            className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm transition ${selectedType === item.id ? "border-lime-300/50 bg-lime-300/10 text-lime-100 shadow-[0_0_22px_rgba(190,242,100,0.10)]" : "border-white/12 bg-black/20 text-stone-400 hover:border-lime-300/30 hover:text-lime-100"}`}
           >
-            {group.title}
+            <item.icon className="size-3.5" />
+            {item.label}
           </button>
         ))}
       </div>
+
+      <div className="relative mx-auto flex max-w-4xl flex-wrap justify-center gap-2">
+        {mcpServers.map((server) => (
+          <span key={server.id} className="inline-flex items-center gap-1.5 rounded-full border border-lime-300/20 bg-lime-300/[0.07] px-3 py-1.5 text-xs text-lime-100">
+            <ServerCog className="size-3.5" />
+            {server.name}
+          </span>
+        ))}
+        {quickPresetPrompts.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => appendPrompt(preset)}
+            className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] px-3 py-2 text-xs leading-5 text-stone-300 shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:border-amber-200/35 hover:bg-amber-200/10 hover:text-amber-50"
+          >
+            {preset.length > 52 ? `${preset.slice(0, 52)}...` : preset}
+          </button>
+        ))}
+      </div>
+      <ModelPickerDialog open={modelPickerOpen} onOpenChange={setModelPickerOpen} selectedModel={model} onSelect={setModel} />
     </div>
   );
 }
-
-function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabled, model, onModelChange, models, buildMode, onBuildModeChange, shadcnEnabled, onShadcnChange, webSearchEnabled, onWebSearchChange, deepThinkingEnabled, onDeepThinkingChange, canvasEnabled, onCanvasChange, backendEnabled, onBackendChange, styleId, onStyleIdChange, savedDesigns, onOpenDesignDialog, onSelectSavedDesign, selectedSavedDesignId, onAttach, attachmentReady, onImportGithub, savedPrompts, onSavePrompt, onUseSavedPrompt, flagEnabled, selectedMcpServers = [], onMcpChange, onMcpOpenDialog }: { value: string; onValueChange: (value: string) => void; onSend: (value: string) => void; isLoading: boolean; disabled: boolean; model: string; onModelChange: (model: string) => void; models: any[]; buildMode: Mode; onBuildModeChange: (mode: Mode) => void; shadcnEnabled: boolean; onShadcnChange: (value: boolean) => void; webSearchEnabled: boolean; onWebSearchChange: (value: boolean) => void; deepThinkingEnabled: boolean; onDeepThinkingChange: (value: boolean) => void; canvasEnabled: boolean; onCanvasChange: (value: boolean) => void; backendEnabled: boolean; onBackendChange: (value: boolean) => void; styleId: SandboxStyleId; onStyleIdChange: (id: SandboxStyleId) => void; savedDesigns: SavedDesign[]; onOpenDesignDialog: () => void; onSelectSavedDesign: (design: SavedDesign) => void; selectedSavedDesignId?: string | null; onAttach: () => void; attachmentReady?: boolean; onImportGithub: () => void; savedPrompts: SavedPrompt[]; onSavePrompt: () => void; onUseSavedPrompt: (prompt: SavedPrompt) => void; flagEnabled: (key: string) => boolean; selectedMcpServers?: any[]; onMcpChange?: (servers: any[]) => void; onMcpOpenDialog?: () => void }) {
-  /* Phase 4 refresh: clean, quiet composer — single hairline border, no glow,
-   * every optional feature gated by admin feature flags. */
-  const hasValue = value.trim().length > 0 || attachmentReady;
-  const variableCount = (value.match(/\{[^{}]+\}/g) || []).length;
-  const [focused, setFocused] = useState(false);
-  const placeholder = useTypewriterPlaceholder(!value && !focused);
-  const promptLibraryOn = flagEnabled("prompt-library");
-  const anyBuilderToggle = flagEnabled("web-search") || flagEnabled("deep-thinking") || flagEnabled("canvas-mode");
-  return (
-    <div className="w-full">
-      {/* Premium ambient glow: a soft ring behind the composer, always
-          faintly present and brightening on focus — replaces the earlier
-          "no glow" hairline-only treatment. */}
-      <div className="group/glow relative">
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none absolute -inset-1 rounded-[28px] bg-gradient-to-r from-primary/50 via-primary/15 to-primary/50 blur-xl transition-opacity duration-500 ${focused ? "opacity-70" : "opacity-25"}`}
-        />
-        <div className="relative">
-      <div className={`hs-home-composer rounded-2xl border bg-[#fffaf2]/96 text-stone-950 shadow-[0_18px_60px_rgba(43,31,18,0.12)] backdrop-blur-xl transition-colors duration-200 dark:bg-zinc-950/70 dark:text-white dark:shadow-black/30 ${focused ? "border-stone-400/80 dark:border-white/25" : "border-stone-300/80 dark:border-white/10"}`}>
-        <textarea
-          value={value}
-          onChange={(event) => onValueChange(event.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!disabled && hasValue) onSend(value); } }}
-          placeholder={placeholder}
-          aria-label="Describe what to build"
-          disabled={disabled}
-          rows={3}
-          className="min-h-[96px] w-full resize-none rounded-t-2xl bg-transparent px-5 pb-3 pt-5 text-base leading-relaxed text-stone-950 outline-none placeholder:text-stone-500 disabled:opacity-60 dark:text-white dark:placeholder:text-zinc-500"
-        />
-        {attachmentReady ? <div className="mx-5 mb-2 inline-flex rounded-full border border-stone-300 bg-stone-100/80 px-3 py-1 text-xs text-stone-700 dark:border-white/15 dark:bg-white/[0.04] dark:text-zinc-300">Attachment ready</div> : null}
-        {(selectedMcpServers || []).length > 0 && (
-          <div className="mx-5 mb-1 flex flex-wrap gap-1.5">
-            {(selectedMcpServers || []).map((m: any, idx: number) => (
-              <span key={idx} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300">
-                <Plug className="size-3" /> {m.name}
-                <button type="button" onClick={() => onMcpChange && onMcpChange((selectedMcpServers || []).filter((_: any, i: number) => i !== idx))} className="ml-0.5 hover:text-red-500">×</button>
-              </span>
-            ))}
-            <button type="button" onClick={() => onMcpOpenDialog && onMcpOpenDialog()} className="text-[10px] text-emerald-600 underline">manage</button>
-          </div>
-        )}
-        {variableCount > 0 ? <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1.5 text-xs text-stone-500 dark:text-zinc-500"><span className="rounded-full bg-stone-900/[0.06] px-2.5 py-1 text-stone-600 dark:bg-white/[0.06] dark:text-zinc-400">{variableCount} variables</span></div> : null}
-        {promptLibraryOn && savedPrompts.length > 0 ? (
-          <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {savedPrompts.slice(0, 5).map((item) => (
-              <button key={item.id} type="button" onClick={() => onUseSavedPrompt(item)} className="shrink-0 rounded-full border border-stone-300 px-2.5 py-1 text-xs text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-950 dark:border-white/10 dark:text-zinc-400 dark:hover:border-white/20 dark:hover:text-zinc-200">
-                {item.title}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <div className="flex min-h-[54px] items-center justify-between gap-2 border-t border-stone-200/90 px-2.5 py-1.5 dark:border-white/[0.06]">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={disabled}
-                className="inline-flex size-10 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-900/[0.06] hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-900/25 disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300 dark:focus-visible:ring-white/30"
-                aria-label="Open prompt actions"
-              >
-                <Plus className="size-5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[min(86vw,340px)] rounded-xl border-stone-200/80 bg-[#fffaf2] p-1.5 text-stone-950 shadow-lg shadow-stone-950/10 dark:border-white/10 dark:bg-zinc-900 dark:text-white">
-              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={onAttach} className="gap-3"><Upload className="size-4" />Upload file</DropdownMenuItem>
-              {flagEnabled("github-import") ? <DropdownMenuItem onClick={onImportGithub} className="gap-3"><Github className="size-4" />Import from GitHub</DropdownMenuItem> : null}
-              <DropdownMenuItem onClick={() => onMcpOpenDialog && onMcpOpenDialog()} className="gap-3"><Plug className="size-4" />Connect MCP Server</DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
-              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Mode</DropdownMenuLabel>
-              <ModeItem mode="agent" current={buildMode} label="Agent" description="Build the app, write files, validate preview, then self-correct once if needed." icon={<Bot className="size-4" />} onSelect={onBuildModeChange} />
-              <ModeItem mode="plan" current={buildMode} label="Plan" description="Create a buildability plan only: possible, not possible, backend, files, and steps." icon={<ListChecks className="size-4" />} onSelect={onBuildModeChange} />
-              <ModeItem mode="ask" current={buildMode} label="Ask" description="Answer questions without writing a full artifact." icon={<MessageSquare className="size-4" />} onSelect={onBuildModeChange} />
-              <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
-              <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Builder</DropdownMenuLabel>
-              <ToggleItem label="shadcn UI" icon={<Palette className="size-4" />} checked={shadcnEnabled} onChange={onShadcnChange} />
-              {anyBuilderToggle ? <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" /> : null}
-              {flagEnabled("web-search") ? <ToggleItem label="Web search" icon={<SearchIcon className="size-4" />} checked={webSearchEnabled} onChange={onWebSearchChange} /> : null}
-              {flagEnabled("deep-thinking") ? <ToggleItem label="Deep thinking" icon={<Brain className="size-4" />} checked={deepThinkingEnabled} onChange={onDeepThinkingChange} /> : null}
-              {flagEnabled("canvas-mode") ? <ToggleItem label="Canvas" icon={<ImageIcon className="size-4" />} checked={canvasEnabled} onChange={onCanvasChange} /> : null}
-              <ToggleItem label="Backend" icon={<Database className="size-4" />} checked={backendEnabled} onChange={onBackendChange} />
-              {promptLibraryOn ? (
-                <>
-                  <DropdownMenuSeparator className="bg-stone-200 dark:bg-white/10" />
-                  <DropdownMenuLabel className="text-xs text-stone-500 dark:text-zinc-500">Prompts</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={onSavePrompt} disabled={!value.trim()} className="gap-3"><Sparkles className="size-4" />Save this prompt</DropdownMenuItem>
-                  <DropdownMenuItem asChild className="gap-3"><Link href="/library"><Layers className="size-4" />Prompt library</Link></DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {flagEnabled("style-picker") ? (
-            <DesignPicker
-              value={styleId}
-              onChange={onStyleIdChange}
-              disabled={disabled}
-              savedDesigns={savedDesigns}
-              onOpenDesignDialog={onOpenDesignDialog}
-              onSelectSavedDesign={onSelectSavedDesign}
-              selectedSavedDesignId={selectedSavedDesignId}
-            />
-          ) : null}
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
-            {/* Custom-styled dropdown (not a native <select>): a native select's
-                options popup is rendered by the OS/browser using its own light
-                widget theme, ignoring the page's dark mode entirely — that's
-                what made the model list unreadable after opening it. */}
-            <OptionDropdown
-              value={model}
-              onValueChange={onModelChange}
-              aria-label="Select AI model"
-              disabled={disabled}
-              triggerLabel={models.find((m: any) => m.value === model)?.label ?? model}
-              triggerClassName="h-9 max-w-[46vw] truncate rounded-full px-0 text-sm text-stone-600 transition-colors hover:text-stone-950 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-300 md:min-w-[200px]"
-              options={models.map((m: any) => ({ value: m.value, label: m.label }))}
-            />
-            {flagEnabled("voice-input") ? <SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-0 bg-transparent text-stone-500 transition-colors hover:bg-transparent hover:text-stone-950 dark:text-zinc-500 dark:hover:text-zinc-300" aria-label="Dictate prompt" /> : null}
-            <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full bg-stone-950 text-white shadow-sm transition-colors hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-950/40 disabled:opacity-30 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-white/40" aria-label="Start build">{isLoading ? <DotFlow size={5} label="Starting build" /> : <ArrowUp className="size-5" />}</button>
-          </div>
-        </div>
-      </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-
-
-
 
 export default function HomePageClient() {
-  const context = use(Context);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [prompt, setPrompt] = useState("");
-  const [buildMode, setBuildMode] = useState<Mode>("agent");
-  const [model, setModel] = useState("zai-org/GLM-5");
-  const { isEnabled: flagEnabled } = useFeatureFlags();
-  const [shadcnEnabled, setShadcnEnabled] = useState(true);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [deepThinkingEnabled, setDeepThinkingEnabled] = useState(false);
-  const [canvasEnabled, setCanvasEnabled] = useState(false);
-  const [backendEnabled, setBackendEnabled] = useState(false);
-  const [selectedMcpServers, setSelectedMcpServers] = useState<any[]>([]);
-  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
-  const [appTypeHint, setAppTypeHint] = useState("");
-  const handleAppTypeChange = (id: string) => {
-    setAppTypeHint(id);
-    if (id === "backend") setBackendEnabled(true);
-    else if (appTypeHint === "backend") setBackendEnabled(false);
-  };
-  const [styleId, setStyleId] = useState<SandboxStyleId>(DEFAULT_STYLE_ID);
-  const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
-  const [designDialogOpen, setDesignDialogOpen] = useState(false);
-  const [selectedDesignPresetId, setSelectedDesignPresetId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/design-presets", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (data?.presets) setSavedDesigns(data.presets); })
-      .catch(() => {});
-  }, []);
-  const [isSubmitting, startTransition] = useTransition();
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
-  const [githubUrl, setGithubUrl] = useState("");
-  const [authOverlayOpen, setAuthOverlayOpen] = useState(false);
-  const [githubError, setGithubError] = useState("");
-  const [isGithubImporting, setIsGithubImporting] = useState(false);
-  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const context = use(Context);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
-  const visibleModels = MODELS.filter((item) => !item.hidden);
-
-  useEffect(() => { let cancelled = false; async function loadBuilderSettings() { try { const response = await fetch("/api/user-settings", { cache: "no-store" }); if (!response.ok) return; const data = await response.json().catch(() => null); const settings = data?.settings; if (!settings || cancelled) return; if (typeof settings.defaultModel === "string") setModel(settings.defaultModel); if (["ask", "plan", "agent"].includes(settings.defaultMode)) setBuildMode(settings.defaultMode); if (typeof settings.shadcnDefault === "boolean") setShadcnEnabled(settings.shadcnDefault); if (typeof settings.webSearchDefault === "boolean") setWebSearchEnabled(settings.webSearchDefault); if (typeof settings.deepThinkingDefault === "boolean") setDeepThinkingEnabled(settings.deepThinkingDefault); if (typeof settings.canvasDefault === "boolean") setCanvasEnabled(settings.canvasDefault); if (typeof settings.backendDefault === "boolean") setBackendEnabled(settings.backendDefault); if (typeof settings.styleDefault === "string") setStyleId(settings.styleDefault as SandboxStyleId); if (typeof settings.githubRepositoryUrl === "string") setGithubUrl(settings.githubRepositoryUrl); } catch {} } loadBuilderSettings(); return () => { cancelled = true; }; }, []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [model, setModel] = useState(MODELS.find((item) => item.recommended && !item.hidden)?.value ?? MODELS[0]?.value ?? "zai-org/GLM-5");
+  const [mode, setMode] = useState<Mode>("agent");
+  const [styleId, setStyleId] = useState<SandboxStyleId>(DEFAULT_STYLE_ID);
+  const [backendEnabled, setBackendEnabled] = useState(false);
+  const [selectedType, setSelectedType] = useState("web-app");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [mcpServers, setMcpServers] = useState<AttachedMcpServer[]>([]);
+  const [authOverlayOpen, setAuthOverlayOpen] = useState(false);
+  const [githubImportOpen, setGithubImportOpen] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubAccessToken, setGithubAccessToken] = useState("");
+  const [githubImporting, setGithubImporting] = useState(false);
+  const [githubImportError, setGithubImportError] = useState<string | null>(null);
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+  const [aiIntegrationOpen, setAiIntegrationOpen] = useState(false);
+  const [aiIntegration, setAiIntegration] = useState<{ provider: BYOKProviderId | "chinnallm"; model: string; goal: string } | null>(null);
+  const [projectImportOpen, setProjectImportOpen] = useState(false);
+  const [projectImporting, setProjectImporting] = useState(false);
+  const [projectImportError, setProjectImportError] = useState<string | null>(null);
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [0, -120]);
 
   useEffect(() => {
     const incomingPrompt = searchParams.get("prompt");
@@ -646,472 +894,508 @@ export default function HomePageClient() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadPrompts() {
-      const response = await fetch("/api/prompts?limit=8", { cache: "no-store" }).catch(() => null);
+    async function loadSettings() {
+      const response = await fetch("/api/user-settings", { cache: "no-store" }).catch(() => null);
       if (!response?.ok) return;
       const data = await response.json().catch(() => null);
-      if (!cancelled && Array.isArray(data?.prompts)) setSavedPrompts(data.prompts);
+      const settings = data?.settings;
+      if (!settings || cancelled) return;
+      if (typeof settings.defaultModel === "string") setModel(settings.defaultModel);
+      if (["ask", "plan", "agent"].includes(settings.defaultMode)) setMode(settings.defaultMode);
+      if (typeof settings.backendDefault === "boolean") setBackendEnabled(settings.backendDefault);
+      if (typeof settings.styleDefault === "string") setStyleId(settings.styleDefault as SandboxStyleId);
     }
-    void loadPrompts();
-    return () => {
-      cancelled = true;
-    };
+    void loadSettings();
+    return () => { cancelled = true; };
   }, []);
 
-  // Resume a pending unauthenticated build after the user completes authentication (redirect back to /).
-  // We reconstruct the final prompt from stored flags + raw input, call create-chat, then go to the chats page
-  // which will handle the generation via the ?generate= param.
   useEffect(() => {
     const raw = sessionStorage.getItem("pendingBuild");
     if (!raw) return;
-
     (async () => {
+      const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
+      if (!session?.user) return;
+      sessionStorage.removeItem("pendingBuild");
+      await createBuild(JSON.parse(raw));
+    })().catch(() => sessionStorage.removeItem("pendingBuild"));
+  }, []);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem("pendingGithubImport");
+    if (!raw) return;
+    (async () => {
+      const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
+      if (!session?.user) return;
+      sessionStorage.removeItem("pendingGithubImport");
+      await importGithubRepo(JSON.parse(raw));
+    })().catch(() => sessionStorage.removeItem("pendingGithubImport"));
+  }, []);
+
+  async function createBuild(data: {
+    rawPrompt: string;
+    model: string;
+    mode: Mode;
+    styleId: SandboxStyleId;
+    backendMode: boolean;
+    selectedType: string;
+    attachments: Attachment[];
+    mcpServers: AttachedMcpServer[];
+    aiIntegration?: { provider: BYOKProviderId | "chinnallm"; model: string; goal: string } | null;
+  }) {
+    const appTypeHintText: Record<string, string> = {
+      prototype: "Build a fast exploratory prototype while keeping all visible controls functional.",
+      "web-app": "Build a complete multi-page web application with real routing and responsive states.",
+      backend: "Backend mode is enabled. Include backend-ready API routes, Prisma/database guidance, and environment variables where required.",
+      "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the requested experience.",
+    };
+    const finalPrompt = [
+      data.rawPrompt || "Build from the uploaded attachment.",
+      appTypeHintText[data.selectedType] || "",
+      data.backendMode ? appTypeHintText.backend : "",
+      data.aiIntegration?.provider === "chinnallm"
+        ? "Use ChinnaLLM for AI features with OpenRouter free for lightweight replies and OpenRouter auto/stronger OpenRouter models as fallback for bigger tasks."
+        : data.aiIntegration
+          ? `Wire AI features only to ${data.aiIntegration.provider}. Preferred route: ${data.aiIntegration.model}. Goal: ${data.aiIntegration.goal}. Ask for missing env vars before calling provider APIs.`
+          : "",
+    ].filter(Boolean).join("\n\n");
+    const aiDetection = requiresAI(finalPrompt);
+    const screenshotUrl = data.attachments.find((item) => item.kind === "image" && item.url)?.url;
+
+    const response = await fetch("/api/create-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: finalPrompt,
+        model: data.model,
+        quality: "high",
+        mode: data.mode,
+        shadcn: true,
+        styleId: data.styleId,
+        screenshotUrl,
+        attachments: data.attachments,
+        aiCapabilities: aiDetection.capabilities,
+        aiIntegration: data.aiIntegration,
+        backendMode: data.backendMode,
+        mcpServers: data.mcpServers,
+      }),
+    });
+    const created = await response.json().catch(() => null);
+    if (!response.ok || !created?.chatId || !created?.lastMessageId) throw new Error(created?.error || "Could not create chat.");
+
+    const params = new URLSearchParams({ generate: created.lastMessageId, model: data.model, quality: "high" });
+    if (aiDetection.detected) {
+      context.setStreamPromise(undefined);
+      router.push(`/chats/${created.chatId}?${params.toString()}`);
+      return;
+    }
+
+    const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId: created.lastMessageId, model: data.model, reasoning: data.mode === "agent", quality: "high" }),
+    }).then(async (streamResponse) => {
+      if (!streamResponse.ok) throw new Error((await streamResponse.text()) || "Failed to start generation");
+      if (!streamResponse.body) throw new Error("No response body");
+      return streamResponse.body;
+    });
+    void streamPromise.catch(() => undefined);
+    context.setStreamPromise(streamPromise);
+    router.push(`/chats/${created.chatId}?${params.toString()}`);
+  }
+
+  function handleSend() {
+    const cleanPrompt = prompt.trim();
+    if (!cleanPrompt && attachments.length === 0) return;
+    const payload = { rawPrompt: cleanPrompt, model, mode, styleId, backendMode: backendEnabled, selectedType, attachments, mcpServers, aiIntegration };
+    setIsSubmitting(true);
+    void (async () => {
       try {
-        const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-        const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
-        if (!authEnforced) {
-          sessionStorage.removeItem("pendingBuild");
-          return;
-        }
-        const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-        if (sess?.user) {
-          const data = JSON.parse(raw);
-          sessionStorage.removeItem("pendingBuild");
-
-          const appTypeHintText: Record<string, string> = {
-            prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
-            "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
-            "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
-            "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
-            "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
-          };
-          const featureHints = [
-            data.webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
-            data.canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
-            data.backendMode ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
-            data.appTypeHint && appTypeHintText[data.appTypeHint] ? appTypeHintText[data.appTypeHint] : "",
-          ].filter(Boolean);
-          const finalPrompt = [data.rawPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
-
-          const createBody: any = {
-            prompt: finalPrompt,
-            model: data.model,
-            quality: data.quality || "high",
-            mode: data.mode || "agent",
-            shadcn: data.shadcn ?? true,
-            styleId: data.styleId,
-            designPresetId: data.designPresetId || undefined,
-            screenshotUrl: data.screenshotUrl,
-            attachments: data.attachments || [],
-            aiCapabilities: [],
-            backendMode: data.backendMode || false,
-            mcpServers: data.mcpServers || [],
-          };
-
-          const res = await fetch("/api/create-chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(createBody),
-          });
-          const created = await res.json().catch(() => null);
-          if (!res.ok || !created?.chatId || !created?.lastMessageId) {
-            toast({ title: "Failed to launch build after sign in", description: created?.error || "Try again from the prompt." });
+        const publicSettings = await fetch("/api/public-settings", { cache: "no-store" }).then((response) => response.json().catch(() => null));
+        const authEnforced = !!(publicSettings?.saasMode && publicSettings?.googleAuth);
+        if (authEnforced) {
+          const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null));
+          if (!session?.user) {
+            sessionStorage.setItem("pendingBuild", JSON.stringify(payload));
+            setAuthOverlayOpen(true);
             return;
           }
-
-          const params = new URLSearchParams({ generate: created.lastMessageId, model: data.model, quality: "high" });
-          if (data.deepThinkingEnabled) params.set("reasoning", "1");
-          router.push(`/chats/${created.chatId}?${params.toString()}`);
         }
-      } catch (err) {
-        console.error("Failed to auto-launch pending build", err);
-        sessionStorage.removeItem("pendingBuild");
-      }
-    })();
-  }, [router]);
-
-  const handlePromptSend = (value?: string) => {
-    const cleanPrompt = (value ?? prompt).trim();
-    if (!cleanPrompt && attachments.length === 0) return;
-
-    startTransition(async () => {
-      try {
-        // If auth is required but user not signed in, save the prompt intent and show auth overlay.
-        // After sign-in, the useEffect below will pick it up and auto-launch the build.
-        try {
-          const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-          const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
-          if (authEnforced) {
-            const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-            if (!sess?.user) {
-              const buildData = {
-                rawPrompt: cleanPrompt,
-                model,
-                quality: "high",
-                mode: buildMode,
-                shadcn: shadcnEnabled,
-                styleId,
-                designPresetId: selectedDesignPresetId || undefined,
-                screenshotUrl: attachments.find((item) => item.kind === "image" && item.url)?.url,
-                attachments,
-                backendMode: backendEnabled,
-                mcpServers: selectedMcpServers,
-                deepThinkingEnabled,
-                appTypeHint,
-                webSearchEnabled,
-                canvasEnabled,
-              };
-              sessionStorage.setItem("pendingBuild", JSON.stringify(buildData));
-              setAuthOverlayOpen(true);
-              return;
-            }
-          }
-        } catch {
-          // fall through to create (it will 401/ error if auth still required)
-        }
-        const appTypeHintText: Record<string, string> = {
-          prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
-          "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
-          "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
-          "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
-          "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
-        };
-        const featureHints = [
-          webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
-          canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
-          backendEnabled ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
-          appTypeHint && appTypeHintText[appTypeHint] ? appTypeHintText[appTypeHint] : "",
-        ].filter(Boolean);
-        const finalPrompt = [cleanPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
-        const aiDetection = requiresAI(finalPrompt);
-        const screenshotUrl = attachments.find((item) => item.kind === "image" && item.url)?.url;
-        const response = await fetch("/api/create-chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalPrompt,
-            model,
-            quality: "high",
-            mode: buildMode,
-            shadcn: shadcnEnabled,
-            styleId,
-            designPresetId: selectedDesignPresetId || undefined,
-            screenshotUrl,
-            attachments,
-            aiCapabilities: aiDetection.capabilities,
-            backendMode: backendEnabled,
-            mcpServers: selectedMcpServers,
-          }),
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok || !data?.chatId || !data?.lastMessageId) throw new Error(data?.error || "Please check auth/API configuration.");
-
-        const params = new URLSearchParams({ generate: data.lastMessageId, model, quality: "high" });
-        if (deepThinkingEnabled) params.set("reasoning", "1");
-
-        if (aiDetection.detected) {
-          context.setStreamPromise(undefined);
-          router.push(`/chats/${data.chatId}?${params.toString()}`);
-          return;
-        }
-
-        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId: data.lastMessageId, model, reasoning: deepThinkingEnabled, quality: "high" }),
-        }).then(async (streamRes) => {
-          if (!streamRes.ok) throw new Error((await streamRes.text()) || "Failed to start generation");
-          if (!streamRes.body) throw new Error("No body on response");
-          return streamRes.body;
-        });
-        void streamPromise.catch(() => undefined);
-        context.setStreamPromise(streamPromise);
-        router.push(`/chats/${data.chatId}?${params.toString()}`);
+        await createBuild(payload);
       } catch (error) {
         toast({ title: "Could not start build", description: error instanceof Error ? error.message : "Please check configuration.", variant: "destructive" });
+      } finally {
+        setIsSubmitting(false);
       }
+    })();
+  }
+
+  async function handleAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/api/blob-upload", { method: "POST", body: formData }).catch(() => null);
+    const data = await response?.json().catch(() => null);
+    if (!response?.ok || !data?.url) {
+      toast({ title: "Upload failed", description: data?.error || "Could not upload the file.", variant: "destructive" });
+      return;
+    }
+    setAttachments((items) => [...items, { kind: file.type.startsWith("image/") ? "image" : "file", filename: file.name, url: data.url, size: file.size }]);
+    if (!prompt.trim()) setPrompt("Build from this uploaded file or screenshot.");
+    event.currentTarget.value = "";
+  }
+
+  async function importGithubRepo(input: { url: string; accessToken?: string }) {
+    const response = await fetch("/api/import-github-repo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: input.url,
+        accessToken: input.accessToken || undefined,
+      }),
     });
-  };
+    const data = await response.json().catch(() => null);
+    if (response.status === 401) {
+      throw new Error("AUTH_REQUIRED");
+    }
+    if (!response.ok || !data?.chatId) {
+      throw new Error(data?.error || "Could not import this GitHub repository.");
+    }
+    toast({
+      title: "GitHub repository imported",
+      description: `${data.fileCount ?? 0} files loaded. Opening the generated workspace.`,
+    });
+    router.push(`/chats/${data.chatId}`);
+  }
 
-  const handleAttachmentUpload = async (file: File) => { const formData = new FormData(); formData.append("file", file); const response = await fetch("/api/blob-upload", { method: "POST", body: formData }); const data = await response.json().catch(() => null); if (!response.ok || !data?.url) { toast({ title: "Upload failed", description: data?.error || "Could not upload file.", variant: "destructive" }); return; } setAttachments((items) => [...items, { kind: file.type.startsWith("image/") ? "image" : "file", filename: file.name, url: data.url, size: file.size }]); if (!prompt.trim()) setPrompt("Build from the uploaded file or screenshot."); };
-
-  const submitGithubImport = () => { const url = githubUrl.trim(); setGithubError(""); if (!url) { setGithubError("Enter a GitHub repository URL."); return; } if (!/^https:\/\/github\.com\/[^/]+\/[^/]+/i.test(url)) { setGithubError("Use a valid GitHub URL like https://github.com/owner/repo."); return; } setIsGithubImporting(true); startTransition(async () => { try { const response = await fetch("/api/import-github-repo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }); const data = await response.json().catch(() => null); if (!response.ok || !data?.chatId) throw new Error(data?.error || "Could not import repository."); setGithubDialogOpen(false); setGithubUrl(""); router.push(`/chats/${data.chatId}?preview=1`); } catch (error) { setGithubError(error instanceof Error ? error.message : "Could not import repository."); } finally { setIsGithubImporting(false); } }); };
-
-  const saveCurrentPrompt = () => {
-    const body = prompt.trim();
-    if (!body) return;
-    startTransition(async () => {
+  function handleGithubImport() {
+    const url = githubUrl.trim();
+    if (!url) {
+      setGithubImportError("Paste a GitHub repository URL first.");
+      return;
+    }
+    setGithubImporting(true);
+    setGithubImportError(null);
+    void (async () => {
       try {
-        const response = await fetch("/api/prompts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: body.split(/\s+/).slice(0, 8).join(" ") || "Saved prompt",
-            body,
-            category: "Composer",
-            tone: "Build-ready",
-            tags: ["composer"],
-            variables: Array.from(new Set(Array.from(body.matchAll(/\{([^{}]+)\}/g)).map((match) => match[1]))),
-            visibility: "private",
-          }),
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok || !data?.prompt) throw new Error(data?.error || "Could not save prompt");
-        setSavedPrompts((items) => [data.prompt, ...items.filter((item) => item.id !== data.prompt.id)].slice(0, 8));
-        toast({ title: "Prompt saved", description: "It is now available in your library." });
+        await importGithubRepo({ url, accessToken: githubAccessToken.trim() });
+        setGithubImportOpen(false);
+        setGithubUrl("");
+        setGithubAccessToken("");
       } catch (error) {
-        toast({ title: "Could not save prompt", description: error instanceof Error ? error.message : "Please check auth settings.", variant: "destructive" });
+        if (error instanceof Error && error.message === "AUTH_REQUIRED") {
+          sessionStorage.setItem("pendingGithubImport", JSON.stringify({ url, accessToken: githubAccessToken.trim() }));
+          sessionStorage.setItem("pendingBuild", JSON.stringify({
+            rawPrompt: `Import and preview this GitHub repository: ${url}`,
+            model,
+            mode,
+            styleId,
+            backendMode: true,
+            selectedType: "web-app",
+            attachments: [],
+            mcpServers,
+          }));
+          setGithubImportOpen(false);
+          setAuthOverlayOpen(true);
+          return;
+        }
+        setGithubImportError(error instanceof Error ? error.message : "Could not import this repository.");
+      } finally {
+        setGithubImporting(false);
       }
-    });
-  };
+    })();
+  }
 
-  const heroWordAnimation = prefersReducedMotion
-    ? { initial: { opacity: 1, y: 0 }, animate: { opacity: 1, y: 0 } }
-    : { initial: { opacity: 0, y: 26 }, animate: { opacity: 1, y: 0 } };
+  function handleApplyAiIntegration(integration: { provider: BYOKProviderId | "chinnallm"; model: string; goal: string }) {
+    setAiIntegration(integration);
+    if (integration.provider === "chinnallm") {
+      setModel("openrouter/auto");
+      setPrompt((current) => {
+        const text = "Add AI features with ChinnaLLM using OpenRouter free for smaller replies and OpenRouter auto fallback for larger generation tasks.";
+        return current.trim() ? `${current.trim()}\n\n${text}` : text;
+      });
+      toast({ title: "ChinnaLLM attached", description: "AI features will use OpenRouter free/auto fallback where needed." });
+      return;
+    }
+    setPrompt((current) => {
+      const text = `Add AI features using ${integration.provider}. Preferred model/route: ${integration.model}. Ask for required environment variables before provider calls.`;
+      return current.trim() ? `${current.trim()}\n\n${text}` : text;
+    });
+    toast({ title: "AI integration attached", description: `${integration.provider} will be used for this build.` });
+  }
+
+  function handleProjectZipImport(file: File) {
+    setProjectImporting(true);
+    setProjectImportError(null);
+    void (async () => {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/import-project", { method: "POST", body: formData });
+        const data = await response.json().catch(() => null);
+        if (response.status === 401) {
+          setProjectImportOpen(false);
+          setAuthOverlayOpen(true);
+          throw new Error("Sign in first, then upload the zip again. Browser security does not allow preserving local files across auth redirects.");
+        }
+        if (!response.ok || !data?.chatId) {
+          throw new Error(data?.error || "Could not import this project zip.");
+        }
+        toast({
+          title: "Project zip imported",
+          description: `${data.fileCount ?? 0} files loaded${data.envVars?.length ? `, ${data.envVars.length} env vars detected` : ""}.`,
+        });
+        setProjectImportOpen(false);
+        router.push(`/chats/${data.chatId}`);
+      } catch (error) {
+        setProjectImportError(error instanceof Error ? error.message : "Could not import this project.");
+      } finally {
+        setProjectImporting(false);
+      }
+    })();
+  }
+
+  function handleProjectGitImport(input: { url: string; accessToken?: string }) {
+    setProjectImporting(true);
+    setProjectImportError(null);
+    void (async () => {
+      try {
+        await importGithubRepo(input);
+        setProjectImportOpen(false);
+      } catch (error) {
+        if (error instanceof Error && error.message === "AUTH_REQUIRED") {
+          sessionStorage.setItem("pendingGithubImport", JSON.stringify(input));
+          setProjectImportOpen(false);
+          setAuthOverlayOpen(true);
+          return;
+        }
+        setProjectImportError(error instanceof Error ? error.message : "Could not import this Git repository.");
+      } finally {
+        setProjectImporting(false);
+      }
+    })();
+  }
+
+  function handleAttachMcpServer(server: any) {
+    const attached = {
+      id: String(server.id),
+      name: String(server.name || "MCP server"),
+      url: typeof server.url === "string" ? server.url : undefined,
+      transport: typeof server.transport === "string" ? server.transport : undefined,
+    };
+    setMcpServers((items) => items.some((item) => item.id === attached.id) ? items : [...items, attached]);
+    setPrompt((current) => {
+      const text = `Use the connected MCP server "${attached.name}" when it helps the build.`;
+      return current.trim() ? `${current.trim()}\n\n${text}` : text;
+    });
+  }
 
   return (
-    <HomeShell>
-      <div className="flex min-h-dvh flex-col bg-background text-foreground">
-        <section id="hero" className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground">
-          {/* Exceptional premium rich gradient background — multi-layered, 
-              deeply dimensional, responsive, and luxurious. Purely decorative. */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#050507]">
-            {/* Deep rich base gradient */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_20%,#0a0b12_0%,#050508_45%,#020203_100%)]" />
-
-            {/* Rich violet-indigo orb (top center) */}
-            <div className="absolute -top-[25%] left-1/2 h-[80vh] w-[110vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,#312e81_0%,#1e1b4b_35%,transparent_70%)] opacity-[0.55] blur-[110px] sm:blur-[130px] md:blur-[160px] lg:blur-[200px]" />
-
-            {/* Deep teal/cyan accent (left) */}
-            <div className="absolute top-[5%] -left-[20%] h-[65vh] w-[70vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#164e63_0%,transparent_65%)] opacity-[0.35] blur-[90px] sm:blur-[110px] md:blur-[140px]" />
-
-            {/* Luxurious magenta-rose accent (right) */}
-            <div className="absolute bottom-[-10%] right-[-15%] h-[70vh] w-[75vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#4c1d95_0%,#312e81_30%,transparent_70%)] opacity-[0.32] blur-[95px] sm:blur-[120px] md:blur-[155px]" />
-
-            {/* Subtle warm amber highlight for richness */}
-            <div className="absolute top-[25%] right-[10%] h-[35vh] w-[45vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#451a03_0%,transparent_75%)] opacity-[0.18] blur-[130px]" />
-
-            {/* Responsive fine grid with premium mask */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-[size:clamp(28px,2.8vw,72px)_clamp(28px,2.8vw,72px)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_25%,#000_25%,transparent_85%)]" />
-
-            {/* Elegant soft vignette for depth */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_95%_75%_at_50%_35%,transparent_25%,rgba(0,0,0,0.75)_85%)]" />
-
-            {/* Very slow, luxurious animated gradient sweep (subtle premium motion) */}
-            <div className="hero-premium-bg absolute inset-0 bg-[linear-gradient(115deg,transparent_15%,rgba(255,255,255,0.025)_48%,transparent_82%)] bg-[length:220%_100%] animate-[premium-sweep_28s_ease-in-out_infinite] [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" />
+    <main className="min-h-dvh overflow-x-clip bg-[#070806] text-stone-100">
+      <AuthenticatedSiteNav />
+      <section className="relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden px-5 py-16 sm:px-6 lg:px-8">
+        <motion.div style={{ y }} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,100,0.18),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(251,191,36,0.12),transparent_28%),linear-gradient(rgba(255,255,255,0.027)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.027)_1px,transparent_1px)] bg-[size:auto,auto,48px_48px,48px_48px]" />
+          <div className="absolute inset-x-0 top-0 h-96 bg-[linear-gradient(180deg,rgba(190,242,100,0.08),transparent)]" />
+        </motion.div>
+        <div className="mx-auto flex max-w-7xl flex-col items-center text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
+            <Sparkles className="size-3.5" />
+            Agentic builds with live code, preview, and checkpoints
           </div>
-          <div className="relative flex min-h-dvh w-full flex-col">
-            <Header hideLogo />
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
-              <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
-                <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-foreground sm:text-[44px] md:text-[80px] lg:text-[92px]">
-                  {["Build.", "Preview.", "Ship."].map((word, index) => (
-                    <motion.span
-                      key={word}
-                      className={`inline-block ${index === 1 ? "mx-2 text-foreground md:mx-6" : ""}`}
-                      {...heroWordAnimation}
-                      transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.1 + index * 0.14, ease: [0.21, 0.47, 0.32, 0.98] }}
-                    >
-                      {word}
-                    </motion.span>
-                  ))}
-                </h1>
-                <motion.p {...heroWordAnimation} transition={{ duration: 0.6, delay: prefersReducedMotion ? 0 : 0.5 }} className="mb-10 max-w-xl text-center text-base leading-7 text-zinc-400 md:text-lg">
-                  Describe any product. Get a working, premium, multi-page app with a live preview — in one prompt.
-                </motion.p>
-                <motion.div id="prompt-composer" className="relative w-full" {...heroWordAnimation} transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.62, ease: [0.21, 0.47, 0.32, 0.98] }}>
-                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} buildMode={buildMode} onBuildModeChange={setBuildMode} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} backendEnabled={backendEnabled} onBackendChange={setBackendEnabled} styleId={styleId} onStyleIdChange={(id) => { setStyleId(id); setSelectedDesignPresetId(null); }} savedDesigns={savedDesigns} onOpenDesignDialog={() => setDesignDialogOpen(true)} onSelectSavedDesign={(design) => setSelectedDesignPresetId(design.id)} selectedSavedDesignId={selectedDesignPresetId} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} savedPrompts={savedPrompts} onSavePrompt={saveCurrentPrompt} onUseSavedPrompt={(item) => setPrompt(item.body)} flagEnabled={flagEnabled} selectedMcpServers={selectedMcpServers} onMcpChange={setSelectedMcpServers} onMcpOpenDialog={() => setMcpDialogOpen(true)} />
-                  <DesignSystemDialog
-                    open={designDialogOpen}
-                    onOpenChange={setDesignDialogOpen}
-                    onSaved={(design) => {
-                      setSavedDesigns((prev) => [design, ...prev]);
-                      setSelectedDesignPresetId(design.id);
-                    }}
-                  />
+          <h1 className="mt-8 max-w-5xl text-balance text-5xl font-semibold tracking-tight text-stone-50 sm:text-7xl lg:text-8xl">
+            Build apps with an agent you can actually inspect.
+          </h1>
+          <p className="mt-6 max-w-2xl text-base leading-7 text-stone-400 sm:text-lg">
+            Describe the product. Chinna-Coder plans the route structure, writes the files, streams the build state, and opens a live preview.
+          </p>
+          <div className="mt-10 w-full">
+            <PromptComposer
+              prompt={prompt}
+              setPrompt={setPrompt}
+              onSend={handleSend}
+              isSubmitting={isSubmitting}
+              model={model}
+              setModel={setModel}
+              mode={mode}
+              setMode={setMode}
+              styleId={styleId}
+              setStyleId={setStyleId}
+              backendEnabled={backendEnabled}
+              setBackendEnabled={setBackendEnabled}
+              selectedType={selectedType}
+              setSelectedType={setSelectedType}
+              attachments={attachments}
+              mcpServers={mcpServers}
+              onAttach={() => fileInputRef.current?.click()}
+              onOpenGithubImport={() => setGithubImportOpen(true)}
+              onOpenProjectImport={() => setProjectImportOpen(true)}
+              onOpenAIIntegration={() => setAiIntegrationOpen(true)}
+              onOpenMcpConnect={() => setMcpDialogOpen(true)}
+            />
+          </div>
+        </div>
+      </section>
 
-                  <McpServerDialog
-                    open={mcpDialogOpen}
-                    onOpenChange={setMcpDialogOpen}
-                    onSaved={(server) => {
-                      // quick connect: add to selected for this generation
-                      setSelectedMcpServers((prev) => {
-                        if (prev.some((s) => s.id === server.id)) return prev;
-                        return [...prev, { id: server.id, name: server.name, url: server.url, transport: server.transport }];
-                      });
-                      toast({ title: "MCP attached for this build", description: server.name });
+      <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
+        {["Agent sees the queue", "You see the files", "Preview stays live"].map((item, index) => (
+          <motion.div key={item} initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ delay: index * 0.08 }} className="rounded-xl border border-lime-300/10 bg-white/[0.035] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/80">Signal {index + 1}</p>
+            <h2 className="mt-3 text-xl font-semibold text-stone-50">{item}</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-400">A restrained surface for build progress, no fake chrome, no mystery status.</p>
+          </motion.div>
+        ))}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-10 sm:px-6 lg:px-8">
+        <div className="grid gap-4 md:grid-cols-2">
+          {sections.map((item, index) => (
+            <motion.article key={item.title} initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ delay: index * 0.05 }} className="group rounded-xl border border-lime-300/10 bg-[#0d0f0a] p-5 transition hover:border-lime-300/30 hover:shadow-[0_0_44px_rgba(190,242,100,0.08)]">
+              <div className="flex items-start gap-4">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-lime-300/20 bg-lime-300/10 text-lime-100">
+                  <item.icon className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/70">{item.eyebrow}</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-stone-50">{item.title}</h2>
+                  <p className="mt-3 text-sm leading-6 text-stone-400">{item.body}</p>
+                </div>
+              </div>
+            </motion.article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-amber-300/15 bg-[linear-gradient(135deg,rgba(251,191,36,0.10),rgba(190,242,100,0.05),rgba(255,255,255,0.03))] p-6 sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-100/80">Launch path</p>
+              <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-stone-50 sm:text-4xl">Start public. Continue authenticated. Keep the exact prompt alive.</h2>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-300">
+                If a visitor sends a prompt before signing in, Chinna-Coder stores the intent, opens auth, then creates the chat and starts the build after sign-in.
+              </p>
+            </div>
+            <Link href="/docs/getting-started" className="inline-flex rounded-lg border border-amber-200/30 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-200/10">
+              Read the workflow <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <RichFooter />
+      <input ref={fileInputRef} type="file" className="hidden" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={handleAttachmentUpload} aria-label="Attach a file" />
+
+      <AIIntegrationDialog
+        open={aiIntegrationOpen}
+        onOpenChange={setAiIntegrationOpen}
+        onApply={handleApplyAiIntegration}
+      />
+
+      <ProjectImportDialog
+        open={projectImportOpen}
+        onOpenChange={setProjectImportOpen}
+        importing={projectImporting}
+        error={projectImportError}
+        onImportZip={handleProjectZipImport}
+        onImportGit={handleProjectGitImport}
+      />
+
+      <Dialog open={githubImportOpen} onOpenChange={setGithubImportOpen}>
+        <DialogContent className="max-w-lg overflow-hidden rounded-2xl border-lime-300/18 bg-[#0d0f0a] p-0 text-stone-100 shadow-2xl shadow-black/50">
+          <div className="relative p-6">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.16),transparent_62%)]" />
+            <div className="relative">
+              <div className="mb-5 grid size-12 place-items-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-100">
+                <Github className="size-5" />
+              </div>
+              <DialogHeader>
+                <DialogTitle className="text-2xl tracking-tight text-stone-50">Import from GitHub</DialogTitle>
+                <DialogDescription className="text-stone-400">
+                  Paste a public repository URL. Chinna-Coder imports the files, creates a project, and opens the generated workspace.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label htmlFor="github-url" className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">Repository URL</label>
+                  <Input
+                    id="github-url"
+                    value={githubUrl}
+                    onChange={(event) => {
+                      setGithubUrl(event.target.value);
+                      setGithubImportError(null);
                     }}
-                    onAttachToGeneration={(server) => {
-                      setSelectedMcpServers((prev) => {
-                        if (prev.some((s) => s.id === server.id)) return prev;
-                        return [...prev, { id: server.id, name: server.name, url: server.url, transport: server.transport }];
-                      });
-                    }}
+                    placeholder="https://github.com/owner/repo"
+                    className="mt-2 h-11 border-white/10 bg-black/30 text-stone-100 placeholder:text-stone-600 focus-visible:ring-lime-200/35"
                   />
-                  <AppTypeChips value={appTypeHint} onChange={handleAppTypeChange} flagEnabled={flagEnabled} disabled={isSubmitting || isGithubImporting} />
-                  <PresetChipsScroller onSelect={setPrompt} />
-                </motion.div>
+                </div>
+                <div>
+                  <label htmlFor="github-token" className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Access token optional</label>
+                  <Input
+                    id="github-token"
+                    value={githubAccessToken}
+                    onChange={(event) => setGithubAccessToken(event.target.value)}
+                    type="password"
+                    placeholder="Only needed for private or rate-limited repos"
+                    className="mt-2 h-11 border-white/10 bg-black/30 text-stone-100 placeholder:text-stone-600 focus-visible:ring-lime-200/35"
+                  />
+                  <p className="mt-2 text-xs leading-5 text-stone-500">The token is used for this import request and is not stored as an app secret.</p>
+                </div>
+                {githubImportError ? (
+                  <p className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-100">{githubImportError}</p>
+                ) : null}
+              </div>
+
+              <div className="mt-6 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <Button type="button" variant="outline" className="h-11 rounded-lg border-lime-300/20 bg-transparent text-lime-100 hover:bg-lime-300/10" onClick={() => setGithubImportOpen(false)} disabled={githubImporting}>
+                  Cancel
+                </Button>
+                <Button type="button" className="h-11 rounded-lg bg-lime-200 px-5 text-stone-950 hover:bg-lime-100" onClick={handleGithubImport} disabled={githubImporting}>
+                  {githubImporting ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
+                  Import repository
+                </Button>
               </div>
             </div>
           </div>
-        </section>
-
-        {/* 01. Showcase - vulk style 1:1 adapted */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20">
-          <div className="mb-8">
-            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
-            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
-            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
-              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
-                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
-                <div className="mt-3 text-white font-medium">{name}</div>
-                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 02. How it works - 3 steps with sub */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
-          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
-            {[
-              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
-              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
-              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
-            ].map(s => (
-              <div key={s.num}>
-                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
-                <div className="font-semibold text-white mb-1">{s.title}</div>
-                <div className="text-sm text-white/70">{s.desc}</div>
-                <a href="#hero" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 03+ Benefits, Security, FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
-              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
-            ))}
-          </div>
-        </section>
-
-        {/* Security & FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
-          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
-        </section>
-
-        <RichFooter />
-
-        {/* 01. Showcase - vulk style 1:1 adapted */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20">
-          <div className="mb-8">
-            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
-            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
-            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
-              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
-                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
-                <div className="mt-3 text-white font-medium">{name}</div>
-                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 02. How it works - 3 steps with sub */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
-          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
-            {[
-              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
-              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
-              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
-            ].map(s => (
-              <div key={s.num}>
-                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
-                <div className="font-semibold text-white mb-1">{s.title}</div>
-                <div className="text-sm text-white/70">{s.desc}</div>
-                <a href="#prompt-composer" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 03+ Benefits, Security, FAQs - dynamic responsive */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
-              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
-            ))}
-          </div>
-        </section>
-
-        {/* Security & FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
-          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
-        </section>
-      </div>
-      <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
-      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
-          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
-            <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
-            <DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}>
-            <div className="space-y-2">
-              <label htmlFor="github-url" className="text-sm font-medium">Repository URL</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" />
-                <Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">{isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}{isGithubImporting ? "Importing" : "Import"}</Button>
-              </div>
-              {githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Supports public GitHub repositories. Private repository import should be connected through account integrations before use.</div>
-          </form>
-          <DialogFooter className="border-t border-border/70 px-5 py-4">
-            <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Auth overlay: shown when unauthenticated user tries to send a prompt.
-          On success the pendingBuild useEffect (above) will create the chat and navigate to /chats with the exact prompt. */}
+      <McpServerDialog
+        open={mcpDialogOpen}
+        onOpenChange={setMcpDialogOpen}
+        title="Connect MCP server"
+        onSaved={(server) => {
+          toast({ title: "MCP server saved", description: "You can attach it to the next build from the prompt composer." });
+          handleAttachMcpServer(server);
+        }}
+        onAttachToGeneration={handleAttachMcpServer}
+      />
+
       <Dialog open={authOverlayOpen} onOpenChange={setAuthOverlayOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md overflow-hidden rounded-2xl border-lime-300/18 bg-[#0d0f0a] p-0 text-stone-100 shadow-2xl shadow-black/50">
+          <div className="relative p-6">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,100,0.18),transparent_62%)]" />
+            <div className="relative">
+              <div className="mb-5 grid size-12 place-items-center rounded-xl border border-lime-300/20 bg-lime-300/10 text-lime-100">
+                <Lock className="size-5" />
+              </div>
           <DialogHeader>
-            <DialogTitle>Sign in to build your app</DialogTitle>
-            <DialogDescription>
-              Your prompt is saved. Sign in with Google and we'll immediately create the chat and start building exactly what you described.
+            <DialogTitle className="text-2xl tracking-tight text-stone-50">Sign in to build your app</DialogTitle>
+            <DialogDescription className="text-stone-400">
+              Your prompt is saved. After Google sign-in, Chinna-Coder opens the chat and starts building exactly what you asked for.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <form action={continueWithGoogle} className="w-full">
-              <Button type="submit" className="w-full" size="lg">
-                <LogIn className="mr-2 size-4" /> Continue with Google
-              </Button>
-            </form>
-            <p className="text-center text-[11px] text-muted-foreground">
-              Free to start. Your builds, chats, and previews are saved to your account.
-            </p>
+          <form action={continueWithGoogle} className="mt-6">
+            <Button type="submit" className="h-11 w-full rounded-lg bg-lime-200 text-stone-950 hover:bg-lime-100">
+              <LogIn className="size-4" />
+              Continue with Google
+            </Button>
+          </form>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
-    </HomeShell>
+    </main>
   );
 }
