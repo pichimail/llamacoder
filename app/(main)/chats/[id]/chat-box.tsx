@@ -84,6 +84,7 @@ export default function ChatBox({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+  const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<
     boolean | null
   >(null);
@@ -473,13 +474,25 @@ export default function ChatBox({
                 </button>
               </Tip>
             ) : (
-              <AiModalAbilitySelector 
-                open={false} 
-                onOpenChange={() => {}} 
-                onSelect={(ability) => {
-                  if (ability.includes('backend')) setBackendEnabled(true);
-                }} 
-              />
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAbilityModalOpen(true)}
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  Abilities
+                </button>
+                <AiModalAbilitySelector 
+                  open={abilityModalOpen} 
+                  onOpenChange={setAbilityModalOpen} 
+                  onSelect={(ability) => {
+                    // Abilities (e.g. backend) are handled in the generation prompt
+                    if (ability.includes('backend')) {
+                      // In a full implementation this could influence the system prompt
+                    }
+                  }} 
+                />
+              </>
             )
           }
           rightActions={
