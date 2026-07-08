@@ -34,7 +34,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -137,9 +136,6 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [appName, setAppName] = useState(chatTitle);
   const [appDescription, setAppDescription] = useState("");
   const [settingsModel, setSettingsModel] = useState("zai-org/GLM-5.1");
-  const [settingsShadcn, setSettingsShadcn] = useState(false);
-  const [settingsCanvas, setSettingsCanvas] = useState(false);
-  const [settingsAutoFix, setSettingsAutoFix] = useState(false);
   const [pendingInstall, setPendingInstall] = useState<string | null>(null);
   const [installKeys, setInstallKeys] = useState<Record<string, string>>({});
   const [domainInput, setDomainInput] = useState("");
@@ -148,14 +144,12 @@ export function ArtifactActionBar({ chatId, chatTitle, activeMessageId, activeVe
   const [seoDescription, setSeoDescription] = useState("");
   const [seoOg, setSeoOg] = useState("");
   const [logsOpen, setLogsOpen] = useState(false);
-  const [deploymentLogs, setDeploymentLogs] = useState<string[]>([]);
-  const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
+  const [deploymentLogs] = useState<string[]>([]);
+  const [selectedDeployment] = useState<any>(null);
   const [byokKeys, setByokKeys] = useState<Array<{ id: string; provider: string; label?: string | null; masked: string }>>([]);
   const [byokKeyInput, setByokKeyInput] = useState("");
-  const [mcpServers, setMcpServers] = useState<any[]>([]);
+  const [, setMcpServers] = useState<any[]>([]);
   const [currentMcpServers, setCurrentMcpServers] = useState<any[]>([]);
-  const [mcpEditDialogOpen, setMcpEditDialogOpen] = useState(false);
-  const [editingServer, setEditingServer] = useState<any>(null);
   const isMobile = useIsMobile();
   const uploadRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);

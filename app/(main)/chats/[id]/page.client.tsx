@@ -68,7 +68,7 @@ const CodeRunner = dynamic(() => import("@/components/code-runner"), { ssr: fals
 type BuilderMode = "preview" | "code" | "design" | "database" | "canvas";
 type MobilePanel = "chat" | "code" | "preview";
 type RawGeneratedFile = { path: string; code?: string; content?: string; language?: string; isPartial?: boolean };
-const MAX_AUTO_FIX_ATTEMPTS = 1;
+const MAX_AUTO_FIX_ATTEMPTS = 5;
 const FIX_CONTEXT_FILE_LIMIT = 18;
 const FIX_CONTEXT_CHAR_BUDGET = 70000;
 const SANDBOX_BUNDLER_TIMEOUT_RE = /Sandbox bundler did not respond in time/i;
@@ -86,19 +86,20 @@ const CONTINUATION_TAIL_CHARS = 6000;
  * generate → continuation → auto-fix), measured from the moment the generation
  * request starts on the client. Once elapsed, the AUTOMATIC auto-fix loop stops
  * kicking off new fix rounds — the last committed version is kept and the user
- * is offered a manual "Fix" — so a build can't silently churn through repeated
- * fix+continuation rounds toward the route's 300s ceiling. Truncation
+ * is offered a manual "Fix" — so a build can't silently churn forever. Truncation
  * continuations are deliberately NOT gated on this clock (they finish an
  * in-flight generation; cutting them off would emit broken code) — they stay
- * bounded by MAX_CONTINUATION_ROUNDS instead. These are intentionally generous
- * circuit-breaker ceilings (not the SLA target itself): they exist to stop
- * runaway fix+continuation churn well before the route's 300s cap, while still
- * leaving room for a large initial generation PLUS at least one full fix round
- * to finish without tripping. Frontend-only apps aim for the 30-60s window but
- * get 120s of slack; full-stack apps (backend mode) aim for 30-120s and get
- * 240s of slack. */
-const GENERATION_BUDGET_MS = 120_000;
-const GENERATION_BUDGET_FULLSTACK_MS = 240_000;
+ * bounded by MAX_CONTINUATION_ROUNDS instead.
+ *
+ * A finished, fully-working app matters more than hitting an internal speed
+ * target, so this is a circuit breaker against genuine runaway loops, not a
+ * speed target to cut work short at. It gives room for a large initial
+ * generation plus up to MAX_AUTO_FIX_ATTEMPTS full fix rounds to actually
+ * converge on a working preview before handing off to the user. Each
+ * individual generation call is still separately bounded by the route's own
+ * maxDuration (300s). */
+const GENERATION_BUDGET_MS = 360_000;
+const GENERATION_BUDGET_FULLSTACK_MS = 600_000;
 
 function getMessageFiles(message: Message): RawGeneratedFile[] {
   const stored = message.files as RawGeneratedFile[] | null;
@@ -960,7 +961,12 @@ Fix requirements:
   }, []);
 
   const handlePreviewReady = useCallback(() => {
-    if (streamPromiseRef.current || streamTextRef.current) return;
+    // No stream/promise guard here: a genuinely stale ready signal from a
+    // superseded preview instance can't reach this callback in the first
+    // place (CodeRunner remounts on a fresh files key and cancels its
+    // internal ready-detection effect on unmount). Gating on those refs only
+    // risked losing the one real "ready" signal to a state-settling race,
+    // permanently stranding the user on whatever tab they were on.
     autoFixPendingRef.current = false;
     lastAutoFixErrorRef.current = "";
     autoFixAttemptRef.current = 0;
@@ -1869,7 +1875,7 @@ Fix requirements:
                         className="hs-composer-swap min-h-0 flex-1 overflow-y-auto border-t border-border/70"
                       />
                     ) : (
-                      <div key="chat-composer" className="hs-composer-swap shrink-0 bg-transparent p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                      <div key="chat-composer" className="hs-composer-swap relative shrink-0 p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                     )}
                   </section>
                 </ResizablePanel>
@@ -1927,7 +1933,7 @@ Fix requirements:
               instead, so "chat" is always reachable regardless of layout. */}
           {effectiveChatCollapsed && (
             <div className="hs-composer-swap pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-              <div className={`pointer-events-auto w-full rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/30 backdrop-blur ${floatingComposerExpanded ? "max-w-xl" : "max-w-md"}`}>
+              <div className={`pointer-events-auto w-full rounded-3xl border border-border/60 bg-background/90 shadow-[0_12px_48px_-12px] shadow-primary/25 ring-1 ring-border/50 backdrop-blur-xl transition-[max-width] duration-300 ${floatingComposerExpanded ? "max-w-xl" : "max-w-md"}`}>
                 <ChatBox
                   chat={chat}
                   variant={floatingComposerExpanded ? "full" : "minimal"}

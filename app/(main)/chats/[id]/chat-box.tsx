@@ -2,9 +2,9 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, MessageSquare, Palette, Shield, Sparkles, Undo2, Github, Plug } from "lucide-react";
+import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Plug } from "lucide-react";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
-import { DotFlow } from "@/components/ui/dot-flow";
+import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
@@ -378,8 +378,6 @@ export default function ChatBox({
     });
   };
 
-  const canUndo = !!onUndo && versions.length > 1;
-
   const chatInfoBar =
     mode === "ask"
       ? {
@@ -406,42 +404,50 @@ export default function ChatBox({
           aria-label="Attach image or file"
         />
 
-        {/* Claude / v0 style live build word + dotted loader above composer */}
-        {(isStreaming || status === "submitted") && (
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 px-3 py-1 text-[11px]">
-            <span className="inline-flex"><DotFlow size={4} /></span>
-            <span className="font-medium text-foreground/85 tracking-tight">
-              {["Scaffolding", "Architecting", "Composing", "Wiring", "Refining", "Polishing", "Validating"][Math.floor(Date.now() / 950) % 7]}
-            </span>
-            <span className="ml-px text-[10px] text-muted-foreground/70">the artifact…</span>
-          </div>
-        )}
+        {/* Build/reasoning activity is shown once, in the left conversation
+            panel — not duplicated here above the composer. */}
 
         {variant === "full" && mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 
+        {/* Float style: plain text affordances, no chip/pill background —
+            these sit directly over the page background, not as a second
+            layered surface stacked on top of the composer. */}
         {variant === "full" && (
-          <Suggestions className="mb-2 px-1">
+          <Suggestions className="mb-1.5 px-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)]">
             {suggestionItems.map((item) => (
               <Suggestion
                 key={item.label}
                 suggestion={item.value}
                 onClick={(value) => setPrompt(value)}
                 disabled={disabled}
-                className="h-8 shrink-0 gap-1.5 border-border/70 bg-zinc-950/70 px-3 text-xs text-muted-foreground hover:border-fuchsia-400/30 hover:bg-zinc-900 hover:text-foreground"
+                className="h-7 shrink-0 gap-1.5 border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
               >
                 {item.icon}
                 {item.label}
               </Suggestion>
             ))}
+            <button
+              type="button"
+              onClick={() => setMcpDialogOpen(true)}
+              disabled={disabled}
+              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
+            >
+              <Plug className="size-3.5" aria-hidden="true" /> MCP
+            </button>
           </Suggestions>
         )}
 
-        <div className="px-1 pb-1 flex gap-1">
-          <button type="button" onClick={() => setMcpDialogOpen(true)} className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-0.5 text-[11px] hover:bg-muted text-muted-foreground hover:text-foreground">
-            <Plug className="size-3.5" /> MCP
-          </button>
-        </div>
-
+        {/* v0-style frame: soft gradient halo that brightens while typing
+            (focus-within) and gently pulses while a build is streaming. */}
+        <div className="group/composer relative">
+          <div
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute -inset-[2px] rounded-[18px] bg-gradient-to-r from-primary/45 via-primary/10 to-primary/45 opacity-0 blur-[6px] transition-opacity duration-500 group-focus-within/composer:opacity-70",
+              isStreaming && "animate-pulse opacity-60",
+            )}
+          />
+          <div className="relative">
         <InputBar
           value={prompt}
           onChange={setPrompt}
@@ -483,18 +489,37 @@ export default function ChatBox({
                 </button>
               </Tip>
             ) : (
-              <OptionDropdown
-                value={mode}
-                onValueChange={(value) => setMode(value as ComposerMode)}
-                aria-label="Select mode"
-                tip="Mode"
-                triggerLabel={<span className="capitalize">{mode}</span>}
-                triggerClassName={ghostTrigger}
-                options={(["ask", "plan", "agent"] as const).map((value) => ({
-                  value,
-                  label: <span className="capitalize">{value}</span>,
-                }))}
-              />
+              <div
+                role="radiogroup"
+                aria-label="Composer mode"
+                className="flex items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 p-0.5"
+              >
+                {(
+                  [
+                    { value: "ask", label: "Ask", icon: MessageCircleQuestion },
+                    { value: "plan", label: "Plan", icon: ListChecks },
+                    { value: "agent", label: "Agent", icon: Sparkles },
+                  ] as const
+                ).map(({ value, label, icon: Icon }) => (
+                  <Tip key={value} label={`${label} mode`}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={mode === value}
+                      onClick={() => setMode(value)}
+                      className={cn(
+                        "inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-all",
+                        mode === value
+                          ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-3" aria-hidden="true" />
+                      <span className={mode === value ? "" : "hidden md:inline"}>{label}</span>
+                    </button>
+                  </Tip>
+                ))}
+              </div>
             )
           }
           rightActions={
@@ -535,13 +560,13 @@ export default function ChatBox({
                 modelId={model}
               >
                 <ContextTrigger asChild>
-                  <button 
-                    type="button" 
-                    className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground flex items-center justify-center text-xs" 
+                  <button
+                    type="button"
+                    className="hidden size-7 items-center justify-center rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground sm:flex"
                     aria-label="Model context"
                     title="Model context usage"
                   >
-                    📊
+                    <Gauge className="size-3.5" aria-hidden="true" />
                   </button>
                 </ContextTrigger>
                 <ContextContent>
@@ -561,43 +586,34 @@ export default function ChatBox({
               </Context>
 
               {versions.length > 0 && onSwitchVersion && (
-                <OptionDropdown
-                  value={currentVersionId || versions[versions.length - 1]?.id || ""}
-                  onValueChange={onSwitchVersion}
-                  aria-label="Restore checkpoint"
-                  tip="Restore checkpoint"
-                  disabled={disabled}
-                  triggerLabel={
-                    versions.find((version) => version.id === currentVersionId)?.label ??
-                    versions[versions.length - 1]?.label
-                  }
-                  triggerClassName={ghostTrigger}
-                  options={versions
-                    .slice()
-                    .reverse()
-                    .map((version) => ({
-                      value: version.id,
-                      label: `Restore ${version.label}`,
-                    }))}
-                />
+                <span className="hidden sm:block">
+                  <OptionDropdown
+                    value={currentVersionId || versions[versions.length - 1]?.id || ""}
+                    onValueChange={onSwitchVersion}
+                    aria-label="Restore checkpoint"
+                    tip="Restore checkpoint"
+                    disabled={disabled}
+                    triggerLabel={
+                      versions.find((version) => version.id === currentVersionId)?.label ??
+                      versions[versions.length - 1]?.label
+                    }
+                    triggerClassName={ghostTrigger}
+                    options={versions
+                      .slice()
+                      .reverse()
+                      .map((version) => ({
+                        value: version.id,
+                        label: `Restore ${version.label}`,
+                      }))}
+                  />
+                </span>
               )}
 
-              {onUndo && (
-                <Tip label="Previous version">
-                  <button
-                    type="button"
-                    onClick={onUndo}
-                    disabled={!canUndo || disabled}
-                    className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground disabled:opacity-40"
-                    aria-label="Undo last version"
-                  >
-                    <Undo2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                </Tip>
-              )}
             </div>
           }
         />
+          </div>
+        </div>
       </div>
 
       <McpServerDialog

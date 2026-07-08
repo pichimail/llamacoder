@@ -7,37 +7,39 @@
   --an-message-radius-inner-offset: 4px;
   --an-max-width: 420px;
 
-  /* Colors - Light mode defaults */
-  --an-background: #f7f2ea;
-  --an-background-secondary: #eee7dc;
-  --an-background-tertiary: #fbf7f0;
-  --an-foreground: #1f1a16;
-  --an-foreground-muted: #6f6358;
-  --an-foreground-subtle: #9b8e80;
-  --an-border-color: #d9cec0;
-  --an-primary-color: #2f6fed;
+  /* Colors — derived from the app's semantic theme tokens so the composer
+     always matches the active theme (light/dark/preset) instead of carrying
+     its own hardcoded palette. */
+  --an-background: hsl(var(--background));
+  --an-background-secondary: hsl(var(--muted));
+  --an-background-tertiary: hsl(var(--card));
+  --an-foreground: hsl(var(--foreground));
+  --an-foreground-muted: hsl(var(--muted-foreground));
+  --an-foreground-subtle: hsl(var(--muted-foreground) / 0.7);
+  --an-border-color: hsl(var(--border));
+  --an-primary-color: hsl(var(--primary));
 
   /* User Messages */
-  --an-user-message-bg: #efe7dc;
-  --an-user-message-text: #1f1a16;
+  --an-user-message-bg: hsl(var(--secondary));
+  --an-user-message-text: hsl(var(--secondary-foreground));
 
   /* Input */
-  --an-input-background: #fffaf2;
-  --an-input-border-color: #d7cab9;
-  --an-input-color: #1f1a16;
-  --an-input-placeholder-color: #8c7f72;
+  --an-input-background: hsl(var(--background));
+  --an-input-border-color: hsl(var(--input));
+  --an-input-color: hsl(var(--foreground));
+  --an-input-placeholder-color: hsl(var(--muted-foreground));
   --an-input-focus-outline: transparent;
   --an-context-padding: 10px;
 
   /* Send/Stop Buttons */
-  --an-send-button-bg: #3b82f6;
-  --an-send-button-color: #ffffff;
+  --an-send-button-bg: hsl(var(--primary));
+  --an-send-button-color: hsl(var(--primary-foreground));
 
   /* Tools */
-  --an-tool-background: #f1e9dd;
-  --an-tool-border-color: #d9cec0;
-  --an-tool-color: #1f1a16;
-  --an-tool-color-muted: #6f6358;
+  --an-tool-background: hsl(var(--muted));
+  --an-tool-border-color: hsl(var(--border));
+  --an-tool-color: hsl(var(--foreground));
+  --an-tool-color-muted: hsl(var(--muted-foreground));
 
   /* Code */
   --an-code-background: #1e1e1e;
@@ -53,36 +55,11 @@
 }
 
 /* Dark mode defaults */
+/* Dark mode: color mappings inherit automatically via the semantic tokens
+   above (the .dark class swaps --background/--foreground/... upstream), so
+   only non-token overrides remain here. */
 .dark {
-  --an-background: #0a0a0a;
-  --an-background-secondary: #242424;
-  --an-background-tertiary: #141414;
-  --an-foreground: #fafafa;
-  --an-foreground-muted: #8c8c8c;
-  --an-foreground-subtle: #71717a;
-  --an-border-color: #2a2a2a;
-  --an-primary-color: #60a5fa;
-
-  --an-user-message-bg: #1a1a1a;
-  --an-user-message-text: #fafafa;
-
-  --an-input-background: #0a0a0a;
-  --an-input-border-color: #2a2a2a;
-  --an-input-color: #fafafa;
-  --an-input-placeholder-color: #71717a;
-  --an-input-focus-outline: transparent;
   --an-context-padding: 12px;
-
-  --an-send-button-bg: #60a5fa;
-  /* Dark mode uses a lighter primary (#60a5fa) — pair it with black text so
-     labels like "Approve" / send-arrow have proper contrast instead of
-     low-contrast white-on-light-blue. */
-  --an-send-button-color: #0a0a0a;
-
-  --an-tool-background: #141414;
-  --an-tool-border-color: #2a2a2a;
-  --an-tool-color: #fafafa;
-  --an-tool-color-muted: #8c8c8c;
 
   --an-code-background: #0a0a0a;
   --an-code-color: #d4d4d4;

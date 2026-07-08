@@ -5,7 +5,6 @@ import { detectArtifactRuntime, getStackFromFiles } from "@/lib/artifact-runtime
 import { withArtifactRuntimeCompat } from "@/lib/artifact-runtime-compat";
 import CodeRunnerReact from "./code-runner-react";
 import type { PreviewMode } from "./code-runner-react";
-import { DotFlow } from "@/components/ui/dot-flow";
 import type { SandpackBuildOptions } from "@/lib/sandpack-config";
 
 const PythonArtifactRunner = dynamic(

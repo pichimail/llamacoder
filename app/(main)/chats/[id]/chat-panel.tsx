@@ -9,7 +9,7 @@ import { PlanResponseCard } from "@/components/plan-mode-panel";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Brain, Archive, ListTodo, Layers, Sparkles, ListChecks } from "lucide-react";
-import { DotFlow } from "@/components/ui/dot-flow";
+import { BuildActivityStrip } from "@/components/chats/build-activity";
 import type { Message } from "./page";
 
 interface ChatPanelProps {
@@ -62,21 +62,9 @@ export function ChatPanel({
     ] : []
   );
 
-  // Unique single English words about the building artifact — Claude style
-  const buildArtifactWords = [
-    "Scaffolding", "Architecting", "Composing", "Wiring", "Styling",
-    "Refining", "Polishing", "Validating", "Optimizing", "Assembling",
-    "Structuring", "Templating", "Theming"
-  ];
-  const getBuildWord = () => {
-    // Stable cycling based on time so it feels alive but not frantic
-    const idx = Math.floor(Date.now() / 1100) % buildArtifactWords.length;
-    return buildArtifactWords[idx];
-  };
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-border/70 px-3 py-3 sm:px-4">
         <MessageSquare className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold text-foreground">Conversation</h2>
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
@@ -84,16 +72,12 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Claude-style live artifact build status (single words + dotted loader) */}
-      {(isStreaming || isReasoningStreaming) && (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 text-xs">
-          <DotFlow size={5} />
-          <span className="font-medium text-foreground/90">
-            {isReasoningStreaming ? "Reasoning" : getBuildWord()}
-          </span>
-          <span className="ml-1 text-[10px] uppercase tracking-[1px] text-muted-foreground/70">artifact</span>
-        </div>
-      )}
+      {/* Live artifact build status (interval-driven shimmer words) */}
+      <BuildActivityStrip
+        active={isStreaming || isReasoningStreaming}
+        phase={isReasoningStreaming ? "reasoning" : "building"}
+        className="mx-3 mt-2"
+      />
 
       <ScrollArea className="flex-1">
         <Accordion
@@ -106,7 +90,7 @@ export function ChatPanel({
           <AccordionItem value="messages" className="border-b border-border/50">
             <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
               <div className="flex items-center gap-2">
-                <MessageSquare className="size-4 text-fuchsia-400" />
+                <MessageSquare className="size-4 text-primary" />
                 <span>Messages</span>
                 <span className="ml-auto text-xs text-muted-foreground">
                   {visibleMessages.length}
@@ -121,7 +105,7 @@ export function ChatPanel({
                     onClick={() => onMessageClick?.(message)}
                     className={`w-full rounded-md border p-3 text-left text-sm transition ${
                       activeMessage?.id === message.id
-                        ? "border-fuchsia-400/50 bg-fuchsia-950/20"
+                        ? "border-primary/50 bg-primary/10"
                         : "border-border/50 hover:border-border hover:bg-muted/30"
                     }`}
                   >
@@ -148,11 +132,6 @@ export function ChatPanel({
                     </div>
                   </button>
                 ))}
-                {isStreaming && (
-                  <div className="rounded-md border border-border/50 p-3">
-                    <Shimmer className="text-sm">Generating response...</Shimmer>
-                  </div>
-                )}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -162,7 +141,7 @@ export function ChatPanel({
             <AccordionItem value="reasoning" className="border-b border-border/50">
               <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <Brain className="size-4 text-violet-400" />
+                  <Brain className="size-4 text-primary" />
                   <span>Reasoning</span>
                   {isReasoningStreaming && (
                     <Sparkles className="ml-auto size-3 animate-pulse text-amber-400" />
@@ -200,7 +179,7 @@ export function ChatPanel({
             <AccordionItem value="tasks" className="border-b border-border/50">
               <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <ListTodo className="size-4 text-amber-400" />
+                  <ListTodo className="size-4 text-primary" />
                   <span>Tasks</span>
                   <span className="ml-auto text-xs text-muted-foreground">
                     {activeTasks.filter(t => t.status === "completed").length}/{activeTasks.length}
@@ -239,7 +218,7 @@ export function ChatPanel({
             <AccordionItem value="plan" className="border-b border-border/50">
               <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <ListChecks className="size-4 text-sky-400" />
+                  <ListChecks className="size-4 text-primary" />
                   <span>Plan</span>
                 </div>
               </AccordionTrigger>
@@ -260,7 +239,7 @@ export function ChatPanel({
             <AccordionItem value="checkpoints" className="border-b border-border/50">
               <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <Archive className="size-4 text-emerald-400" />
+                  <Archive className="size-4 text-primary" />
                   <span>Checkpoints</span>
                   <span className="ml-auto text-xs text-muted-foreground">
                     {checkpoints.length}
@@ -272,14 +251,14 @@ export function ChatPanel({
                   {checkpoints.slice().reverse().map((checkpoint) => (
                     <Checkpoint
                       key={checkpoint.id}
-                      className="rounded-lg border border-border/50 hover:border-emerald-400/50 hover:bg-emerald-950/20 transition"
+                      className="rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/10 transition"
                     >
                       <button
                         onClick={() => onRestoreCheckpoint?.(checkpoint.id)}
                         className="w-full p-3 text-left"
                       >
                         <div className="flex items-center gap-3">
-                          <Layers className="size-4 text-emerald-400" />
+                          <Layers className="size-4 text-primary" />
                           <div className="flex-1">
                             <div className="text-sm font-medium text-foreground">
                               {checkpoint.label}

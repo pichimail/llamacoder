@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest) {
       create: { key: def.key, label: def.label, description: def.description, category: def.category, enabled: parsed.data.enabled },
       update: { enabled: parsed.data.enabled },
     });
-    revalidateTag(FLAGS_TAG);
+    revalidateTag(FLAGS_TAG, { expire: 0 });
     return NextResponse.json({ flag });
   } catch (error) {
     const handled = adminErrorResponse(error);

@@ -47,6 +47,6 @@ export async function setSetting(key: string, value: string) {
     create: { key, value },
     update: { value },
   });
-  revalidateTag(SETTINGS_TAG);
+  revalidateTag(SETTINGS_TAG, { expire: 0 });
   return result;
 }

@@ -124,7 +124,7 @@ export function DesignWorkspace({
   }, [viewport, zoom])
 
   const previewPane = (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-[#0a0a0a]">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-muted/40">
       {/* Top chrome: viewport controls */}
       <div className="flex h-9 items-center justify-between border-b border-border/60 bg-background/95 px-2 text-xs">
         <div className="flex items-center gap-1">
@@ -154,9 +154,12 @@ export function DesignWorkspace({
       </div>
 
       {/* Dominant center canvas */}
-      <div ref={previewContainerRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto bg-[#050505] p-4">
+      <div
+        ref={previewContainerRef}
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-2 sm:p-4 bg-muted/60 [background-image:radial-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:20px_20px]"
+      >
         <div
-          className="relative origin-top-left overflow-hidden rounded border border-border/50 bg-white shadow-xl"
+          className="relative origin-top-left overflow-hidden rounded-lg border border-border/60 bg-background shadow-xl"
           style={containerStyle}
         >
           <DesignInspectorBridge
@@ -286,12 +289,29 @@ export function DesignWorkspace({
   )
 
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden bg-background text-foreground" style={{ minWidth: 390 }}>
+    <div className="flex h-full min-h-0 w-full min-w-0 overflow-hidden bg-background text-foreground">
       {/* Left history rail (collapsible) */}
       <div className="hidden shrink-0 border-r md:block">{leftRail}</div>
 
-      {/* Center dominant preview canvas */}
-      <div className="min-w-0 flex-1 overflow-hidden">{previewPane}</div>
+      {/* Center column: dominant preview canvas + the mobile inspector sheet
+          stacked BELOW it (previously the sheet sat in the horizontal flex row,
+          which rendered it as a squeezed right-hand column instead of a
+          bottom sheet on small screens). */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{previewPane}</div>
+
+        {/* Mobile inspector bottom sheet (always local — the composer slot
+            isn't visible on mobile while Design mode is active). */}
+        <div className="shrink-0 border-t xl:hidden">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between bg-background px-3 py-2 text-xs font-medium">
+              Inspector
+              <span className="text-muted-foreground group-open:hidden">tap to open</span>
+            </summary>
+            <div className="h-[42vh] overflow-auto border-t">{inspectorPane}</div>
+          </details>
+        </div>
+      </div>
 
       {/* Right inspector: portaled into the chat composer slot when available
           (desktop) so the controls replace the composer instead of stacking a
@@ -304,15 +324,6 @@ export function DesignWorkspace({
           {rightOpen && inspectorPane}
         </div>
       )}
-
-      {/* Mobile inspector bottom sheet (always local — the composer slot isn't
-          visible on mobile while Design mode is active). */}
-      <div className="xl:hidden border-t">
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between bg-background px-3 py-2 text-xs">Inspector <span className="text-muted-foreground group-open:hidden">tap to open</span></summary>
-          <div className="h-[42vh] overflow-auto border-t">{inspectorPane}</div>
-        </details>
-      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Send, Loader2, Plus, Paperclip, Mic, Sparkles } from 'lucide-react';
+import { Send, Loader2, Paperclip, Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DotFlow } from '@/components/ui/dot-flow';

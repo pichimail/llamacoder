@@ -249,7 +249,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
 
     // Merge files into the workspace (non-destructive for overlapping paths — last wins)
     const filesToSync = imported.files.map((f) => ({ path: f.path, content: f.code }));
-    const syncResult = await syncFiles(chatId, filesToSync);
+    await syncFiles(chatId, filesToSync);
 
     // Also write the magic bootstrap artifacts
     const extraFiles: any[] = [];

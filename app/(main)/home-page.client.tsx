@@ -1,9 +1,10 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
+import { OptionDropdown } from "@/components/option-dropdown";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, ChevronDown, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,7 +25,7 @@ import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { MODELS } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI, requiresMcpTools } from "@/lib/ai-detection";
+import { requiresAI } from "@/lib/ai-detection";
 import { toast } from "@/hooks/use-toast";
 import { Context } from "./providers";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
@@ -466,6 +467,15 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
   const anyBuilderToggle = flagEnabled("web-search") || flagEnabled("deep-thinking") || flagEnabled("canvas-mode");
   return (
     <div className="w-full">
+      {/* Premium ambient glow: a soft ring behind the composer, always
+          faintly present and brightening on focus — replaces the earlier
+          "no glow" hairline-only treatment. */}
+      <div className="group/glow relative">
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute -inset-1 rounded-[28px] bg-gradient-to-r from-primary/50 via-primary/15 to-primary/50 blur-xl transition-opacity duration-500 ${focused ? "opacity-70" : "opacity-25"}`}
+        />
+        <div className="relative">
       <div className={`hs-home-composer rounded-2xl border bg-[#fffaf2]/96 text-stone-950 shadow-[0_18px_60px_rgba(43,31,18,0.12)] backdrop-blur-xl transition-colors duration-200 dark:bg-zinc-950/70 dark:text-white dark:shadow-black/30 ${focused ? "border-stone-400/80 dark:border-white/25" : "border-stone-300/80 dark:border-white/10"}`}>
         <textarea
           value={value}
@@ -553,22 +563,24 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
             />
           ) : null}
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
-            <label className="sr-only" htmlFor="home-model-select">Model</label>
-            <div className="group relative inline-flex max-w-[46vw] md:min-w-[200px]">
-              <select
-                id="home-model-select"
-                value={model}
-                onChange={(event) => onModelChange(event.target.value)}
-                disabled={disabled}
-                className="peer h-9 w-full appearance-none rounded-full border-0 bg-transparent py-0 pl-0 pr-6 text-sm text-stone-600 outline-none transition-colors hover:text-stone-950 focus:text-stone-950 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-300 dark:focus:text-zinc-200"
-              >
-                {models.map((m: any) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-stone-500 transition-colors group-hover:text-stone-800 dark:text-zinc-600 dark:group-hover:text-zinc-400" aria-hidden="true" />
-            </div>
+            {/* Custom-styled dropdown (not a native <select>): a native select's
+                options popup is rendered by the OS/browser using its own light
+                widget theme, ignoring the page's dark mode entirely — that's
+                what made the model list unreadable after opening it. */}
+            <OptionDropdown
+              value={model}
+              onValueChange={onModelChange}
+              aria-label="Select AI model"
+              disabled={disabled}
+              triggerLabel={models.find((m: any) => m.value === model)?.label ?? model}
+              triggerClassName="h-9 max-w-[46vw] truncate rounded-full px-0 text-sm text-stone-600 transition-colors hover:text-stone-950 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-300 md:min-w-[200px]"
+              options={models.map((m: any) => ({ value: m.value, label: m.label }))}
+            />
             {flagEnabled("voice-input") ? <SpeechInput onTranscriptionChange={(text) => onValueChange(transcriptJoin(value, text))} disabled={disabled} className="size-10 rounded-full border-0 bg-transparent text-stone-500 transition-colors hover:bg-transparent hover:text-stone-950 dark:text-zinc-500 dark:hover:text-zinc-300" aria-label="Dictate prompt" /> : null}
             <button type="button" onClick={() => onSend(value)} disabled={disabled || !hasValue} className="inline-flex size-10 items-center justify-center rounded-full bg-stone-950 text-white shadow-sm transition-colors hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-950/40 disabled:opacity-30 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-white/40" aria-label="Start build">{isLoading ? <DotFlow size={5} label="Starting build" /> : <ArrowUp className="size-5" />}</button>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>
@@ -869,6 +881,13 @@ export default function HomePageClient() {
     <HomeShell>
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
         <section id="hero" className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground">
+          {/* Premium ambient backdrop: a soft primary-tinted glow behind the
+              headline plus a faint grid for texture — both purely decorative
+              (aria-hidden, pointer-events-none) and theme-adaptive via tokens. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+            <div className="absolute left-1/2 top-[-10%] h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-primary/20 blur-[140px] dark:bg-primary/25" />
+            <div className="absolute inset-0 bg-[linear-gradient(hsl(var(--foreground)/0.035)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--foreground)/0.035)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,black_40%,transparent_100%)]" />
+          </div>
           <div className="relative flex min-h-dvh w-full flex-col">
             <Header hideLogo />
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
