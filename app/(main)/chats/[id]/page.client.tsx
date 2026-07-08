@@ -961,7 +961,12 @@ Fix requirements:
   }, []);
 
   const handlePreviewReady = useCallback(() => {
-    if (streamPromiseRef.current || streamTextRef.current) return;
+    // No stream/promise guard here: a genuinely stale ready signal from a
+    // superseded preview instance can't reach this callback in the first
+    // place (CodeRunner remounts on a fresh files key and cancels its
+    // internal ready-detection effect on unmount). Gating on those refs only
+    // risked losing the one real "ready" signal to a state-settling race,
+    // permanently stranding the user on whatever tab they were on.
     autoFixPendingRef.current = false;
     lastAutoFixErrorRef.current = "";
     autoFixAttemptRef.current = 0;

@@ -221,10 +221,15 @@ Any impossible, unsafe, credential-gated, or underspecified parts that should no
 **6. File Structure**  
 Main routes, components, lib files, and server files to generate.
 
-**7. Build Steps**  
+**7. Build Steps**
 Ordered implementation steps for the agent to follow, including validation and preview checks.
 
 Keep it practical and specific. Do not turn non-landing app requests into landing pages.
+
+## FORMATTING (READABILITY)
+Every section body must be a markdown bullet or numbered list — one concrete point per line, short
+sentences. Never write a section as a dense paragraph; the user is scanning this to understand what
+will be built before code starts, so each line must stand on its own.
 `;
 
 export const askModePrompt = dedent`

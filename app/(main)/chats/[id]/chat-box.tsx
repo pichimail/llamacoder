@@ -2,7 +2,7 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Undo2, Plug } from "lucide-react";
+import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Plug } from "lucide-react";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { BuildActivityStrip } from "@/components/chats/build-activity";
 import { cn } from "@/lib/utils";
@@ -379,8 +379,6 @@ export default function ChatBox({
     });
   };
 
-  const canUndo = !!onUndo && versions.length > 1;
-
   const chatInfoBar =
     mode === "ask"
       ? {
@@ -413,15 +411,18 @@ export default function ChatBox({
 
         {variant === "full" && mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 
+        {/* Float style: plain text affordances, no chip/pill background —
+            these sit directly over the page background, not as a second
+            layered surface stacked on top of the composer. */}
         {variant === "full" && (
-          <Suggestions className="mb-2 px-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)]">
+          <Suggestions className="mb-1.5 px-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)]">
             {suggestionItems.map((item) => (
               <Suggestion
                 key={item.label}
                 suggestion={item.value}
                 onClick={(value) => setPrompt(value)}
                 disabled={disabled}
-                className="h-8 shrink-0 gap-1.5 rounded-full border-border/60 bg-card/60 px-3 text-xs text-muted-foreground backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-accent hover:text-accent-foreground"
+                className="h-7 shrink-0 gap-1.5 border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
               >
                 {item.icon}
                 {item.label}
@@ -431,7 +432,7 @@ export default function ChatBox({
               type="button"
               onClick={() => setMcpDialogOpen(true)}
               disabled={disabled}
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-border/60 bg-transparent px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-accent-foreground"
+              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
             >
               <Plug className="size-3.5" aria-hidden="true" /> MCP
             </button>
@@ -610,19 +611,6 @@ export default function ChatBox({
                 </span>
               )}
 
-              {onUndo && (
-                <Tip label="Previous version">
-                  <button
-                    type="button"
-                    onClick={onUndo}
-                    disabled={!canUndo || disabled}
-                    className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground disabled:opacity-40"
-                    aria-label="Undo last version"
-                  >
-                    <Undo2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                </Tip>
-              )}
             </div>
           }
         />
