@@ -58,7 +58,7 @@ function SidebarLink({ href, icon: Icon, label, active, collapsed, onClick }: {
 
 function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolean; onToggle?: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { chats, user, isAuthenticated } = useHomeSidebarData();
+  const { chats, user, isAuthenticated, authEnabled } = useHomeSidebarData();
   const { isEnabled } = useFeatureFlags();
   const isAdmin = Boolean(user?.isAdmin && isAuthenticated);
   const recentChats = useMemo(() => chats.slice(0, 8), [chats]);
@@ -169,6 +169,9 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
 
+  const { isAuthenticated: isAuthedGlobal, authEnabled: authOnGlobal } = useHomeSidebarData();
+  const showSidebar = !immersiveFullscreen && !isAdminRoute && (!authOnGlobal || isAuthedGlobal);
+
   useEffect(() => {
     const onChange = (event: Event) => {
       setImmersiveFullscreen(Boolean((event as CustomEvent<{ active: boolean }>).detail?.active));
@@ -191,14 +194,14 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
   // So immersive mode only hides the sidebar/mobile-bar siblings, it never
   // changes where `children` sits in the tree.
   return (
-    <div className={cn("h-dvh overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out", !immersiveFullscreen && "lg:grid", !immersiveFullscreen && (collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]"))}>
-      {!immersiveFullscreen && (
+    <div className={cn("h-dvh overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-200 ease-out", showSidebar && "lg:grid", showSidebar && (collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[264px_minmax(0,1fr)]"))}>
+      {showSidebar && (
         <div className="hidden lg:sticky lg:top-0 lg:block lg:h-dvh lg:overflow-hidden">
           <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {!immersiveFullscreen && (
+        {showSidebar && !immersiveFullscreen && (
           <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur lg:hidden">
             <button type="button" onClick={() => setMobileOpen(true)} className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" aria-label="Open navigation">
               <Menu className="size-4" aria-hidden="true" />
@@ -211,7 +214,7 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
-      {mobileOpen ? (
+      {showSidebar && mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close navigation overlay" onClick={() => setMobileOpen(false)} />
           <div className="absolute inset-y-0 left-0 w-[min(85vw,300px)] bg-background shadow-2xl">

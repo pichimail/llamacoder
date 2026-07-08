@@ -4,7 +4,7 @@ import { HomeShell } from "@/components/home/home-shell";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, LogIn, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,6 +29,7 @@ import { requiresAI } from "@/lib/ai-detection";
 import { toast } from "@/hooks/use-toast";
 import { Context } from "./providers";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
+import { continueWithGoogle } from "@/app/login/actions";
 
 type Mode = "ask" | "plan" | "agent";
 type Attachment = { kind: "image" | "file"; filename: string; url?: string; size?: number };
@@ -744,6 +745,7 @@ export default function HomePageClient() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const [githubUrl, setGithubUrl] = useState("");
+  const [authOverlayOpen, setAuthOverlayOpen] = useState(false);
   const [githubError, setGithubError] = useState("");
   const [isGithubImporting, setIsGithubImporting] = useState(false);
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
@@ -772,11 +774,117 @@ export default function HomePageClient() {
     };
   }, []);
 
+  // Resume a pending unauthenticated build after the user completes authentication (redirect back to /).
+  // We reconstruct the final prompt from stored flags + raw input, call create-chat, then go to the chats page
+  // which will handle the generation via the ?generate= param.
+  useEffect(() => {
+    const raw = sessionStorage.getItem("pendingBuild");
+    if (!raw) return;
+
+    (async () => {
+      try {
+        const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+        const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
+        if (!authEnforced) {
+          sessionStorage.removeItem("pendingBuild");
+          return;
+        }
+        const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+        if (sess?.user) {
+          const data = JSON.parse(raw);
+          sessionStorage.removeItem("pendingBuild");
+
+          const appTypeHintText: Record<string, string> = {
+            prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
+            "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
+            "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
+            "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
+            "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
+          };
+          const featureHints = [
+            data.webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
+            data.canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
+            data.backendMode ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
+            data.appTypeHint && appTypeHintText[data.appTypeHint] ? appTypeHintText[data.appTypeHint] : "",
+          ].filter(Boolean);
+          const finalPrompt = [data.rawPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
+
+          const createBody: any = {
+            prompt: finalPrompt,
+            model: data.model,
+            quality: data.quality || "high",
+            mode: data.mode || "agent",
+            shadcn: data.shadcn ?? true,
+            styleId: data.styleId,
+            designPresetId: data.designPresetId || undefined,
+            screenshotUrl: data.screenshotUrl,
+            attachments: data.attachments || [],
+            aiCapabilities: [],
+            backendMode: data.backendMode || false,
+            mcpServers: data.mcpServers || [],
+          };
+
+          const res = await fetch("/api/create-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(createBody),
+          });
+          const created = await res.json().catch(() => null);
+          if (!res.ok || !created?.chatId || !created?.lastMessageId) {
+            toast({ title: "Failed to launch build after sign in", description: created?.error || "Try again from the prompt." });
+            return;
+          }
+
+          const params = new URLSearchParams({ generate: created.lastMessageId, model: data.model, quality: "high" });
+          if (data.deepThinkingEnabled) params.set("reasoning", "1");
+          router.push(`/chats/${created.chatId}?${params.toString()}`);
+        }
+      } catch (err) {
+        console.error("Failed to auto-launch pending build", err);
+        sessionStorage.removeItem("pendingBuild");
+      }
+    })();
+  }, [router]);
+
   const handlePromptSend = (value?: string) => {
     const cleanPrompt = (value ?? prompt).trim();
     if (!cleanPrompt && attachments.length === 0) return;
+
     startTransition(async () => {
       try {
+        // If auth is required but user not signed in, save the prompt intent and show auth overlay.
+        // After sign-in, the useEffect below will pick it up and auto-launch the build.
+        try {
+          const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+          const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
+          if (authEnforced) {
+            const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+            if (!sess?.user) {
+              const buildData = {
+                rawPrompt: cleanPrompt,
+                model,
+                quality: "high",
+                mode: buildMode,
+                shadcn: shadcnEnabled,
+                styleId,
+                designPresetId: selectedDesignPresetId || undefined,
+                screenshotUrl: attachments.find((item) => item.kind === "image" && item.url)?.url,
+                attachments,
+                backendMode: backendEnabled,
+                mcpServers: selectedMcpServers,
+                deepThinkingEnabled,
+                appTypeHint,
+                webSearchEnabled,
+                canvasEnabled,
+              };
+              sessionStorage.setItem("pendingBuild", JSON.stringify(buildData));
+              setAuthOverlayOpen(true);
+              return;
+            }
+          }
+        } catch {
+          // fall through to create (it will 401/ error if auth still required)
+        }
         const appTypeHintText: Record<string, string> = {
           prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
           "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
@@ -1011,6 +1119,29 @@ export default function HomePageClient() {
           <DialogFooter className="border-t border-border/70 px-5 py-4">
             <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auth overlay: shown when unauthenticated user tries to send a prompt.
+          On success the pendingBuild useEffect (above) will create the chat and navigate to /chats with the exact prompt. */}
+      <Dialog open={authOverlayOpen} onOpenChange={setAuthOverlayOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sign in to build your app</DialogTitle>
+            <DialogDescription>
+              Your prompt is saved. Sign in with Google and we'll immediately create the chat and start building exactly what you described.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <form action={continueWithGoogle} className="w-full">
+              <Button type="submit" className="w-full" size="lg">
+                <LogIn className="mr-2 size-4" /> Continue with Google
+              </Button>
+            </form>
+            <p className="text-center text-[11px] text-muted-foreground">
+              Free to start. Your builds, chats, and previews are saved to your account.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </HomeShell>
