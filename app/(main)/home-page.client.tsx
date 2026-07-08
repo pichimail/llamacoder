@@ -1,10 +1,9 @@
 "use client";
 
 import { HomeShell } from "@/components/home/home-shell";
-import { OptionDropdown } from "@/components/option-dropdown";
 import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type ReactNode } from "react";
 import { DotFlow } from "@/components/ui/dot-flow";
-import { ArrowUp, Bot, Box, Brain, Check, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, LogIn, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
+import { ArrowUp, Bot, Box, Brain, Check, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, LogIn, MessageSquare, Palette, Plus, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Plug } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,8 +20,9 @@ import { SpeechInput } from "@/components/ai-elements/speech-input";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/header";
-import { FeaturedAppsGrid } from "@/components/featured-apps-grid";
+import { OptionDropdown } from "@/components/option-dropdown";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { RichFooter } from "@/components/rich-footer";
 import { MODELS } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
 import { requiresAI } from "@/lib/ai-detection";
@@ -588,126 +588,10 @@ function PremiumPromptComposer({ value, onValueChange, onSend, isLoading, disabl
   );
 }
 
-/* ---------- Landing sections (scroll-reveal via framer-motion) ---------- */
 
-const revealVariants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0 },
-};
 
-function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
-  const prefersReducedMotion = useReducedMotion();
-  if (prefersReducedMotion) return <div className={className}>{children}</div>;
-  return (
-    <motion.div className={className} variants={revealVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.55, delay, ease: [0.21, 0.47, 0.32, 0.98] }}>
-      {children}
-    </motion.div>
-  );
-}
 
-const HOW_IT_WORKS = [
-  { icon: Wand2, step: "01", title: "Prompt", body: "Describe the product in plain language. Pick a style preset, model, and build mode — the agent plans routes, files, and states for you." },
-  { icon: Eye, step: "02", title: "Preview", body: "Watch a live, interactive preview compile in seconds. Every button, form, and route works — iterate with follow-up prompts as patches." },
-  { icon: Rocket, step: "03", title: "Ship", body: "Export complete, typed Next.js code with real file-system routing, ready to push to GitHub and deploy anywhere." },
-] as const;
 
-const FEATURE_GRID = [
-  { icon: Layers, title: "Real multi-page routing", body: "Generated apps use genuine App Router file structure — layouts, nested routes, and navigation that actually navigates." },
-  { icon: Palette, title: "Five premium style presets", body: "Modern SaaS, Editorial, Warm, Vibrant, and Glass. Consistent tokens across light and dark mode, never flat gray." },
-  { icon: Code2, title: "Production-grade output", body: "Typed TSX, shadcn/ui primitives, working states, empty states, and accessibility baked in from the first render." },
-  { icon: Zap, title: "3D & WebGL ready", body: "Three.js with react-three-fiber and drei is supported out of the box — interactive scenes with orbit controls, no stubs." },
-  { icon: Sparkles, title: "Agentic self-correction", body: "The agent validates the preview after building and repairs compile or runtime issues in the same run." },
-  { icon: Github, title: "GitHub import & remix", body: "Import a public repository into a live chat, preview it instantly, and remix it with prompts." },
-] as const;
-
-function HowItWorksSection() {
-  return (
-    <section id="how-it-works" className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-      <Reveal>
-        <Badge variant="outline" className="mb-4 rounded-full border-indigo-400/40 px-3 py-1 text-xs text-indigo-300">How it works</Badge>
-        <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white md:text-5xl">From idea to running app in three steps</h2>
-      </Reveal>
-      <div className="mt-10 grid gap-4 md:mt-14 md:grid-cols-3 md:gap-6">
-        {HOW_IT_WORKS.map((item, index) => (
-          <Reveal key={item.step} delay={index * 0.12}>
-            <Card className="h-full rounded-2xl border-white/10 bg-white/[0.04] shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:border-white/20">
-              <CardContent className="flex h-full flex-col gap-4 p-6">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex size-11 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300"><item.icon className="size-5" /></span>
-                  <span className="text-sm font-semibold tracking-widest text-zinc-600">{item.step}</span>
-                </div>
-                <h3 className="text-lg font-semibold tracking-tight text-white">{item.title}</h3>
-                <p className="text-sm leading-6 text-zinc-400">{item.body}</p>
-              </CardContent>
-            </Card>
-          </Reveal>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function FeatureGridSection() {
-  return (
-    <section id="built-for-production" className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-      <Reveal>
-        <Badge variant="outline" className="mb-4 rounded-full border-indigo-400/40 px-3 py-1 text-xs text-indigo-300">Built for production</Badge>
-        <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white md:text-5xl">Not a demo generator. A product builder.</h2>
-        <p className="mt-4 max-w-xl text-base leading-7 text-zinc-400">Every generated app compiles first, works second, and looks premium third — with real routing, real states, and real dark mode.</p>
-      </Reveal>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 md:mt-14 lg:grid-cols-3 md:gap-6">
-        {FEATURE_GRID.map((item, index) => (
-          <Reveal key={item.title} delay={(index % 3) * 0.1}>
-            <Card className="h-full rounded-2xl border-white/10 bg-white/[0.04] shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:border-white/20">
-              <CardContent className="flex h-full flex-col gap-3 p-6">
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-white/[0.06] text-indigo-300"><item.icon className="size-5" /></span>
-                <h3 className="text-base font-semibold tracking-tight text-white">{item.title}</h3>
-                <p className="text-sm leading-6 text-zinc-400">{item.body}</p>
-              </CardContent>
-            </Card>
-          </Reveal>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function PoweredBySection() {
-  return (
-    <section id="powered-by" className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-      <Reveal>
-        <Card className="overflow-hidden rounded-3xl border-white/10 bg-gradient-to-br from-indigo-500/15 via-transparent to-fuchsia-500/10">
-          <CardContent className="flex flex-col gap-6 p-8 md:flex-row md:items-center md:justify-between md:p-12">
-            <div className="max-w-xl">
-              <Badge variant="outline" className="mb-4 rounded-full border-indigo-400/40 px-3 py-1 text-xs text-indigo-300">Powered by ChinnaLLM</Badge>
-              <h2 className="text-2xl font-bold tracking-tight text-white md:text-4xl">Agentic generation with deep thinking, web search, and plan mode</h2>
-              <p className="mt-4 text-sm leading-7 text-zinc-400 md:text-base">Choose the model, toggle deep reasoning for complex builds, run plan mode to scope before generating, and let the agent self-correct against the live preview.</p>
-            </div>
-            <Button asChild size="lg" className="h-12 shrink-0 rounded-xl bg-indigo-500 px-6 text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:bg-indigo-400">
-              <Link href="#prompt-composer">Start building</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </Reveal>
-    </section>
-  );
-}
-
-function LandingFooter() {
-  return (
-    <footer className="border-t border-white/10 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-12">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-zinc-500">Chinna-Coder — Build. Preview. Ship.</p>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-zinc-500">
-          <Link href="/gallery" className="transition hover:text-zinc-200">Gallery</Link>
-          <Link href="/library" className="transition hover:text-zinc-200">Library</Link>
-          <Link href="/settings" className="transition hover:text-zinc-200">Settings</Link>
-          <Link href="/dashboard" className="transition hover:text-zinc-200">Dashboard</Link>
-        </nav>
-      </div>
-    </footer>
-  );
-}
 
 export default function HomePageClient() {
   const context = use(Context);
@@ -1072,31 +956,61 @@ export default function HomePageClient() {
           </div>
         </section>
 
-        <HowItWorksSection />
-        <FeatureGridSection />
-        <PoweredBySection />
-
-        {/* Featured templates (existing grid, restyled container) */}
-        {flagEnabled("templates") ? (
-        <section id="featured-templates" className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-20 pt-4">
-          <Reveal>
-            <Card className="rounded-3xl border-white/10 bg-white/[0.03] px-4 py-4 shadow-sm backdrop-blur-md md:px-6 md:py-6">
-              <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-4">
-                <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-white">Featured templates</h2>
-                  <p className="mt-1 text-sm text-zinc-400">Open a responsive preview, then remix in the builder.</p>
-                </div>
-                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
-                  <Link href="/gallery">View gallery</Link>
-                </Button>
+        {/* 01. Showcase - vulk style 1:1 adapted */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-20">
+          <div className="mb-8">
+            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
+            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
+            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
+              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
+                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
+                <div className="mt-3 text-white font-medium">{name}</div>
+                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
               </div>
-              <div className="mt-4"><FeaturedAppsGrid apps={[]} limit={6} compact /></div>
-            </Card>
-          </Reveal>
+            ))}
+          </div>
         </section>
-        ) : null}
 
-        <LandingFooter />
+        {/* 02. How it works - 3 steps with sub */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
+          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
+          <div className="mt-8 grid gap-8 md:grid-cols-3">
+            {[
+              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
+              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
+              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
+            ].map(s => (
+              <div key={s.num}>
+                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
+                <div className="font-semibold text-white mb-1">{s.title}</div>
+                <div className="text-sm text-white/70">{s.desc}</div>
+                <a href="#hero" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 03+ Benefits, Security, FAQs */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
+              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
+            ))}
+          </div>
+        </section>
+
+        {/* Security & FAQs */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
+          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
+        </section>
+
+        <RichFooter />
 
         {/* 01. Showcase - vulk style 1:1 adapted */}
         <section className="mx-auto w-full max-w-6xl px-4 py-20">
