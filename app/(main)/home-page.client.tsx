@@ -6,7 +6,6 @@ import { use, useEffect, useRef, useState, useTransition, type ChangeEvent, type
 import { DotFlow } from "@/components/ui/dot-flow";
 import { ArrowUp, Bot, Box, Brain, Check, Code2, Eye, Github, Image as ImageIcon, Layers, ListChecks, Database, Loader2, Lock, LogIn, MessageSquare, Palette, Plus, Rocket, Search as SearchIcon, Smartphone, Sparkles, Store, Upload, Video, Wand2, Zap, Plug } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ScrambleText } from "@/components/scramble-text";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";

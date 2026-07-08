@@ -35,6 +35,7 @@ function isValidatablePath(path: string) {
 const ALLOWED_DEPS = new Set([
   "@react-three/drei",
   "@react-three/fiber",
+  "@gsap/react",
   "@hookform/resolvers",
   "@radix-ui/react-accordion",
   "@radix-ui/react-alert-dialog",

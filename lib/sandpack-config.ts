@@ -807,6 +807,7 @@ const dependencies = {
   "@twind/core": "latest",
   "@twind/preset-autoprefix": "latest",
   "@twind/preset-tailwind": "latest",
+  "@gsap/react": "^2.1.2",
   "@react-three/drei": "latest",
   "@react-three/fiber": "latest",
   animejs: "latest",

@@ -60,7 +60,7 @@ function SidebarLink({ href, icon: Icon, label, active, collapsed, onClick }: {
 
 function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolean; onToggle?: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { chats, user, isAuthenticated, authEnabled } = useHomeSidebarData();
+  const { chats, user, isAuthenticated } = useHomeSidebarData();
   const { isEnabled } = useFeatureFlags();
   const isAdmin = Boolean(user?.isAdmin && isAuthenticated);
   const recentChats = useMemo(() => chats.slice(0, 8), [chats]);

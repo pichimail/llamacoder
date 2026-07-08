@@ -2,14 +2,14 @@
 
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
-import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Plug } from "lucide-react";
+import { Gauge, MessageSquare } from "lucide-react";
 import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
 import { AiSuggestions } from "@/components/ui/ai-suggestions";
 import { AiModalSelector } from "@/components/ui/ai-modal-selector";
 import { AiResponseWriter } from "@/components/ui/ai-response-writer";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
 import { MODELS } from "@/lib/constants";
@@ -18,7 +18,6 @@ import { toast } from "@/hooks/use-toast";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { PlanModePanel } from "@/components/plan-mode-panel";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Context, ContextTrigger, ContextContent, ContextContentHeader, ContextContentBody, ContextContentFooter } from "@/components/ai-elements/context";
 
@@ -78,7 +77,7 @@ export default function ChatBox({
   const [quality] = useState<"low" | "high">(
     chat.quality === "high" ? "high" : "low",
   );
-  const [mode, setMode] = useState<ComposerMode>("agent");
+  const [mode] = useState<ComposerMode>("agent");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>();
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
@@ -106,47 +105,6 @@ export default function ChatBox({
     setModel(nextModel);
     void persistBuilderSettings({ model: nextModel });
   };
-
-  const suggestionItems = useMemo(
-    () => [
-      {
-        label: "Improve UI hierarchy",
-        value: "Improve the current artifact UI hierarchy with stronger spacing, clearer sections, sharper typography, and polished dark/light states.",
-        icon: <Palette className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add empty/loading/error states",
-        value: "Add complete empty, loading, and error states for every major data surface in this artifact.",
-        icon: <Sparkles className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add filters and search",
-        value: "Add working local search, filtering, sorting, and view controls to the current dashboard/app data surfaces.",
-        icon: <Code2 className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add backend scaffold",
-        value: "Add preview-safe backend-shaped files for API routes, typed data access, and environment variable placeholders without breaking the live preview.",
-        icon: <Database className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add role permissions",
-        value: "Add a role permissions workflow with local state, protected actions, audit-friendly UI, and clear admin/operator states.",
-        icon: <Shield className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add ChinnaLLM assistant",
-        value: "Integrate a ChinnaLLM assistant feature with platform credits or BYOK, local preview fallback, and required UI states.",
-        icon: <Brain className="size-3.5" aria-hidden="true" />,
-      },
-      {
-        label: "Add AI analysis",
-        value: "Integrate a ChinnaLLM analysis panel with platform credits or BYOK, local preview fallback, and required UI states.",
-        icon: <Brain className="size-3.5" aria-hidden="true" />,
-      },
-    ],
-    [],
-  );
 
   useEffect(() => {
     let cancelled = false;

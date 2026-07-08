@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function AiModalSelector({ trigger, options = ["Claude 3.5", "GLM-4", "GPT-4o"], onSelect }: { trigger?: React.ReactNode; options?: string[]; onSelect?: (v: string) => void }) {

@@ -116,8 +116,17 @@ function dependenciesFor(input: BuildInput, templateId: BuildTemplateId) {
 
   deps.add("lucide-react");
   if (input.shadcn) deps.add("shadcn-style components");
-  if (templateId === "motion-landing" || /\b(animation|motion|framer|gsap|three|3d|canvas|parallax)\b/.test(text)) {
+  if (templateId === "motion-landing" || /\b(animation|motion|framer|parallax|reveal|micro[- ]interaction)\b/.test(text)) {
     deps.add("framer-motion");
+  }
+  if (/\b(gsap|kinetic|scrolltrigger|scroll story|scroll-driven|text reveal|split text|scramble|draggable|motion path)\b/.test(text)) {
+    deps.add("gsap");
+    deps.add("@gsap/react");
+  }
+  if (/\b(three|3d|webgl|r3f|react three fiber|canvas scene|orbitcontrols|orbit controls)\b/.test(text)) {
+    deps.add("three");
+    deps.add("@react-three/fiber");
+    deps.add("@react-three/drei");
   }
   if (/\b(chart|charts|graph|analytics|metrics|dashboard)\b/.test(text)) deps.add("local chart-ready data helpers");
   if (/\b(upload|file|image|attachment)\b/.test(text)) deps.add("file input handling");

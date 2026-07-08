@@ -5,7 +5,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Task, TaskTrigger, TaskContent, TaskItem } from "@/components/ai-elements/task";
 import { Checkpoint } from "@/components/ai-elements/checkpoint";
 import { PlanResponseCard } from "@/components/plan-mode-panel";
-import { Shimmer } from "@/components/ai-elements/shimmer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Archive, ListTodo, Layers, ListChecks } from "lucide-react";
 import { BuildActivityStrip } from "@/components/chats/build-activity";

@@ -353,6 +353,27 @@ const THREEJS_SUPPORT_RULE = dedent`
   Use requestAnimationFrame/renderer cleanup in useEffect where raw Three.js is used; with react-three-fiber, prefer useFrame and let the Canvas manage the loop.
   The sandbox supports three, @react-three/fiber, and @react-three/drei — import directly, do not stub.`;
 
+const GSAP_SUPPORT_RULE = dedent`
+  ## GSAP / ADVANCED MOTION SUPPORT
+  Use GSAP only when the latest user prompt asks for cinematic motion, scroll storytelling, text reveals, kinetic landing pages, 3D-feeling product pages, draggable interactions, dashboard micro-interactions, or explicitly says GSAP.
+  The sandbox supports \`gsap\` and \`@gsap/react\`. Import them directly:
+  - \`import { gsap } from "gsap";\`
+  - \`import { useGSAP } from "@gsap/react";\`
+  Register only the plugins actually used by the generated file; never register a giant plugin list by default.
+  Safe plugin imports for generated artifacts include:
+  - \`ScrollTrigger\` from "gsap/ScrollTrigger"
+  - \`ScrollToPlugin\` from "gsap/ScrollToPlugin"
+  - \`TextPlugin\` from "gsap/TextPlugin"
+  - \`Draggable\` from "gsap/Draggable"
+  - \`Flip\` from "gsap/Flip"
+  - \`MotionPathPlugin\` from "gsap/MotionPathPlugin"
+  - \`Observer\` from "gsap/Observer"
+  - \`RoughEase\`, \`ExpoScaleEase\`, and \`SlowMo\` from "gsap/EasePack"
+  For text reveals, prefer SplitText only when the import resolves; otherwise build a local split-by-word/character component and animate spans with GSAP.
+  Avoid environment-sensitive plugins unless the user explicitly requested them and the import is necessary: DrawSVGPlugin, MorphSVGPlugin, InertiaPlugin, ScrollSmoother, GSDevTools, MotionPathHelper, Physics2DPlugin, PhysicsPropsPlugin, PixiPlugin, CustomBounce, CustomWiggle, and CustomEase.
+  Always scope animations with \`useGSAP(() => { ... }, { scope: ref })\` or \`gsap.context(...)\`, clean up on unmount, and respect reduced motion with \`window.matchMedia("(prefers-reduced-motion: reduce)")\`.
+  For 3D requests, combine GSAP with Three.js only for camera/object choreography or scroll-linked scene transitions; keep the main scene in @react-three/fiber and use useFrame for continuous animation.`;
+
 /* ============================================================
  * PHASE 1 AUDIT: SEMANTIC-TOKEN + ANTI-SLOP ENFORCEMENT — ADDITIVE ONLY.
  * Appended AFTER the active style direction block so it reinforces (never
@@ -514,6 +535,7 @@ export function getMainCodingPrompt(
     // takes precedence over the 12 built-in presets when provided.
     p += "\n\n" + (customDesign?.content ? getCustomDesignBlock(customDesign.content, customDesign.instructions) : getStyleDirectionBlock(styleId));
     p += "\n\n" + THREEJS_SUPPORT_RULE;
+    p += "\n\n" + GSAP_SUPPORT_RULE;
     // Phase 1 audit: semantic-token + anti-slop enforcement, appended AFTER the
     // style block so it reinforces the active preset. Additive; never modifies
     // obedience/routing/file-structure rules.
