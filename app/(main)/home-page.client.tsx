@@ -881,12 +881,32 @@ export default function HomePageClient() {
     <HomeShell>
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
         <section id="hero" className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground">
-          {/* Premium ambient backdrop: a soft primary-tinted glow behind the
-              headline plus a faint grid for texture — both purely decorative
-              (aria-hidden, pointer-events-none) and theme-adaptive via tokens. */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <div className="absolute left-1/2 top-[-10%] h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-primary/20 blur-[140px] dark:bg-primary/25" />
-            <div className="absolute inset-0 bg-[linear-gradient(hsl(var(--foreground)/0.035)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--foreground)/0.035)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,black_40%,transparent_100%)]" />
+          {/* Exceptional premium rich gradient background — multi-layered, 
+              deeply dimensional, responsive, and luxurious. Purely decorative. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#050507]">
+            {/* Deep rich base gradient */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_20%,#0a0b12_0%,#050508_45%,#020203_100%)]" />
+
+            {/* Rich violet-indigo orb (top center) */}
+            <div className="absolute -top-[25%] left-1/2 h-[80vh] w-[110vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,#312e81_0%,#1e1b4b_35%,transparent_70%)] opacity-[0.55] blur-[110px] sm:blur-[130px] md:blur-[160px] lg:blur-[200px]" />
+
+            {/* Deep teal/cyan accent (left) */}
+            <div className="absolute top-[5%] -left-[20%] h-[65vh] w-[70vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#164e63_0%,transparent_65%)] opacity-[0.35] blur-[90px] sm:blur-[110px] md:blur-[140px]" />
+
+            {/* Luxurious magenta-rose accent (right) */}
+            <div className="absolute bottom-[-10%] right-[-15%] h-[70vh] w-[75vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#4c1d95_0%,#312e81_30%,transparent_70%)] opacity-[0.32] blur-[95px] sm:blur-[120px] md:blur-[155px]" />
+
+            {/* Subtle warm amber highlight for richness */}
+            <div className="absolute top-[25%] right-[10%] h-[35vh] w-[45vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#451a03_0%,transparent_75%)] opacity-[0.18] blur-[130px]" />
+
+            {/* Responsive fine grid with premium mask */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-[size:clamp(28px,2.8vw,72px)_clamp(28px,2.8vw,72px)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_25%,#000_25%,transparent_85%)]" />
+
+            {/* Elegant soft vignette for depth */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_95%_75%_at_50%_35%,transparent_25%,rgba(0,0,0,0.75)_85%)]" />
+
+            {/* Very slow, luxurious animated gradient sweep (subtle premium motion) */}
+            <div className="hero-premium-bg absolute inset-0 bg-[linear-gradient(115deg,transparent_15%,rgba(255,255,255,0.025)_48%,transparent_82%)] bg-[length:220%_100%] animate-[premium-sweep_28s_ease-in-out_infinite] [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" />
           </div>
           <div className="relative flex min-h-dvh w-full flex-col">
             <Header hideLogo />

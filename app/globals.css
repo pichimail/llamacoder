@@ -131,6 +131,15 @@
   }
 }
 
+@keyframes premium-sweep {
+  0%, 100% {
+    background-position: 220% 0;
+  }
+  50% {
+    background-position: -20% 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -142,6 +151,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .headline-gradient-word {
+    animation: none !important;
+  }
+  .hero-premium-bg {
     animation: none !important;
   }
 }
