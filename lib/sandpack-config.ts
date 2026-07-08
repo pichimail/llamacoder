@@ -848,7 +848,6 @@ const dependencies = {
   "date-fns": "^3.6.0",
   "embla-carousel-react": "^8.1.8",
   "framer-motion": "^11.15.0",
-  "next-themes": "latest",
   postprocessing: "6.36.0",
   "react-day-picker": "^8.10.1",
   "react-hook-form": "latest",

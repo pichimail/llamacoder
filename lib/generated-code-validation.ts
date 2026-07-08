@@ -76,7 +76,6 @@ const ALLOWED_DEPS = new Set([
   "gsap",
   "lucide-react",
   "next",
-  "next-themes",
   "postprocessing",
   "react",
   "react-day-picker",
@@ -565,7 +564,11 @@ export async function validateGeneratedCodeFiles(
 
     const bad = detectBadImports(code);
     for (const b of bad) {
-      issues.push({ path: file.path, line: 1, column: 1, message: `Unapproved external dependency: ${b}`, excerpt: b });
+      const isThemeLib = /^next-themes/.test(b);
+      const message = isThemeLib
+        ? `Unapproved external dependency: ${b}. Do not build a context-based theme provider/hook — the sandbox already applies the active theme's ".dark" class externally. If a local toggle is needed, use a plain component that calls document.documentElement.classList.toggle("dark") directly; never import next-themes or define your own ThemeProvider/useTheme.`
+        : `Unapproved external dependency: ${b}`;
+      issues.push({ path: file.path, line: 1, column: 1, message, excerpt: b });
     }
 
     const unresolved = detectUnresolvedLocalImports(file.path, code, availablePaths);

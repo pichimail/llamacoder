@@ -1,7 +1,7 @@
 /** Feature flags (Phase 4). Every feature shipped in P1–P4 is dynamically
  * controllable from the admin panel. DB rows override these defaults;
  * unknown/missing flags default to enabled so the platform fails open. */
-import { unstable_cache, revalidateTag } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { getPrisma } from "@/lib/prisma";
 
 export type FeatureFlagDef = {

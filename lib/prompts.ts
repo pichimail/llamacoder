@@ -383,6 +383,13 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
     bg-muted text-muted-foreground, or bg-primary text-primary-foreground token pairs.
   - Theme toggles must actually switch the preview theme by toggling the documentElement light/dark
     class (or a local theme state bound to that class); do not render a decorative toggle only.
+  - BANNED: the "next-themes" package, and any hand-rolled ThemeProvider/ThemeContext +
+    useTheme() context pair. The sandbox already applies the active preset's ".dark" class
+    externally to the document root — a generated app never needs its own theme context, and every
+    provider/consumer pair the model writes from scratch is a live crash risk (useTheme called
+    outside its provider throws and blanks the whole preview). If a local light/dark toggle is
+    wanted, implement it as a single stateless component: a button whose onClick does
+    document.documentElement.classList.toggle("dark") — no context, no provider, no separate hook.
 
   ## MANDATORY SHADCN PRIMITIVES (when COMPONENT LIBRARY is ON)
   For these control types, use the corresponding shadcn/ui primitive rather than a hand-rolled
