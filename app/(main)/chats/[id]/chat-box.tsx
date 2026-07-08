@@ -465,7 +465,11 @@ export default function ChatBox({
 
               <AiModalSelector 
                 options={(availableModels ?? MODELS.filter((item) => !item.hidden)).map(i => i.label || i.value)} 
-                onSelect={handleModelChange}
+                value={(availableModels ?? MODELS.filter((item) => !item.hidden)).find(i => i.value === model)?.label || model}
+                onSelect={(label) => {
+                  const match = (availableModels ?? MODELS.filter((item) => !item.hidden)).find(i => (i.label || i.value) === label);
+                  handleModelChange(match?.value ?? label);
+                }}
                 trigger="Model"
               />
 

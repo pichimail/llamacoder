@@ -668,7 +668,10 @@ export default function HomePageClient() {
     (async () => {
       try {
         const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-        const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
+        // Gate whenever Google auth is actually available, regardless of the
+        // saasMode flag — auth is required for any authed build the moment
+        // sign-in is configured. (Environments without auth configured stay open.)
+        const authEnforced = !!pub?.googleAuth;
         if (!authEnforced) {
           sessionStorage.removeItem("pendingBuild");
           return;
@@ -740,7 +743,9 @@ export default function HomePageClient() {
         // After sign-in, the useEffect below will pick it up and auto-launch the build.
         try {
           const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-          const authEnforced = !!(pub?.saasMode && pub?.googleAuth);
+          // Strict gating: require sign-in whenever Google auth is available,
+          // not only in saasMode. Keeps open-build environments unaffected.
+          const authEnforced = !!pub?.googleAuth;
           if (authEnforced) {
             const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
             if (!sess?.user) {

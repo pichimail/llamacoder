@@ -62,7 +62,10 @@ export function useHomeSidebarData(): HomeSidebarData {
     async function load() {
       try {
         const settings = await fetchJsonWithTimeout("/api/public-settings")
-        const authOn = !!(settings?.saasMode && settings?.googleAuth)
+        // Treat auth as enabled whenever Google sign-in is actually available,
+        // independent of the saasMode flag, so the sidebar/workspace stays
+        // hidden for unauthenticated visitors wherever auth is configured.
+        const authOn = !!settings?.googleAuth
         let sessionUser: any = null
 
         if (authOn) {
