@@ -397,7 +397,7 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
     Tailwind color-scale utilities used as surfaces or body text (bg-gray-*, text-gray-*,
     bg-slate-*, bg-zinc-*, text-neutral-*, etc.). Map them to the nearest token:
     bg-white/bg-gray-50 → bg-background or bg-card; text-black/text-gray-900 → text-foreground;
-    text-gray-500 → text-muted-foreground; bg-gray-100 → bg-muted; border-gray-200 → border-border.
+    text-gray-500 → text-muted-foreground; bg-gray-100 → bg-muted; border-gray-200 ��� border-border.
   - BANNED: arbitrary multi-layer shadow stacks (three or more chained shadow-* utilities, or
     arbitrary box-shadow values with multiple layers / colored glows). Use a single shadow-sm /
     shadow / shadow-md from the scale. No 0_0_Npx colored-glow shadows.
@@ -453,9 +453,47 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   spec. Do not compress, summarize, paraphrase, reorder priorities, or reinterpret it into a
   more familiar template. Build each stated screen, entity, field, and interaction as written.`;
 
+/**
+ * Human-readable names for each built-in style preset, used to name the
+ * active selection inside the strict style-lock header.
+ */
+const STYLE_DISPLAY_NAMES: Record<string, string> = {
+  "modern-saas": "Modern SaaS",
+  "editorial-dark": "Editorial Dark",
+  "warm-neutral": "Warm Neutral",
+  "vibrant-accent": "Vibrant Accent",
+  glassmorphism: "Glassmorphism",
+  brutalist: "Brutalist",
+};
+
+/**
+ * Returns the style direction block for the given preset, wrapped in a STRICT
+ * style-lock contract. The user picked this design mode from the dropdown, so
+ * it is treated as a hard, non-negotiable instruction — the generator must not
+ * silently substitute a different aesthetic, blend presets, or fall back to a
+ * generic look. This is the enforcement point for "listen exactly to the user
+ * selected theme style only, strictly".
+ */
 export function getStyleDirectionBlock(styleId?: string): string {
-  if (!styleId) return STYLE_DIRECTION_BLOCKS[DEFAULT_STYLE_ID];
-  return STYLE_DIRECTION_BLOCKS[styleId] ?? STYLE_DIRECTION_BLOCKS[DEFAULT_STYLE_ID];
+  const resolvedId =
+    styleId && STYLE_DIRECTION_BLOCKS[styleId] ? styleId : DEFAULT_STYLE_ID;
+  const block = STYLE_DIRECTION_BLOCKS[resolvedId];
+  const displayName = STYLE_DISPLAY_NAMES[resolvedId] ?? resolvedId;
+
+  const lock = dedent`
+    ## DESIGN MODE LOCK (STRICT — SELECTED BY THE USER, NON-NEGOTIABLE)
+    The user explicitly selected the "${displayName}" design mode from the style
+    dropdown. This selection is a HARD CONTRACT, not a suggestion:
+    - Apply the "${displayName}" direction below to EVERY screen, component, and state.
+    - Do NOT substitute, blend, or drift toward any other preset or a generic default look.
+    - Do NOT override the injected theme tokens; build on top of them.
+    - If the user's prompt and this design mode ever seem to conflict on pure
+      aesthetics (color, radius, surface treatment, typography feel), the design
+      mode WINS for visual styling while you still satisfy the prompt's features.
+    - Treat the anti-patterns listed below as banned.
+  `;
+
+  return `${lock}\n\n${block}`;
 }
 
 /**

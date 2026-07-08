@@ -560,6 +560,76 @@ export default function ChatBox({
     );
   }
 
+<<<<<<< HEAD
+              <AiModalSelector 
+                options={(availableModels ?? MODELS.filter((item) => !item.hidden)).map(i => i.label || i.value)} 
+                value={(availableModels ?? MODELS.filter((item) => !item.hidden)).find(i => i.value === model)?.label || model}
+                onSelect={(label) => {
+                  const match = (availableModels ?? MODELS.filter((item) => !item.hidden)).find(i => (i.label || i.value) === label);
+                  handleModelChange(match?.value ?? label);
+                }}
+                trigger="Model"
+              />
+
+              {/* Subtle Context icon wired with model context - exactly in chats prompt, functional */}
+              <Context 
+                usedTokens={Math.floor(prompt.length / 4) + 200} 
+                maxTokens={model.includes('GLM') ? 128000 : model.includes('claude') ? 200000 : 128000} 
+                modelId={model}
+              >
+                <ContextTrigger asChild>
+                  <button
+                    type="button"
+                    className="hidden size-7 items-center justify-center rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground sm:flex"
+                    aria-label="Model context"
+                    title="Model context usage"
+                  >
+                    <Gauge className="size-3.5" aria-hidden="true" />
+                  </button>
+                </ContextTrigger>
+                <ContextContent>
+                  <ContextContentHeader>
+                    <span className="text-sm font-medium">Context • {model.split('/').pop()}</span>
+                  </ContextContentHeader>
+                  <ContextContentBody>
+                    <div className="text-xs text-muted-foreground">
+                      ~{Math.floor(prompt.length / 4)} tokens used in prompt<br />
+                      Approx context usage for model
+                    </div>
+                  </ContextContentBody>
+                  <ContextContentFooter>
+                    <span className="text-[10px] text-muted-foreground">Click for details (demo)</span>
+                  </ContextContentFooter>
+                </ContextContent>
+              </Context>
+
+              {versions.length > 0 && onSwitchVersion && (
+                <span className="hidden sm:block">
+                  <OptionDropdown
+                    value={currentVersionId || versions[versions.length - 1]?.id || ""}
+                    onValueChange={onSwitchVersion}
+                    aria-label="Restore checkpoint"
+                    tip="Restore checkpoint"
+                    disabled={disabled}
+                    triggerLabel={
+                      versions.find((version) => version.id === currentVersionId)?.label ??
+                      versions[versions.length - 1]?.label
+                    }
+                    triggerClassName={ghostTrigger}
+                    options={versions
+                      .slice()
+                      .reverse()
+                      .map((version) => ({
+                        value: version.id,
+                        label: `Restore ${version.label}`,
+                      }))}
+                  />
+                </span>
+              )}
+
+            </div>
+          }
+=======
   return (
     <TooltipProvider>
       <div ref={composerRef} className="relative w-full chat-composer">
@@ -570,6 +640,7 @@ export default function ChatBox({
           accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
           aria-label="Attach image or file"
           onChange={handleAttachmentUpload}
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
         />
 
         <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">

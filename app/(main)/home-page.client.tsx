@@ -3,6 +3,18 @@
 import Link from "next/link";
 import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+<<<<<<< HEAD
+import Header from "@/components/header";
+import { OptionDropdown } from "@/components/option-dropdown";
+import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { MarketingSections } from "@/components/marketing/marketing-sections";
+import { MODELS } from "@/lib/constants";
+import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
+import { requiresAI } from "@/lib/ai-detection";
+import { toast } from "@/hooks/use-toast";
+import { Context } from "./providers";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
+=======
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight,
@@ -34,6 +46,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
 import { continueWithGoogle } from "@/app/login/actions";
 import { Context } from "./providers";
 import { Button } from "@/components/ui/button";
@@ -1010,6 +1023,60 @@ export default function HomePageClient() {
     setIsSubmitting(true);
     void (async () => {
       try {
+<<<<<<< HEAD
+        const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+        // Gate whenever Google auth is actually available, regardless of the
+        // saasMode flag — auth is required for any authed build the moment
+        // sign-in is configured. (Environments without auth configured stay open.)
+        const authEnforced = !!pub?.googleAuth;
+        if (!authEnforced) {
+          sessionStorage.removeItem("pendingBuild");
+          return;
+        }
+        const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+        if (sess?.user) {
+          const data = JSON.parse(raw);
+          sessionStorage.removeItem("pendingBuild");
+
+          const appTypeHintText: Record<string, string> = {
+            prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
+            "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
+            "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
+            "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
+            "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
+          };
+          const featureHints = [
+            data.webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
+            data.canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
+            data.backendMode ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
+            data.appTypeHint && appTypeHintText[data.appTypeHint] ? appTypeHintText[data.appTypeHint] : "",
+          ].filter(Boolean);
+          const finalPrompt = [data.rawPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
+
+          const createBody: any = {
+            prompt: finalPrompt,
+            model: data.model,
+            quality: data.quality || "high",
+            mode: data.mode || "agent",
+            shadcn: data.shadcn ?? true,
+            styleId: data.styleId,
+            designPresetId: data.designPresetId || undefined,
+            screenshotUrl: data.screenshotUrl,
+            attachments: data.attachments || [],
+            aiCapabilities: [],
+            backendMode: data.backendMode || false,
+            mcpServers: data.mcpServers || [],
+          };
+
+          const res = await fetch("/api/create-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(createBody),
+          });
+          const created = await res.json().catch(() => null);
+          if (!res.ok || !created?.chatId || !created?.lastMessageId) {
+            toast({ title: "Failed to launch build after sign in", description: created?.error || "Try again from the prompt." });
+=======
         const publicSettings = await fetch("/api/public-settings", { cache: "no-store" }).then((response) => response.json().catch(() => null));
         const authEnforced = !!(publicSettings?.saasMode && publicSettings?.googleAuth);
         if (authEnforced) {
@@ -1017,10 +1084,120 @@ export default function HomePageClient() {
           if (!session?.user) {
             sessionStorage.setItem("pendingBuild", JSON.stringify(payload));
             setAuthOverlayOpen(true);
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
             return;
           }
         }
+<<<<<<< HEAD
+      } catch (err) {
+        console.error("Failed to auto-launch pending build", err);
+        sessionStorage.removeItem("pendingBuild");
+      }
+    })();
+  }, [router]);
+
+  const handlePromptSend = (value?: string) => {
+    const cleanPrompt = (value ?? prompt).trim();
+    if (!cleanPrompt && attachments.length === 0) return;
+
+    startTransition(async () => {
+      try {
+        // If auth is required but user not signed in, save the prompt intent and show auth overlay.
+        // After sign-in, the useEffect below will pick it up and auto-launch the build.
+        try {
+          const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+          // Strict gating: require sign-in whenever Google auth is available,
+          // not only in saasMode. Keeps open-build environments unaffected.
+          const authEnforced = !!pub?.googleAuth;
+          if (authEnforced) {
+            const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
+            if (!sess?.user) {
+              const buildData = {
+                rawPrompt: cleanPrompt,
+                model,
+                quality: "high",
+                mode: buildMode,
+                shadcn: shadcnEnabled,
+                styleId,
+                designPresetId: selectedDesignPresetId || undefined,
+                screenshotUrl: attachments.find((item) => item.kind === "image" && item.url)?.url,
+                attachments,
+                backendMode: backendEnabled,
+                mcpServers: selectedMcpServers,
+                deepThinkingEnabled,
+                appTypeHint,
+                webSearchEnabled,
+                canvasEnabled,
+              };
+              sessionStorage.setItem("pendingBuild", JSON.stringify(buildData));
+              setAuthOverlayOpen(true);
+              return;
+            }
+          }
+        } catch {
+          // fall through to create (it will 401/ error if auth still required)
+        }
+        const appTypeHintText: Record<string, string> = {
+          prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
+          "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
+          "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
+          "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
+          "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
+        };
+        const featureHints = [
+          webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
+          canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
+          backendEnabled ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
+          appTypeHint && appTypeHintText[appTypeHint] ? appTypeHintText[appTypeHint] : "",
+        ].filter(Boolean);
+        const finalPrompt = [cleanPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
+        const aiDetection = requiresAI(finalPrompt);
+        const screenshotUrl = attachments.find((item) => item.kind === "image" && item.url)?.url;
+        const response = await fetch("/api/create-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: finalPrompt,
+            model,
+            quality: "high",
+            mode: buildMode,
+            shadcn: shadcnEnabled,
+            styleId,
+            designPresetId: selectedDesignPresetId || undefined,
+            screenshotUrl,
+            attachments,
+            aiCapabilities: aiDetection.capabilities,
+            backendMode: backendEnabled,
+            mcpServers: selectedMcpServers,
+          }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.chatId || !data?.lastMessageId) throw new Error(data?.error || "Please check auth/API configuration.");
+
+        const params = new URLSearchParams({ generate: data.lastMessageId, model, quality: "high" });
+        if (deepThinkingEnabled) params.set("reasoning", "1");
+
+        if (aiDetection.detected) {
+          context.setStreamPromise(undefined);
+          router.push(`/chats/${data.chatId}?${params.toString()}`);
+          return;
+        }
+
+        const streamPromise = fetch("/api/get-next-completion-stream-promise", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: data.lastMessageId, model, reasoning: deepThinkingEnabled, quality: "high" }),
+        }).then(async (streamRes) => {
+          if (!streamRes.ok) throw new Error((await streamRes.text()) || "Failed to start generation");
+          if (!streamRes.body) throw new Error("No body on response");
+          return streamRes.body;
+        });
+        void streamPromise.catch(() => undefined);
+        context.setStreamPromise(streamPromise);
+        router.push(`/chats/${data.chatId}?${params.toString()}`);
+=======
         await createBuild(payload);
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
       } catch (error) {
         toast({ title: "Could not start build", description: error instanceof Error ? error.message : "Please check configuration.", variant: "destructive" });
       } finally {
@@ -1191,6 +1368,67 @@ export default function HomePageClient() {
   }
 
   return (
+<<<<<<< HEAD
+    <HomeShell>
+      <div className="flex min-h-dvh flex-col bg-background text-foreground">
+        <section id="hero" className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground">
+          {/* Exceptional premium rich gradient background — multi-layered, 
+              deeply dimensional, responsive, and luxurious. Purely decorative. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#050507]">
+            {/* Deep rich base gradient — near-black with a faint emerald cast */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_18%,#04100c_0%,#04070a_45%,#020403_100%)]" />
+
+            {/* Primary emerald aurora orb (top center) */}
+            <div className="absolute -top-[28%] left-1/2 h-[82vh] w-[115vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,#065f46_0%,#064e3b_35%,transparent_70%)] opacity-[0.6] blur-[110px] sm:blur-[130px] md:blur-[170px] lg:blur-[210px]" />
+
+            {/* Teal accent (left) */}
+            <div className="absolute top-[4%] -left-[20%] h-[66vh] w-[72vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#0f766e_0%,transparent_65%)] opacity-[0.42] blur-[90px] sm:blur-[110px] md:blur-[140px]" />
+
+            {/* Lime/spring-green accent (right) for the aurora shift */}
+            <div className="absolute bottom-[-12%] right-[-16%] h-[72vh] w-[76vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#3f6212_0%,#134e2a_32%,transparent_72%)] opacity-[0.34] blur-[95px] sm:blur-[120px] md:blur-[160px]" />
+
+            {/* Cool cyan highlight for depth */}
+            <div className="absolute top-[24%] right-[8%] h-[38vh] w-[46vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#083344_0%,transparent_75%)] opacity-[0.22] blur-[130px]" />
+
+            {/* Responsive fine grid with premium mask */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-[size:clamp(28px,2.8vw,72px)_clamp(28px,2.8vw,72px)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_25%,#000_25%,transparent_85%)]" />
+
+            {/* Elegant soft vignette for depth */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_95%_75%_at_50%_35%,transparent_25%,rgba(0,0,0,0.75)_85%)]" />
+
+            {/* Very slow, luxurious animated gradient sweep (subtle premium motion) */}
+            <div className="hero-premium-bg absolute inset-0 bg-[linear-gradient(115deg,transparent_15%,rgba(255,255,255,0.025)_48%,transparent_82%)] bg-[length:220%_100%] animate-[premium-sweep_28s_ease-in-out_infinite] [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" />
+          </div>
+          <div className="relative flex min-h-dvh w-full flex-col">
+            <Header hideLogo />
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
+              <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
+                <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-white sm:text-[44px] md:text-[80px] lg:text-[92px]">
+                  {["Build.", "Preview.", "Ship."].map((word, index) => (
+                    <motion.span
+                      key={word}
+                      className={`inline-block ${index === 1 ? "mx-2 bg-gradient-to-b from-emerald-200 to-teal-400 bg-clip-text text-transparent md:mx-6" : ""}`}
+                      {...heroWordAnimation}
+                      transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.1 + index * 0.14, ease: [0.21, 0.47, 0.32, 0.98] }}
+                    >
+                      {word}
+                    </motion.span>
+                  ))}
+                </h1>
+                <motion.p {...heroWordAnimation} transition={{ duration: 0.6, delay: prefersReducedMotion ? 0 : 0.5 }} className="mb-10 max-w-xl text-center text-base leading-7 text-zinc-400 md:text-lg">
+                  Describe any product. Get a working, premium, multi-page app with a live preview — in one prompt.
+                </motion.p>
+                <motion.div id="prompt-composer" className="relative w-full" {...heroWordAnimation} transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.62, ease: [0.21, 0.47, 0.32, 0.98] }}>
+                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} buildMode={buildMode} onBuildModeChange={setBuildMode} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} backendEnabled={backendEnabled} onBackendChange={setBackendEnabled} styleId={styleId} onStyleIdChange={(id) => { setStyleId(id); setSelectedDesignPresetId(null); }} savedDesigns={savedDesigns} onOpenDesignDialog={() => setDesignDialogOpen(true)} onSelectSavedDesign={(design) => setSelectedDesignPresetId(design.id)} selectedSavedDesignId={selectedDesignPresetId} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} savedPrompts={savedPrompts} onSavePrompt={saveCurrentPrompt} onUseSavedPrompt={(item) => setPrompt(item.body)} flagEnabled={flagEnabled} selectedMcpServers={selectedMcpServers} onMcpChange={setSelectedMcpServers} onMcpOpenDialog={() => setMcpDialogOpen(true)} />
+                  <DesignSystemDialog
+                    open={designDialogOpen}
+                    onOpenChange={setDesignDialogOpen}
+                    onSaved={(design) => {
+                      setSavedDesigns((prev) => [design, ...prev]);
+                      setSelectedDesignPresetId(design.id);
+                    }}
+                  />
+=======
     <main className="min-h-dvh overflow-x-clip bg-[#070806] text-stone-100">
       <AuthenticatedSiteNav />
       <section className="relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden px-5 py-16 sm:px-6 lg:px-8">
@@ -1236,6 +1474,7 @@ export default function HomePageClient() {
           </div>
         </div>
       </section>
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
 
       <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
         {["Agent sees the queue", "You see the files", "Preview stays live"].map((item, index) => (
@@ -1358,6 +1597,34 @@ export default function HomePageClient() {
               </div>
             </div>
           </div>
+<<<<<<< HEAD
+        </section>
+
+        <MarketingSections />
+      </div>
+      <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
+      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
+          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
+            <DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}>
+            <div className="space-y-2">
+              <label htmlFor="github-url" className="text-sm font-medium">Repository URL</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" />
+                <Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">{isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}{isGithubImporting ? "Importing" : "Import"}</Button>
+              </div>
+              {githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Supports public GitHub repositories. Private repository import should be connected through account integrations before use.</div>
+          </form>
+          <DialogFooter className="border-t border-border/70 px-5 py-4">
+            <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
+          </DialogFooter>
+=======
+>>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
         </DialogContent>
       </Dialog>
 
