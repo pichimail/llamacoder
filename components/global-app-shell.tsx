@@ -27,6 +27,8 @@ import {
 import AuthButton from "@/components/auth-button";
 import ThemeToggle from "@/components/theme-toggle";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
+import { CookieBanner } from "@/components/cookie-banner";
+import { RichFooter } from "@/components/rich-footer";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { cn } from "@/lib/utils";
 
@@ -227,6 +229,9 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
+      {children}
+      <RichFooter />
+      <CookieBanner />
     </div>
   );
 }

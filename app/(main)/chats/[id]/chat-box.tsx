@@ -3,6 +3,9 @@
 import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Plug } from "lucide-react";
+import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
+import { AiSuggestions } from "@/components/ui/ai-suggestions";
+import { AiModalSelector } from "@/components/ui/ai-modal-selector";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -413,28 +416,7 @@ export default function ChatBox({
             these sit directly over the page background, not as a second
             layered surface stacked on top of the composer. */}
         {variant === "full" && (
-          <Suggestions className="mb-1.5 px-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)]">
-            {suggestionItems.map((item) => (
-              <Suggestion
-                key={item.label}
-                suggestion={item.value}
-                onClick={(value) => setPrompt(value)}
-                disabled={disabled}
-                className="h-7 shrink-0 gap-1.5 border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
-              >
-                {item.icon}
-                {item.label}
-              </Suggestion>
-            ))}
-            <button
-              type="button"
-              onClick={() => setMcpDialogOpen(true)}
-              disabled={disabled}
-              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
-            >
-              <Plug className="size-3.5" aria-hidden="true" /> MCP
-            </button>
-          </Suggestions>
+          <AiSuggestions onSelect={(value) => setPrompt(value)} />
         )}
 
         {/* v0-style frame: soft gradient halo that brightens while typing
@@ -489,37 +471,13 @@ export default function ChatBox({
                 </button>
               </Tip>
             ) : (
-              <div
-                role="radiogroup"
-                aria-label="Composer mode"
-                className="flex items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 p-0.5"
-              >
-                {(
-                  [
-                    { value: "ask", label: "Ask", icon: MessageCircleQuestion },
-                    { value: "plan", label: "Plan", icon: ListChecks },
-                    { value: "agent", label: "Agent", icon: Sparkles },
-                  ] as const
-                ).map(({ value, label, icon: Icon }) => (
-                  <Tip key={value} label={`${label} mode`}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={mode === value}
-                      onClick={() => setMode(value)}
-                      className={cn(
-                        "inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-all",
-                        mode === value
-                          ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <Icon className="size-3" aria-hidden="true" />
-                      <span className={mode === value ? "" : "hidden md:inline"}>{label}</span>
-                    </button>
-                  </Tip>
-                ))}
-              </div>
+              <AiModalAbilitySelector 
+                open={false} 
+                onOpenChange={() => {}} 
+                onSelect={(ability) => {
+                  if (ability.includes('backend')) setBackendEnabled(true);
+                }} 
+              />
             )
           }
           rightActions={
@@ -532,25 +490,10 @@ export default function ChatBox({
                 aria-label="Dictate chat prompt (speech-to-text)"
               />
 
-              <OptionDropdown
-                value={model}
-                onValueChange={handleModelChange}
-                aria-label="Select AI model"
-                tip="Model"
-                triggerLabel={
-                  availableModels?.find((item) => item.value === model)?.label ??
-                  MODELS.find((item) => item.value === model)?.label ??
-                  model
-                }
-                triggerClassName={ghostTrigger}
-                options={(availableModels ?? MODELS.filter((item) => !item.hidden)).map((item) => ({
-                  value: item.value,
-                  label:
-                    "available" in item && item.available === false
-                      ? `${item.label} (needs API key)`
-                      : item.label,
-                  disabled: "available" in item ? !item.available : false,
-                }))}
+              <AiModalSelector 
+                options={(availableModels ?? MODELS.filter((item) => !item.hidden)).map(i => i.label || i.value)} 
+                onSelect={handleModelChange}
+                trigger="Model"
               />
 
               {/* Subtle Context icon wired with model context - exactly in chats prompt, functional */}

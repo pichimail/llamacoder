@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Task, TaskTrigger, TaskContent, TaskItem } from "@/components/ai-elements/task";
 import { Checkpoint } from "@/components/ai-elements/checkpoint";
 import { PlanResponseCard } from "@/components/plan-mode-panel";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Brain, Archive, ListTodo, Layers, Sparkles, ListChecks } from "lucide-react";
+import { MessageSquare, Archive, ListTodo, Layers, ListChecks } from "lucide-react";
 import { BuildActivityStrip } from "@/components/chats/build-activity";
 import type { Message } from "./page";
+import { AiResponseWriter } from "@/components/ui/ai-response-writer";
 
 interface ChatPanelProps {
   chat: {
@@ -136,42 +136,11 @@ export function ChatPanel({
             </AccordionContent>
           </AccordionItem>
 
-          {/* Reasoning Section */}
-          {(reasoningText || isReasoningStreaming) && (
-            <AccordionItem value="reasoning" className="border-b border-border/50">
-              <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <Brain className="size-4 text-primary" />
-                  <span>Reasoning</span>
-                  {isReasoningStreaming && (
-                    <Sparkles className="ml-auto size-3 animate-pulse text-amber-400" />
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="py-2">
-                  <Reasoning
-                    isStreaming={isReasoningStreaming}
-                    defaultOpen
-                    className="rounded-lg border border-border/50 bg-muted/30 p-3"
-                  >
-                    <ReasoningTrigger
-                      className="text-xs"
-                      getThinkingMessage={(streaming, duration) =>
-                        streaming ? (
-                          <Shimmer duration={1.25}>Reasoning through the build...</Shimmer>
-                        ) : (
-                          <span>Reasoned for {duration ?? "a few"} seconds</span>
-                        )
-                      }
-                    />
-                    <ReasoningContent className="max-h-72 overflow-auto rounded-md border border-border/40 bg-background/40 p-3 text-xs leading-5">
-                      {reasoningText || "Analyzing requirements, file structure, and preview risks before writing files."}
-                    </ReasoningContent>
-                  </Reasoning>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+          {/* AiResponseWriter - full responsive for building artifact */}
+          {(isStreaming || isReasoningStreaming) && (
+            <div className="px-4 py-2">
+              <AiResponseWriter isActive={true} />
+            </div>
           )}
 
           {/* Tasks Section */}
