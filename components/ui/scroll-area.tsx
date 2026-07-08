@@ -7,10 +7,16 @@ const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
 >(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root {...props}>
+  // `className` (sizing utilities like flex-1, h-full, max-h-*) goes on Root
+  // — it's the actual box that participates in the surrounding flex/grid
+  // layout. The Viewport always fills Root at 100%. Putting sizing classes
+  // on the Viewport instead (as this used to) leaves Root unsized, so it
+  // grows to its content's natural height and the nearest real scroll
+  // container (often the whole page) scrolls instead of this ScrollArea.
+  <ScrollAreaPrimitive.Root className={cn("overflow-hidden", className)} {...props}>
     <ScrollAreaPrimitive.Viewport
       ref={ref}
-      className={cn("h-full w-full rounded-[inherit]", className)}
+      className="h-full w-full rounded-[inherit]"
     >
       {children}
     </ScrollAreaPrimitive.Viewport>

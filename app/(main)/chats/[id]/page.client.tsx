@@ -1875,7 +1875,7 @@ Fix requirements:
                         className="hs-composer-swap min-h-0 flex-1 overflow-y-auto border-t border-border/70"
                       />
                     ) : (
-                      <div key="chat-composer" className="hs-composer-swap relative shrink-0 bg-gradient-to-t from-background via-background/85 to-transparent p-3 pt-4"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
+                      <div key="chat-composer" className="hs-composer-swap relative shrink-0 p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
                     )}
                   </section>
                 </ResizablePanel>

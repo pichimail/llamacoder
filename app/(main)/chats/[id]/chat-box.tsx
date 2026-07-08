@@ -4,7 +4,6 @@ import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage }
 import { OptionDropdown } from "@/components/option-dropdown";
 import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, MessageSquare, Palette, Shield, Sparkles, Plug } from "lucide-react";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
-import { BuildActivityStrip } from "@/components/chats/build-activity";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
@@ -405,9 +404,8 @@ export default function ChatBox({
           aria-label="Attach image or file"
         />
 
-        {/* Live build/reasoning activity above the composer (interval-driven
-            shimmer — keeps animating even while the page idles on a stream). */}
-        <BuildActivityStrip active={isStreaming || isPending} className="mb-2" />
+        {/* Build/reasoning activity is shown once, in the left conversation
+            panel — not duplicated here above the composer. */}
 
         {variant === "full" && mode === "plan" ? <PlanModePanel className="mb-3" /> : null}
 

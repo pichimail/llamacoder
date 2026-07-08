@@ -132,11 +132,6 @@ export function ChatPanel({
                     </div>
                   </button>
                 ))}
-                {isStreaming && (
-                  <div className="rounded-md border border-border/50 p-3">
-                    <Shimmer className="text-sm">Generating response...</Shimmer>
-                  </div>
-                )}
               </div>
             </AccordionContent>
           </AccordionItem>
