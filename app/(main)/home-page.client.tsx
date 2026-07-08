@@ -22,7 +22,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/header";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { RichFooter } from "@/components/rich-footer";
+import { MarketingSections } from "@/components/marketing/marketing-sections";
 import { MODELS } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
 import { requiresAI } from "@/lib/ai-detection";
@@ -876,20 +876,20 @@ export default function HomePageClient() {
           {/* Exceptional premium rich gradient background — multi-layered, 
               deeply dimensional, responsive, and luxurious. Purely decorative. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#050507]">
-            {/* Deep rich base gradient */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_20%,#0a0b12_0%,#050508_45%,#020203_100%)]" />
+            {/* Deep rich base gradient — near-black with a faint emerald cast */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_18%,#04100c_0%,#04070a_45%,#020403_100%)]" />
 
-            {/* Rich violet-indigo orb (top center) */}
-            <div className="absolute -top-[25%] left-1/2 h-[80vh] w-[110vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,#312e81_0%,#1e1b4b_35%,transparent_70%)] opacity-[0.55] blur-[110px] sm:blur-[130px] md:blur-[160px] lg:blur-[200px]" />
+            {/* Primary emerald aurora orb (top center) */}
+            <div className="absolute -top-[28%] left-1/2 h-[82vh] w-[115vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,#065f46_0%,#064e3b_35%,transparent_70%)] opacity-[0.6] blur-[110px] sm:blur-[130px] md:blur-[170px] lg:blur-[210px]" />
 
-            {/* Deep teal/cyan accent (left) */}
-            <div className="absolute top-[5%] -left-[20%] h-[65vh] w-[70vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#164e63_0%,transparent_65%)] opacity-[0.35] blur-[90px] sm:blur-[110px] md:blur-[140px]" />
+            {/* Teal accent (left) */}
+            <div className="absolute top-[4%] -left-[20%] h-[66vh] w-[72vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#0f766e_0%,transparent_65%)] opacity-[0.42] blur-[90px] sm:blur-[110px] md:blur-[140px]" />
 
-            {/* Luxurious magenta-rose accent (right) */}
-            <div className="absolute bottom-[-10%] right-[-15%] h-[70vh] w-[75vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#4c1d95_0%,#312e81_30%,transparent_70%)] opacity-[0.32] blur-[95px] sm:blur-[120px] md:blur-[155px]" />
+            {/* Lime/spring-green accent (right) for the aurora shift */}
+            <div className="absolute bottom-[-12%] right-[-16%] h-[72vh] w-[76vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#3f6212_0%,#134e2a_32%,transparent_72%)] opacity-[0.34] blur-[95px] sm:blur-[120px] md:blur-[160px]" />
 
-            {/* Subtle warm amber highlight for richness */}
-            <div className="absolute top-[25%] right-[10%] h-[35vh] w-[45vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#451a03_0%,transparent_75%)] opacity-[0.18] blur-[130px]" />
+            {/* Cool cyan highlight for depth */}
+            <div className="absolute top-[24%] right-[8%] h-[38vh] w-[46vw] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#083344_0%,transparent_75%)] opacity-[0.22] blur-[130px]" />
 
             {/* Responsive fine grid with premium mask */}
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-[size:clamp(28px,2.8vw,72px)_clamp(28px,2.8vw,72px)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_25%,#000_25%,transparent_85%)]" />
@@ -904,11 +904,11 @@ export default function HomePageClient() {
             <Header hideLogo />
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-8 md:pb-32">
               <div className="flex w-full max-w-[920px] -translate-y-2 flex-col items-center md:-translate-y-6">
-                <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-foreground sm:text-[44px] md:text-[80px] lg:text-[92px]">
+                <h1 className="mb-10 text-center text-[38px] font-bold leading-[1.02] tracking-tight text-white sm:text-[44px] md:text-[80px] lg:text-[92px]">
                   {["Build.", "Preview.", "Ship."].map((word, index) => (
                     <motion.span
                       key={word}
-                      className={`inline-block ${index === 1 ? "mx-2 text-foreground md:mx-6" : ""}`}
+                      className={`inline-block ${index === 1 ? "mx-2 bg-gradient-to-b from-emerald-200 to-teal-400 bg-clip-text text-transparent md:mx-6" : ""}`}
                       {...heroWordAnimation}
                       transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.1 + index * 0.14, ease: [0.21, 0.47, 0.32, 0.98] }}
                     >
@@ -956,115 +956,7 @@ export default function HomePageClient() {
           </div>
         </section>
 
-        {/* 01. Showcase - vulk style 1:1 adapted */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20">
-          <div className="mb-8">
-            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
-            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
-            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
-              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
-                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
-                <div className="mt-3 text-white font-medium">{name}</div>
-                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 02. How it works - 3 steps with sub */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
-          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
-            {[
-              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
-              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
-              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
-            ].map(s => (
-              <div key={s.num}>
-                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
-                <div className="font-semibold text-white mb-1">{s.title}</div>
-                <div className="text-sm text-white/70">{s.desc}</div>
-                <a href="#hero" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 03+ Benefits, Security, FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
-              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
-            ))}
-          </div>
-        </section>
-
-        {/* Security & FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
-          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
-        </section>
-
-        <RichFooter />
-
-        {/* 01. Showcase - vulk style 1:1 adapted */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20">
-          <div className="mb-8">
-            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
-            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
-            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
-              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
-                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
-                <div className="mt-3 text-white font-medium">{name}</div>
-                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 02. How it works - 3 steps with sub */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
-          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
-            {[
-              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
-              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
-              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
-            ].map(s => (
-              <div key={s.num}>
-                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
-                <div className="font-semibold text-white mb-1">{s.title}</div>
-                <div className="text-sm text-white/70">{s.desc}</div>
-                <a href="#prompt-composer" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 03+ Benefits, Security, FAQs - dynamic responsive */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
-              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
-            ))}
-          </div>
-        </section>
-
-        {/* Security & FAQs */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
-          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
-        </section>
+        <MarketingSections />
       </div>
       <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
       <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
