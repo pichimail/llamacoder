@@ -28,7 +28,6 @@ import AuthButton from "@/components/auth-button";
 import ThemeToggle from "@/components/theme-toggle";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
 import { CookieBanner } from "@/components/cookie-banner";
-import { RichFooter } from "@/components/rich-footer";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { cn } from "@/lib/utils";
 
@@ -229,8 +228,9 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-      {children}
-      <RichFooter />
+      {/* Global cookie consent — rendered once for every route. The footer is
+          owned by individual pages (marketing shell / landing sections) so it
+          scrolls inside the content column instead of escaping the layout. */}
       <CookieBanner />
     </div>
   );
