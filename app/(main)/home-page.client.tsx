@@ -1098,6 +1098,60 @@ export default function HomePageClient() {
         ) : null}
 
         <LandingFooter />
+
+        {/* 01. Showcase - vulk style 1:1 adapted */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-20">
+          <div className="mb-8">
+            <div className="uppercase tracking-[3px] text-xs text-white/50">Showcase</div>
+            <h2 className="text-4xl font-semibold tracking-tight text-white">Built with Chinna-Coder.</h2>
+            <p className="text-white/60 mt-1">Real apps. One prompt each. Every preview is live.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {["Sneaker Store", "Team Dashboard", "Booking Platform", "Analytics Hub", "E-commerce", "CRM"].map((name, i) => (
+              <div key={i} className="group rounded-2xl border border-white/10 bg-zinc-950/60 p-2 hover:border-white/20 transition">
+                <div className="rounded-xl bg-black/60 p-4 text-xs text-white/50">app.chinna-coder.dev</div>
+                <div className="mt-3 text-white font-medium">{name}</div>
+                <div className="text-[10px] text-emerald-400">Live preview • 42 files • 1.2s</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 02. How it works - 3 steps with sub */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <div className="text-xs uppercase tracking-widest text-white/50 mb-2">How it works</div>
+          <h2 className="text-4xl font-semibold tracking-[-1.5px] text-white">From Prompt to Production</h2>
+          <div className="mt-8 grid gap-8 md:grid-cols-3">
+            {[
+              { num: "01", title: "Describe Your App", desc: "Tell us what to build. Be specific or vague." },
+              { num: "02", title: "AI Generates Everything", desc: "Multi-agent plans, codes, validates." },
+              { num: "03", title: "Preview & Deploy", desc: "Live hot-reload. One click deploy." }
+            ].map(s => (
+              <div key={s.num}>
+                <div className="text-6xl font-mono text-white/10 mb-2">{s.num}</div>
+                <div className="font-semibold text-white mb-1">{s.title}</div>
+                <div className="text-sm text-white/70">{s.desc}</div>
+                <a href="#prompt-composer" className="text-xs text-emerald-400 hover:underline">Learn more →</a>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 03+ Benefits, Security, FAQs - dynamic responsive */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <h2 className="text-3xl font-semibold tracking-tight mb-8 text-white">Everything You Need to Ship</h2>
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            {["Full-stack (frontend, backend, DB, auth)", "Live Sandpack preview & hot reload", "Design inspector & theme system", "MCP tools & external APIs", "Export to GitHub / ZIP", "Credits & BYOK support"].map((f,i) => (
+              <div key={i} className="rounded-xl border border-white/10 p-4 hover:border-white/30 transition">{f}</div>
+            ))}
+          </div>
+        </section>
+
+        {/* Security & FAQs */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 border-t border-white/10">
+          <h2 className="text-2xl font-semibold mb-4 text-white">Built for security-first teams</h2>
+          <p className="text-white/70">EU infrastructure, Firecracker isolation, full data control. <Link href="/privacy" className="underline">Read security →</Link></p>
+        </section>
       </div>
       <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
       <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>

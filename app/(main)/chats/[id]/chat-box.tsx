@@ -6,6 +6,7 @@ import { Brain, Code2, Database, Gauge, ListChecks, MessageCircleQuestion, Messa
 import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
 import { AiSuggestions } from "@/components/ui/ai-suggestions";
 import { AiModalSelector } from "@/components/ui/ai-modal-selector";
+import { AiResponseWriter } from "@/components/ui/ai-response-writer";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -430,6 +431,7 @@ export default function ChatBox({
             )}
           />
           <div className="relative">
+        {isStreaming && <AiResponseWriter isActive={isStreaming} />}
         <InputBar
           value={prompt}
           onChange={setPrompt}
