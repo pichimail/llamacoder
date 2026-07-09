@@ -1468,12 +1468,10 @@ export default function HomePageClient() {
               </div>
             </div>
           </div>
-        </section>
+        </DialogContent>
+      </Dialog>
 
-        <MarketingSections />
-      </div>
       <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
-      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>

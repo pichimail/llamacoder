@@ -76,19 +76,6 @@ export function RichFooter() {
         <div className="col-span-2 md:col-span-1 text-xs">
           © {new Date().getFullYear()} Chinna-Coder. All rights reserved.<br />
           Built with love and lots of AI.
-        <div className="grid gap-8 sm:grid-cols-3">
-          {footerGroups.map((group) => (
-            <div key={group.title}>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/80">{group.title}</h2>
-              <div className="mt-4 grid gap-2">
-                {group.links.map((link) => (
-                  <Link key={link.href} href={link.href} className="text-stone-400 transition hover:text-lime-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/60">
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </footer>
