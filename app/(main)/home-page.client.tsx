@@ -37,6 +37,7 @@ import Header from "@/components/header";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { MarketingSections } from "@/components/marketing/marketing-sections";
+import { HomeShell } from "@/components/home/home-shell";
 import { MODELS, type ModelConfig } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
 import { requiresAI } from "@/lib/ai-detection";
