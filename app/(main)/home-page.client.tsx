@@ -1531,6 +1531,12 @@ export default function HomePageClient() {
           </div>
         </DialogContent>
       </Dialog>
-    </main>
+
+      <McpServerDialog
+        open={mcpDialogOpen}
+        onOpenChange={setMcpDialogOpen}
+        onSelected={handleAttachMcpServer}
+      />
+    </HomeShell>
   );
 }
