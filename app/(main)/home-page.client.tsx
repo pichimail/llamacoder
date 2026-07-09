@@ -59,7 +59,6 @@ import { Input } from "@/components/ui/input";
 import { RichFooter } from "@/components/rich-footer";
 import { Textarea } from "@/components/ui/textarea";
 import { BYOK_PROVIDERS, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
-import { toast } from "@/hooks/use-toast";
 
 type Attachment = { kind: "image" | "file"; filename: string; url?: string; size?: number };
 type Mode = "ask" | "plan" | "agent";
