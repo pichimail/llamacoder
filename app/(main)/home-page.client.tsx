@@ -1490,29 +1490,6 @@ export default function HomePageClient() {
       </Dialog>
 
       <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
-      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
-          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
-            <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
-            <DialogDescription>Paste a public repository URL. Chinna-Coder will import files, create a chat, and open the live preview.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4 px-5 py-5" onSubmit={(event) => { event.preventDefault(); submitGithubImport(); }}>
-            <div className="space-y-2">
-              <label htmlFor="github-url" className="text-sm font-medium">Repository URL</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input id="github-url" autoFocus value={githubUrl} onChange={(event) => setGithubUrl(event.target.value)} placeholder="https://github.com/pichimail/llamacoder" disabled={isGithubImporting} className="h-11 rounded-xl" />
-                <Button type="submit" disabled={isGithubImporting || !githubUrl.trim()} className="h-11 rounded-xl px-5">{isGithubImporting ? <Loader2 className="size-4 animate-spin" /> : null}{isGithubImporting ? "Importing" : "Import"}</Button>
-              </div>
-              {githubError ? <p className="text-sm text-destructive">{githubError}</p> : null}
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Supports public GitHub repositories. Private repository import should be connected through account integrations before use.</div>
-          </form>
-          <DialogFooter className="border-t border-border/70 px-5 py-4">
-            <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={authOverlayOpen} onOpenChange={setAuthOverlayOpen}>
         <DialogContent className="max-w-md overflow-hidden rounded-2xl border-lime-300/18 bg-[#0d0f0a] p-0 text-stone-100 shadow-2xl shadow-black/50">
           <div className="relative p-6">
