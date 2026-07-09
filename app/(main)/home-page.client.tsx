@@ -1338,8 +1338,8 @@ export default function HomePageClient() {
                     isSubmitting={isSubmitting}
                     model={model}
                     setModel={setModel}
-                    mode={buildMode}
-                    setMode={setBuildMode}
+                    mode={mode}
+                    setMode={setMode}
                     styleId={styleId}
                     setStyleId={(id) => {
                       setStyleId(id);
@@ -1347,8 +1347,8 @@ export default function HomePageClient() {
                     }}
                     backendEnabled={backendEnabled}
                     setBackendEnabled={setBackendEnabled}
-                    selectedType={buildMode}
-                    setSelectedType={setBuildMode}
+                    selectedType={selectedType}
+                    setSelectedType={setSelectedType}
                     attachments={attachments}
                     mcpServers={selectedMcpServers}
                     onAttach={() => fileInputRef.current?.click()}
