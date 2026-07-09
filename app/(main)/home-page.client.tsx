@@ -891,6 +891,11 @@ export default function HomePageClient() {
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [0, -120]);
 
+  const heroWordAnimation = {
+    initial: { opacity: 0, y: prefersReducedMotion ? 0 : 24 },
+    animate: { opacity: 1, y: 0 },
+  };
+
   useEffect(() => {
     const incomingPrompt = searchParams.get("prompt");
     if (incomingPrompt) setPrompt(incomingPrompt);
