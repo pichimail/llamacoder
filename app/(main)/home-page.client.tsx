@@ -1350,7 +1350,7 @@ export default function HomePageClient() {
                     selectedType={selectedType}
                     setSelectedType={setSelectedType}
                     attachments={attachments}
-                    mcpServers={selectedMcpServers}
+                    mcpServers={mcpServers}
                     onAttach={() => fileInputRef.current?.click()}
                     onOpenGithubImport={() => setGithubDialogOpen(true)}
                     onOpenProjectImport={() => {}}
