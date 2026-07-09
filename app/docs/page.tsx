@@ -43,7 +43,6 @@ const docs = [
 
 export default function DocsPage() {
   return (
-<<<<<<< HEAD
     <MarketingShell
       eyebrow="Documentation"
       title="Build with confidence"
@@ -132,21 +131,5 @@ export default function DocsPage() {
         </Reveal>
       </section>
     </MarketingShell>
-=======
-    <PublicPageShell
-      eyebrow="Docs"
-      title="Build docs for the agentic app workspace."
-      description="Short, practical guides for starting builds, reading agent progress, adding integrations, and understanding security boundaries."
-    >
-      <div className="grid gap-3 md:grid-cols-2">
-        {docs.map((doc) => (
-          <Link key={doc.href} href={doc.href} className="rounded-xl border border-lime-300/10 bg-white/[0.035] p-5 transition hover:border-lime-300/30 hover:bg-lime-300/[0.06]">
-            <h2 className="text-lg font-semibold text-stone-50">{doc.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-400">{doc.body}</p>
-          </Link>
-        ))}
-      </div>
-    </PublicPageShell>
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
   );
 }

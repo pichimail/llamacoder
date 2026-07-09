@@ -3,18 +3,6 @@
 import Link from "next/link";
 import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-<<<<<<< HEAD
-import Header from "@/components/header";
-import { OptionDropdown } from "@/components/option-dropdown";
-import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { MarketingSections } from "@/components/marketing/marketing-sections";
-import { MODELS } from "@/lib/constants";
-import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI } from "@/lib/ai-detection";
-import { toast } from "@/hooks/use-toast";
-import { Context } from "./providers";
-import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
-=======
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight,
@@ -45,10 +33,17 @@ import {
   TerminalSquare,
   UploadCloud,
 } from "lucide-react";
-
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
-import { continueWithGoogle } from "@/app/login/actions";
+import Header from "@/components/header";
+import { OptionDropdown } from "@/components/option-dropdown";
+import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { MarketingSections } from "@/components/marketing/marketing-sections";
+import { MODELS } from "@/lib/constants";
+import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
+import { requiresAI } from "@/lib/ai-detection";
+import { toast } from "@/hooks/use-toast";
 import { Context } from "./providers";
+import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
+import { continueWithGoogle } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -1016,86 +1011,6 @@ export default function HomePageClient() {
     router.push(`/chats/${created.chatId}?${params.toString()}`);
   }
 
-  function handleSend() {
-    const cleanPrompt = prompt.trim();
-    if (!cleanPrompt && attachments.length === 0) return;
-    const payload = { rawPrompt: cleanPrompt, model, mode, styleId, backendMode: backendEnabled, selectedType, attachments, mcpServers, aiIntegration };
-    setIsSubmitting(true);
-    void (async () => {
-      try {
-<<<<<<< HEAD
-        const pub = await fetch("/api/public-settings", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-        // Gate whenever Google auth is actually available, regardless of the
-        // saasMode flag — auth is required for any authed build the moment
-        // sign-in is configured. (Environments without auth configured stay open.)
-        const authEnforced = !!pub?.googleAuth;
-        if (!authEnforced) {
-          sessionStorage.removeItem("pendingBuild");
-          return;
-        }
-        const sess = await fetch("/api/auth/session", { cache: "no-store" }).then((r) => r.json().catch(() => null));
-        if (sess?.user) {
-          const data = JSON.parse(raw);
-          sessionStorage.removeItem("pendingBuild");
-
-          const appTypeHintText: Record<string, string> = {
-            prototype: "Build a fast exploratory prototype: fewer states and edge cases, prioritize speed of iteration over completeness.",
-            "web-app": "Build a complete multi-page web application with proper routing between distinct views.",
-            "mobile-app": "Build with a mobile-first layout: bottom navigation, large tap targets, safe-area handling, native-app feel.",
-            "3d-webgl": "Include an interactive Three.js/WebGL scene as a core part of the experience.",
-            "app-stores": "Structure the app to be packageable for iOS/Android app store submission (Capacitor-compatible layout, native-feeling navigation).",
-          };
-          const featureHints = [
-            data.webSearchEnabled ? "Web search option is enabled. Add source-aware UI states only when real backend data is provided." : "",
-            data.canvasEnabled ? "Canvas option is enabled. Include an editable visual workspace when relevant." : "",
-            data.backendMode ? "Backend mode is enabled. Generate Neon/Postgres, Prisma, API routes, and env setup files where the app requires persistence." : "",
-            data.appTypeHint && appTypeHintText[data.appTypeHint] ? appTypeHintText[data.appTypeHint] : "",
-          ].filter(Boolean);
-          const finalPrompt = [data.rawPrompt || "Build from the uploaded attachment.", ...featureHints].join("\n\n");
-
-          const createBody: any = {
-            prompt: finalPrompt,
-            model: data.model,
-            quality: data.quality || "high",
-            mode: data.mode || "agent",
-            shadcn: data.shadcn ?? true,
-            styleId: data.styleId,
-            designPresetId: data.designPresetId || undefined,
-            screenshotUrl: data.screenshotUrl,
-            attachments: data.attachments || [],
-            aiCapabilities: [],
-            backendMode: data.backendMode || false,
-            mcpServers: data.mcpServers || [],
-          };
-
-          const res = await fetch("/api/create-chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(createBody),
-          });
-          const created = await res.json().catch(() => null);
-          if (!res.ok || !created?.chatId || !created?.lastMessageId) {
-            toast({ title: "Failed to launch build after sign in", description: created?.error || "Try again from the prompt." });
-=======
-        const publicSettings = await fetch("/api/public-settings", { cache: "no-store" }).then((response) => response.json().catch(() => null));
-        const authEnforced = !!(publicSettings?.saasMode && publicSettings?.googleAuth);
-        if (authEnforced) {
-          const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null));
-          if (!session?.user) {
-            sessionStorage.setItem("pendingBuild", JSON.stringify(payload));
-            setAuthOverlayOpen(true);
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
-            return;
-          }
-        }
-<<<<<<< HEAD
-      } catch (err) {
-        console.error("Failed to auto-launch pending build", err);
-        sessionStorage.removeItem("pendingBuild");
-      }
-    })();
-  }, [router]);
-
   const handlePromptSend = (value?: string) => {
     const cleanPrompt = (value ?? prompt).trim();
     if (!cleanPrompt && attachments.length === 0) return;
@@ -1195,15 +1110,12 @@ export default function HomePageClient() {
         void streamPromise.catch(() => undefined);
         context.setStreamPromise(streamPromise);
         router.push(`/chats/${data.chatId}?${params.toString()}`);
-=======
-        await createBuild(payload);
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
       } catch (error) {
         toast({ title: "Could not start build", description: error instanceof Error ? error.message : "Please check configuration.", variant: "destructive" });
       } finally {
         setIsSubmitting(false);
       }
-    })();
+    });
   }
 
   async function handleAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -1368,7 +1280,6 @@ export default function HomePageClient() {
   }
 
   return (
-<<<<<<< HEAD
     <HomeShell>
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
         <section id="hero" className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -1428,55 +1339,10 @@ export default function HomePageClient() {
                       setSelectedDesignPresetId(design.id);
                     }}
                   />
-=======
-    <main className="min-h-dvh overflow-x-clip bg-[#070806] text-stone-100">
-      <AuthenticatedSiteNav />
-      <section className="relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden px-5 py-16 sm:px-6 lg:px-8">
-        <motion.div style={{ y }} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,100,0.18),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(251,191,36,0.12),transparent_28%),linear-gradient(rgba(255,255,255,0.027)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.027)_1px,transparent_1px)] bg-[size:auto,auto,48px_48px,48px_48px]" />
-          <div className="absolute inset-x-0 top-0 h-96 bg-[linear-gradient(180deg,rgba(190,242,100,0.08),transparent)]" />
-        </motion.div>
-        <div className="mx-auto flex max-w-7xl flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
-            <Sparkles className="size-3.5" />
-            Agentic builds with live code, preview, and checkpoints
-          </div>
-          <h1 className="mt-8 max-w-5xl text-balance text-5xl font-semibold tracking-tight text-stone-50 sm:text-7xl lg:text-8xl">
-            Build apps with an agent you can actually inspect.
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-stone-400 sm:text-lg">
-            Describe the product. Chinna-Coder plans the route structure, writes the files, streams the build state, and opens a live preview.
-          </p>
-          <div className="mt-10 w-full">
-            <PromptComposer
-              prompt={prompt}
-              setPrompt={setPrompt}
-              onSend={handleSend}
-              isSubmitting={isSubmitting}
-              model={model}
-              setModel={setModel}
-              mode={mode}
-              setMode={setMode}
-              styleId={styleId}
-              setStyleId={setStyleId}
-              backendEnabled={backendEnabled}
-              setBackendEnabled={setBackendEnabled}
-              selectedType={selectedType}
-              setSelectedType={setSelectedType}
-              attachments={attachments}
-              mcpServers={mcpServers}
-              onAttach={() => fileInputRef.current?.click()}
-              onOpenGithubImport={() => setGithubImportOpen(true)}
-              onOpenProjectImport={() => setProjectImportOpen(true)}
-              onOpenAIIntegration={() => setAiIntegrationOpen(true)}
-              onOpenMcpConnect={() => setMcpDialogOpen(true)}
-            />
-          </div>
-        </div>
-      </section>
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
+        </section>
+        <MarketingSections />
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
+        <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
         {["Agent sees the queue", "You see the files", "Preview stays live"].map((item, index) => (
           <motion.div key={item} initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ delay: index * 0.08 }} className="rounded-xl border border-lime-300/10 bg-white/[0.035] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/80">Signal {index + 1}</p>
@@ -1597,7 +1463,6 @@ export default function HomePageClient() {
               </div>
             </div>
           </div>
-<<<<<<< HEAD
         </section>
 
         <MarketingSections />
@@ -1623,8 +1488,6 @@ export default function HomePageClient() {
           <DialogFooter className="border-t border-border/70 px-5 py-4">
             <Button type="button" variant="outline" onClick={() => setGithubDialogOpen(false)} disabled={isGithubImporting}>Cancel</Button>
           </DialogFooter>
-=======
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
         </DialogContent>
       </Dialog>
 
