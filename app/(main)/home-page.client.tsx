@@ -37,7 +37,7 @@ import Header from "@/components/header";
 import { OptionDropdown } from "@/components/option-dropdown";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { MarketingSections } from "@/components/marketing/marketing-sections";
-import { MODELS } from "@/lib/constants";
+import { MODELS, type ModelConfig } from "@/lib/constants";
 import { SANDBOX_STYLE_PRESETS, DEFAULT_STYLE_ID, type SandboxStyleId } from "@/lib/sandbox-theme";
 import { requiresAI } from "@/lib/ai-detection";
 import { toast } from "@/hooks/use-toast";
@@ -56,12 +56,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { RichFooter } from "@/components/rich-footer";
 import { Textarea } from "@/components/ui/textarea";
-import { MODELS, type ModelConfig } from "@/lib/constants";
-import { DEFAULT_STYLE_ID, SANDBOX_STYLE_PRESETS, type SandboxStyleId } from "@/lib/sandbox-theme";
-import { requiresAI } from "@/lib/ai-detection";
 import { BYOK_PROVIDERS, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
 import { toast } from "@/hooks/use-toast";
 
