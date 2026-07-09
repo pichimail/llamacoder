@@ -48,7 +48,6 @@ export function RichFooter() {
             © {new Date().getFullYear()} Chinna-Coder. All rights reserved.
           </p>
         </div>
-<<<<<<< HEAD
         <div>
           <div className="font-medium text-white/80 mb-2">Product</div>
           <div className="space-y-1">
@@ -77,7 +76,6 @@ export function RichFooter() {
         <div className="col-span-2 md:col-span-1 text-xs">
           © {new Date().getFullYear()} Chinna-Coder. All rights reserved.<br />
           Built with love and lots of AI.
-=======
         <div className="grid gap-8 sm:grid-cols-3">
           {footerGroups.map((group) => (
             <div key={group.title}>
@@ -91,7 +89,6 @@ export function RichFooter() {
               </div>
             </div>
           ))}
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
         </div>
       </div>
     </footer>
