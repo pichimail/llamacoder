@@ -1472,6 +1472,7 @@ export default function HomePageClient() {
       </Dialog>
 
       <input ref={fileInputRef} className="hidden" type="file" title="Attach file" aria-label="Attach file" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleAttachmentUpload(file); if (event.currentTarget) event.currentTarget.value = ""; }} />
+      <Dialog open={githubDialogOpen} onOpenChange={(open) => { if (!isGithubImporting) setGithubDialogOpen(open); }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-3xl border-border/70 bg-background p-0 shadow-2xl">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-base"><Github className="size-4" />Import from GitHub</DialogTitle>
@@ -1494,17 +1495,6 @@ export default function HomePageClient() {
         </DialogContent>
       </Dialog>
 
-      <McpServerDialog
-        open={mcpDialogOpen}
-        onOpenChange={setMcpDialogOpen}
-        title="Connect MCP server"
-        onSaved={(server) => {
-          toast({ title: "MCP server saved", description: "You can attach it to the next build from the prompt composer." });
-          handleAttachMcpServer(server);
-        }}
-        onAttachToGeneration={handleAttachMcpServer}
-      />
-
       <Dialog open={authOverlayOpen} onOpenChange={setAuthOverlayOpen}>
         <DialogContent className="max-w-md overflow-hidden rounded-2xl border-lime-300/18 bg-[#0d0f0a] p-0 text-stone-100 shadow-2xl shadow-black/50">
           <div className="relative p-6">
@@ -1513,18 +1503,18 @@ export default function HomePageClient() {
               <div className="mb-5 grid size-12 place-items-center rounded-xl border border-lime-300/20 bg-lime-300/10 text-lime-100">
                 <Lock className="size-5" />
               </div>
-          <DialogHeader>
-            <DialogTitle className="text-2xl tracking-tight text-stone-50">Sign in to build your app</DialogTitle>
-            <DialogDescription className="text-stone-400">
-              Your prompt is saved. After Google sign-in, Chinna-Coder opens the chat and starts building exactly what you asked for.
-            </DialogDescription>
-          </DialogHeader>
-          <form action={continueWithGoogle} className="mt-6">
-            <Button type="submit" className="h-11 w-full rounded-lg bg-lime-200 text-stone-950 hover:bg-lime-100">
-              <LogIn className="size-4" />
-              Continue with Google
-            </Button>
-          </form>
+              <DialogHeader>
+                <DialogTitle className="text-2xl tracking-tight text-stone-50">Sign in to build your app</DialogTitle>
+                <DialogDescription className="text-stone-400">
+                  Your prompt is saved. After Google sign-in, Chinna-Coder opens the chat and starts building exactly what you asked for.
+                </DialogDescription>
+              </DialogHeader>
+              <form action={continueWithGoogle} className="mt-6">
+                <Button type="submit" className="h-11 w-full rounded-lg bg-lime-200 text-stone-950 hover:bg-lime-100">
+                  <LogIn className="size-4" />
+                  Continue with Google
+                </Button>
+              </form>
             </div>
           </div>
         </DialogContent>
