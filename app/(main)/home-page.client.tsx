@@ -1339,7 +1339,12 @@ export default function HomePageClient() {
                       setSelectedDesignPresetId(design.id);
                     }}
                   />
+                </motion.div>
+              </div>
+            </div>
+          </div>
         </section>
+
         <MarketingSections />
 
         <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
