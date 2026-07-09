@@ -1357,14 +1357,6 @@ export default function HomePageClient() {
                     onOpenAIIntegration={() => {}}
                     onOpenMcpConnect={() => setMcpDialogOpen(true)}
                   />
-                  <DesignSystemDialog
-                    open={designDialogOpen}
-                    onOpenChange={setDesignDialogOpen}
-                    onSaved={(design) => {
-                      setSavedDesigns((prev) => [design, ...prev]);
-                      setSelectedDesignPresetId(design.id);
-                    }}
-                  />
                 </motion.div>
               </div>
             </div>
