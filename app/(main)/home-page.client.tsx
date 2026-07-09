@@ -1331,7 +1331,32 @@ export default function HomePageClient() {
                   Describe any product. Get a working, premium, multi-page app with a live preview — in one prompt.
                 </motion.p>
                 <motion.div id="prompt-composer" className="relative w-full" {...heroWordAnimation} transition={{ duration: 0.7, delay: prefersReducedMotion ? 0 : 0.62, ease: [0.21, 0.47, 0.32, 0.98] }}>
-                  <PremiumPromptComposer value={prompt} onValueChange={setPrompt} onSend={handlePromptSend} isLoading={isSubmitting} disabled={isSubmitting || isGithubImporting} model={model} onModelChange={setModel} models={visibleModels} buildMode={buildMode} onBuildModeChange={setBuildMode} shadcnEnabled={shadcnEnabled} onShadcnChange={setShadcnEnabled} webSearchEnabled={webSearchEnabled} onWebSearchChange={setWebSearchEnabled} deepThinkingEnabled={deepThinkingEnabled} onDeepThinkingChange={setDeepThinkingEnabled} canvasEnabled={canvasEnabled} onCanvasChange={setCanvasEnabled} backendEnabled={backendEnabled} onBackendChange={setBackendEnabled} styleId={styleId} onStyleIdChange={(id) => { setStyleId(id); setSelectedDesignPresetId(null); }} savedDesigns={savedDesigns} onOpenDesignDialog={() => setDesignDialogOpen(true)} onSelectSavedDesign={(design) => setSelectedDesignPresetId(design.id)} selectedSavedDesignId={selectedDesignPresetId} onAttach={() => fileInputRef.current?.click()} attachmentReady={attachments.length > 0} onImportGithub={() => setGithubDialogOpen(true)} savedPrompts={savedPrompts} onSavePrompt={saveCurrentPrompt} onUseSavedPrompt={(item) => setPrompt(item.body)} flagEnabled={flagEnabled} selectedMcpServers={selectedMcpServers} onMcpChange={setSelectedMcpServers} onMcpOpenDialog={() => setMcpDialogOpen(true)} />
+                  <PromptComposer
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    onSend={handlePromptSend}
+                    isSubmitting={isSubmitting}
+                    model={model}
+                    setModel={setModel}
+                    mode={buildMode}
+                    setMode={setBuildMode}
+                    styleId={styleId}
+                    setStyleId={(id) => {
+                      setStyleId(id);
+                      setSelectedDesignPresetId(null);
+                    }}
+                    backendEnabled={backendEnabled}
+                    setBackendEnabled={setBackendEnabled}
+                    selectedType={buildMode}
+                    setSelectedType={setBuildMode}
+                    attachments={attachments}
+                    mcpServers={selectedMcpServers}
+                    onAttach={() => fileInputRef.current?.click()}
+                    onOpenGithubImport={() => setGithubDialogOpen(true)}
+                    onOpenProjectImport={() => {}}
+                    onOpenAIIntegration={() => {}}
+                    onOpenMcpConnect={() => setMcpDialogOpen(true)}
+                  />
                   <DesignSystemDialog
                     open={designDialogOpen}
                     onOpenChange={setDesignDialogOpen}
