@@ -235,6 +235,12 @@
   .hero-premium-bg {
     animation: none !important;
   }
+  .animate-gradient-1,
+  .animate-gradient-2,
+  .animate-gradient-3,
+  .animate-gradient-4 {
+    animation: none !important;
+  }
 }
 
 @layer components {
@@ -912,6 +918,22 @@ a:hover {
   50% {
     transform: translate(-8%, -6%) scale(1.09);
   }
+}
+
+.animate-gradient-1 {
+  animation: gradient-1 22s ease-in-out infinite;
+}
+
+.animate-gradient-2 {
+  animation: gradient-2 26s ease-in-out infinite;
+}
+
+.animate-gradient-3 {
+  animation: gradient-3 19s ease-in-out infinite;
+}
+
+.animate-gradient-4 {
+  animation: gradient-4 30s ease-in-out infinite;
 }
 
 .animate-gradient-foreground-1 {

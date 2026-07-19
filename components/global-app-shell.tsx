@@ -270,12 +270,6 @@ export function GlobalAppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-<<<<<<< HEAD
-      {/* Global cookie consent — rendered once for every route. The footer is
-          owned by individual pages (marketing shell / landing sections) so it
-          scrolls inside the content column instead of escaping the layout. */}
-=======
->>>>>>> 9c7536dbf9f8471c76b368a07f876eb1f010b903
       <CookieBanner />
     </div>
   );
