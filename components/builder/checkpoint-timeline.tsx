@@ -81,20 +81,22 @@ export function CheckpointTimeline({
                     type="button"
                     onClick={() => onIterate(version.id)}
                     className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                    aria-label="Iterate from this checkpoint"
                     title="Iterate from this checkpoint"
                   >
                     <ArrowUpRight className="size-3.5" aria-hidden="true" />
-                    <span className="hidden sm:inline">Iterate</span>
+                    <span className="hidden sm:inline" aria-hidden="true">Iterate</span>
                   </button>
                   {!isCurrent ? (
                     <button
                       type="button"
                       onClick={() => onRestore(version.id)}
                       className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                      aria-label="Restore this checkpoint"
                       title="Restore this checkpoint"
                     >
                       <RotateCcw className="size-3.5" aria-hidden="true" />
-                      <span className="hidden sm:inline">Restore</span>
+                      <span className="hidden sm:inline" aria-hidden="true">Restore</span>
                     </button>
                   ) : null}
                 </div>

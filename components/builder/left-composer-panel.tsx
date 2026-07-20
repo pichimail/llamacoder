@@ -131,6 +131,7 @@ export function LeftComposerPanel({
             {visibleMessages.map((message) => (
               <button
                 key={message.id}
+                type="button"
                 onClick={() => onMessageClick?.(message)}
                 className={`w-full rounded-md border p-3 text-left text-sm transition ${
                   activeMessage?.id === message.id

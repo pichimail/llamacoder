@@ -28,7 +28,7 @@ export function MobileBuilderSwitcher({
 }) {
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label="Builder panel"
       className={cn(
         "sticky top-0 z-20 flex w-full items-center gap-1 overflow-x-auto border-b border-border/70 bg-background/95 px-2 py-1.5 backdrop-blur",
@@ -42,8 +42,7 @@ export function MobileBuilderSwitcher({
           <button
             key={panel}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             onClick={() => onChange(panel)}
             className={cn(
               "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition",
