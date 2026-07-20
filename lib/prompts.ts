@@ -182,6 +182,34 @@ Landing-page quality bar:
 - Keep mobile first-class with no horizontal overflow, overlapping text, or hover-only required actions.
 - Include local interaction behavior for forms, tabs, toggles, nav, carousels, or demos where useful.
 - Still compile first. Every import must resolve and every effect must clean up timers, animation contexts, canvas renderers, and event listeners.
+
+## SECTION COMPLETENESS CONTRACT (NON-NEGOTIABLE)
+Before finishing, re-read the user's prompt sentence by sentence and confirm every named requirement
+exists as a real, populated section or page in the output. If the prompt names concrete sections or
+features — "pricing", "product imagery", "docs links", "testimonials", "FAQ", "case studies",
+"integrations", "contact" — you MUST build ALL of them with real content. Never stop after the hero
+or after one or two sections and call it done; a build that only satisfies the first clause of a
+multi-part prompt has NOT met the bar even if it compiles cleanly. Unless the prompt is for a
+narrow single-purpose page (waitlist-only, coming-soon-only), build each of the sections the prompt
+implies as its own visually distinct block with intentional spacing rhythm — do not compress a
+multi-section request into one short scrolling page with a single code snippet and a footer.
+
+## HERO VISUAL BAR (NON-NEGOTIABLE, ANTI-SLOP)
+A hero made of only a centered heading, a subheading, and a button is not acceptable as the entire
+first viewport of a premium landing page — that reads as generic AI output, not a shipped product.
+The hero MUST include a real visual anchor in addition to copy, chosen to fit the product:
+- A product mockup: a browser-chrome or device-frame component showing a believable in-app
+  screenshot, built from real local markup/components (never an external image URL).
+- A layered graphic composition: an illustration, abstract shapes, a dashboard/data-visualization
+  preview, or a small interactive demo widget.
+- A code/terminal panel ONLY for developer-facing products, and only paired with at least one other
+  visual element (a diagram, live counter, or mockup) — never a lone code block as the entire hero.
+Do not default to a plain background with two-tone gradient heading text as the whole hero
+treatment. BANNED as a default: bg-clip-text gradient headline text using stock blue/purple/indigo
+combinations (a top generic-AI tell) — use the active style preset's accent tokens, and prefer
+confident solid typography over gradient-text tricks unless the selected design mode specifically
+calls for a gradient treatment. Give the hero real visual weight through layered surfaces,
+considered imagery, or a populated interactive element, not typography alone.
 `;
 
 const premiumProductAppPrompt = dedent`
@@ -375,6 +403,27 @@ const GSAP_SUPPORT_RULE = dedent`
   For 3D requests, combine GSAP with Three.js only for camera/object choreography or scroll-linked scene transitions; keep the main scene in @react-three/fiber and use useFrame for continuous animation.`;
 
 /* ============================================================
+ * NO-DEAD-CONTROLS RULE — ADDITIVE ONLY, EVERY BUILD (not just image clones).
+ * IMAGE_CLONE_FIDELITY already enforces "every visible interactive element
+ * must work" for screenshot-clone requests; this generalizes the same bar to
+ * every generated app regardless of whether an image was attached. Appended
+ * after the support rules so it reinforces (never overrides) existing rules.
+ * ============================================================ */
+const NO_DEAD_CONTROLS_RULE = dedent`
+  ## EVERY VISIBLE CLICKABLE ELEMENT MUST WORK OR BE REMOVED
+  A generated app is judged as a working product, not a static mockup. Before finishing, mentally
+  click every visible interactive element and confirm it does something real:
+  - Every button, link, tab, menu item, toggle, checkbox, filter, and form control must have real
+    local behavior — navigate a real route, mutate real state, open a real dialog/sheet, submit a
+    form, or otherwise change what's on screen. Never leave an \`onClick\` empty or missing.
+  - Every nav item and breadcrumb goes to a real route or in-page section; never a dead \`href="#"\`.
+  - Any list/table/card grid shown must be populated with realistic data, and its row/item actions
+    (view, edit, delete, expand) must work against that data (local state is fine).
+  - If a feature is out of scope for this build, remove the control entirely rather than shipping
+    a decorative one that does nothing when clicked. A smaller, fully-working app beats a larger
+    one with dead controls.`;
+
+/* ============================================================
  * MULTI-ROUTE ENFORCEMENT — ADDITIVE ONLY.
  * Closes the specific failure mode where a "full app / SaaS" request is
  * satisfied with ONE giant file that fakes multiple pages via hash routing,
@@ -480,6 +529,10 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   - No double-layered / nested panels (a card inside a card inside a card with competing borders
     and shadows). One surface layer per region.
   - No glow blobs, radial "aurora" gradient orbs, or neon halos behind hero/section content.
+  - No stock bg-clip-text gradient headline text (blue/purple/indigo two-tone gradients on the main
+    heading) as a default treatment — a top generic-AI tell. Use the active style preset's accent
+    tokens and confident solid typography instead, unless the selected design mode specifically
+    calls for a gradient-text treatment.
   - No glassmorphism / backdrop-blur translucent surfaces UNLESS the active STYLE DIRECTION block
     above is the Glassmorphism preset. Outside that preset, keep surfaces solid.
   - No dark-on-dark or low-contrast text. Body text must clear WCAG AA against its surface.
@@ -695,6 +748,7 @@ export function getMainCodingPrompt(
     // never modifies obedience/routing/file-structure rules — they reinforce them.
     p += "\n\n" + MULTI_ROUTE_ENFORCEMENT;
     p += "\n\n" + MOBILE_FIRST_UX_RULES;
+    p += "\n\n" + NO_DEAD_CONTROLS_RULE;
     // Phase 1 audit: semantic-token + anti-slop enforcement, appended AFTER the
     // style block so it reinforces the active preset. Additive; never modifies
     // obedience/routing/file-structure rules.
