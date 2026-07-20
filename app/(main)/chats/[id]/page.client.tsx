@@ -77,7 +77,7 @@ const SANDBOX_BUNDLER_TIMEOUT_RE = /Sandbox bundler did not respond in time/i;
  * loop from the general autofix loop above — truncation is a known, mechanical
  * failure mode (not a code-quality issue), so it gets its own generous budget
  * and doesn't count against MAX_AUTO_FIX_ATTEMPTS. */
-const MAX_CONTINUATION_ROUNDS = 3;
+const MAX_CONTINUATION_ROUNDS = 5;
 /** How many trailing characters of a truncated response to send back to the
  * model as continuation context. Large enough to show the incomplete last
  * file, small enough to stay well under any model's input budget. */
@@ -1113,7 +1113,7 @@ Fix requirements:
             } else if (wasTruncated && continuationRoundRef.current >= MAX_CONTINUATION_ROUNDS) {
               setContinuationStatus("exhausted");
               toast({
-                title: "Generation still incomplete after 3 attempts",
+                title: `Generation still incomplete after ${MAX_CONTINUATION_ROUNDS} attempts`,
                 description: "This build is unusually large. The partial result was saved — click Regenerate or simplify the request.",
                 variant: "destructive",
               });

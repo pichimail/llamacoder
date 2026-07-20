@@ -1,4 +1,3 @@
-@import "../components/agent-elements/agent-ui.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -217,6 +216,91 @@
 .reveal.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Emerald glass dashboard theme — scoped so the admin console and the user
+   dashboard share one premium, Chakra-like glassmorphic surface language
+   without touching the public marketing site's own aurora styling.
+   Every shadcn primitive underneath (Card, Button, Input, Badge...) is built
+   from these CSS variables, so retinting them here cascades automatically. */
+.emerald-glass-theme {
+  color-scheme: dark;
+  --background: 150 28% 4%;
+  --foreground: 150 18% 96%;
+  --card: 152 26% 8%;
+  --card-foreground: 150 18% 96%;
+  --popover: 152 28% 7%;
+  --popover-foreground: 150 18% 96%;
+  --primary: 152 68% 45%;
+  --primary-foreground: 152 45% 6%;
+  --secondary: 152 20% 14%;
+  --secondary-foreground: 150 18% 96%;
+  --muted: 152 18% 12%;
+  --muted-foreground: 150 12% 70%;
+  --accent: 152 42% 17%;
+  --accent-foreground: 150 18% 96%;
+  --destructive: 0 72% 56%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 152 28% 20%;
+  --input: 152 24% 16%;
+  --ring: 152 68% 50%;
+  --radius: 1rem;
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 90% 55% at 12% -10%, oklch(0.45 0.12 162 / 0.32) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 55% at 100% 8%, oklch(0.5 0.11 180 / 0.20) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 60% at 45% 105%, oklch(0.42 0.11 150 / 0.18) 0%, transparent 65%),
+    #050b09;
+  background-attachment: fixed;
+}
+
+.emerald-glass-theme ::selection {
+  background: oklch(0.62 0.16 160 / 0.35);
+}
+
+/* Any shadcn <Card> (data-slot="card") gets a frosted emerald panel. */
+.emerald-glass-theme [data-slot="card"],
+.emerald-glass-theme .glass-surface {
+  background: linear-gradient(160deg, oklch(0.7 0.09 160 / 0.10), oklch(0.32 0.05 170 / 0.05));
+  border: 1px solid oklch(0.72 0.12 160 / 0.16);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 10px 40px -16px oklch(0 0 0 / 0.6);
+  transition: border-color 0.25s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.25s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 0.25s cubic-bezier(0.23, 1, 0.32, 1),
+    background 0.25s ease;
+}
+
+.emerald-glass-theme a[data-slot="card"]:hover,
+.emerald-glass-theme button[data-slot="card"]:hover,
+.emerald-glass-theme .glass-surface.glass-interactive:hover,
+.emerald-glass-theme a:has([data-slot="card"]):hover [data-slot="card"] {
+  border-color: oklch(0.78 0.17 160 / 0.5);
+  box-shadow:
+    0 0 0 1px oklch(0.78 0.17 160 / 0.22),
+    0 16px 54px -16px oklch(0.62 0.16 160 / 0.4);
+  transform: translateY(-3px);
+  background: linear-gradient(160deg, oklch(0.74 0.11 160 / 0.16), oklch(0.36 0.06 170 / 0.08));
+}
+
+.emerald-glass-theme input,
+.emerald-glass-theme select,
+.emerald-glass-theme textarea {
+  background-color: oklch(0.24 0.03 170 / 0.45);
+}
+
+.emerald-glass-theme table thead tr {
+  border-color: oklch(0.72 0.12 160 / 0.16);
+}
+
+.emerald-glass-theme table tbody tr {
+  border-color: oklch(0.72 0.12 160 / 0.1);
+  transition: background-color 0.2s ease;
+}
+
+.emerald-glass-theme table tbody tr:hover {
+  background-color: oklch(0.6 0.15 160 / 0.06);
 }
 
 @layer base {

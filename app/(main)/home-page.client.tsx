@@ -720,6 +720,7 @@ function PromptComposer({
             }
           }}
           placeholder="Build a 3D solar system viewer with Three.js and orbit controls..."
+          aria-label="Describe what to build"
           className="relative min-h-[168px] resize-none border-0 bg-transparent p-5 text-base leading-7 text-stone-100 placeholder:text-stone-500 focus-visible:ring-0 sm:p-7 sm:text-lg"
         />
         <div className="border-t border-white/12 bg-black/20 p-3 sm:p-4">
@@ -916,7 +917,18 @@ export default function HomePageClient() {
       const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
       if (!session?.user) return;
       sessionStorage.removeItem("pendingBuild");
-      await createBuild(JSON.parse(raw));
+      setIsSubmitting(true);
+      try {
+        await createBuild(JSON.parse(raw));
+      } catch (error) {
+        toast({
+          title: "Could not resume your build after sign-in",
+          description: error instanceof Error ? error.message : "Please re-enter your prompt and try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     })().catch(() => sessionStorage.removeItem("pendingBuild"));
   }, []);
 
@@ -927,7 +939,15 @@ export default function HomePageClient() {
       const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
       if (!session?.user) return;
       sessionStorage.removeItem("pendingGithubImport");
-      await importGithubRepo(JSON.parse(raw));
+      try {
+        await importGithubRepo(JSON.parse(raw));
+      } catch (error) {
+        toast({
+          title: "Could not resume your GitHub import after sign-in",
+          description: error instanceof Error ? error.message : "Please paste the repository URL again.",
+          variant: "destructive",
+        });
+      }
     })().catch(() => sessionStorage.removeItem("pendingGithubImport"));
   }, []);
 
@@ -974,7 +994,7 @@ export default function HomePageClient() {
         screenshotUrl,
         attachments: data.attachments,
         aiCapabilities: aiDetection.capabilities,
-        aiIntegration: data.aiIntegration,
+        aiIntegration: data.aiIntegration ? (data.aiIntegration.provider === "chinnallm" ? "chinnallm" : "byok") : null,
         backendMode: data.backendMode,
         mcpServers: data.mcpServers,
       }),

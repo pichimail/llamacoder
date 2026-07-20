@@ -25,7 +25,6 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import ThemeToggle from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +89,7 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
     <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Admin navigation">
       {NAV_SECTIONS.map((section) => (
         <div key={section.title}>
-          <p className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+          <p className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-300/50">
             {section.title}
           </p>
           <div className="space-y-0.5">
@@ -102,12 +101,13 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
                   asChild
                   variant="ghost"
                   className={cn(
-                    "h-9 w-full justify-start gap-2.5 rounded-lg border-l-2 border-transparent px-3 text-sm font-normal text-muted-foreground transition-colors",
-                    active && "border-primary bg-muted/60 font-medium text-foreground",
+                    "h-9 w-full justify-start gap-2.5 rounded-xl border-l-2 border-transparent px-3 text-sm font-normal text-muted-foreground transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-400/10 hover:text-emerald-100",
+                    active &&
+                      "border-emerald-400 bg-emerald-400/[0.08] font-medium text-emerald-100 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.15)]",
                   )}
                 >
                   <Link href={item.href} onClick={onNavigate}>
-                    <item.icon className="size-4 shrink-0" />
+                    <item.icon className={cn("size-4 shrink-0", active && "text-emerald-300")} />
                     {item.label}
                   </Link>
                 </Button>
@@ -123,19 +123,18 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
 function SidebarFooter() {
   const { user } = useHomeSidebarData();
   return (
-    <div className="shrink-0 border-t border-border/60 p-3">
-      <div className="flex items-center gap-3">
-        <Avatar className="size-8">
+    <div className="shrink-0 border-t border-emerald-400/10 p-3">
+      <div className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-emerald-400/[0.06]">
+        <Avatar className="size-8 ring-1 ring-emerald-400/25">
           <AvatarImage src={(user as any)?.image ?? (user as any)?.avatarUrl ?? undefined} alt="" />
-          <AvatarFallback className="text-xs">{(user?.name || user?.email || "A").slice(0, 1).toUpperCase()}</AvatarFallback>
+          <AvatarFallback className="bg-emerald-400/10 text-xs text-emerald-200">{(user?.name || user?.email || "A").slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{user?.name || user?.email || "Admin"}</p>
-          <Badge variant="secondary" className="mt-0.5 rounded-full px-2 py-0 text-[10px]">
+          <p className="truncate text-sm font-medium text-foreground">{user?.name || user?.email || "Admin"}</p>
+          <Badge className="mt-0.5 rounded-full border-emerald-400/25 bg-emerald-400/10 px-2 py-0 text-[10px] text-emerald-200 hover:bg-emerald-400/10">
             <Shield className="mr-1 size-2.5" /> Admin
           </Badge>
         </div>
-        <ThemeToggle />
       </div>
     </div>
   );
@@ -146,19 +145,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const sidebarHeader = (
-    <div className="flex items-center gap-2 border-b border-border/60 px-4 py-4">
+    <div className="flex items-center gap-2 border-b border-emerald-400/10 px-4 py-4">
       <Link href="/" className="flex items-center gap-2">
-        <Rocket className="size-5 text-primary" />
-        <span className="text-sm font-semibold tracking-tight">Chinna-Coder</span>
+        <span className="grid size-8 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 shadow-[0_0_20px_rgba(52,211,153,0.15)]">
+          <Rocket className="size-4 text-emerald-300" />
+        </span>
+        <span className="text-sm font-semibold tracking-tight text-foreground">Chinna-Coder</span>
       </Link>
-      <Badge variant="outline" className="ml-auto rounded-full px-2 py-0 text-[10px]">Admin</Badge>
+      <Badge className="ml-auto rounded-full border-emerald-400/25 bg-emerald-400/10 px-2 py-0 text-[10px] text-emerald-200">Admin</Badge>
     </div>
   );
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+    <div className="emerald-glass-theme flex h-dvh overflow-hidden text-foreground">
       {/* Desktop sidebar */}
-      <aside className="hidden h-dvh w-60 shrink-0 flex-col overflow-hidden border-r border-border/60 bg-card/40 md:flex">
+      <aside className="hidden h-dvh w-64 shrink-0 flex-col overflow-hidden border-r border-emerald-400/10 bg-black/20 backdrop-blur-2xl md:flex">
         {sidebarHeader}
         <SidebarNav pathname={pathname} />
         <SidebarFooter />
@@ -166,22 +167,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-emerald-400/10 bg-black/40 px-3 py-2 backdrop-blur-xl md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-11" aria-label="Open admin menu">
+              <Button variant="ghost" size="icon" className="size-11 text-emerald-200 hover:bg-emerald-400/10 hover:text-emerald-100" aria-label="Open admin menu">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex h-full w-72 flex-col gap-0 overflow-hidden p-0">
+            <SheetContent side="left" className="flex h-full w-72 flex-col gap-0 overflow-hidden border-emerald-400/10 bg-black/70 p-0 backdrop-blur-2xl">
               <SheetTitle className="sr-only">Admin navigation</SheetTitle>
               {sidebarHeader}
               <SidebarNav pathname={pathname} onNavigate={() => setMobileOpen(false)} />
               <SidebarFooter />
             </SheetContent>
           </Sheet>
-          <span className="text-sm font-semibold">Admin</span>
-          <div className="ml-auto"><ThemeToggle /></div>
+          <span className="text-sm font-semibold text-foreground">Admin</span>
         </header>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">{children}</main>

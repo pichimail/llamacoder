@@ -375,6 +375,77 @@ const GSAP_SUPPORT_RULE = dedent`
   For 3D requests, combine GSAP with Three.js only for camera/object choreography or scroll-linked scene transitions; keep the main scene in @react-three/fiber and use useFrame for continuous animation.`;
 
 /* ============================================================
+ * MULTI-ROUTE ENFORCEMENT — ADDITIVE ONLY.
+ * Closes the specific failure mode where a "full app / SaaS" request is
+ * satisfied with ONE giant file that fakes multiple pages via hash routing,
+ * a client-side router, or a useState "currentPage" switch. Appended after the
+ * support rules so it reinforces (never overrides) the routing contract in the
+ * agent system prompt. Injected for every agent build.
+ * ============================================================ */
+const MULTI_ROUTE_ENFORCEMENT = dedent`
+  ## REAL FILE-SYSTEM ROUTES, NEVER A SINGLE-FILE SPA (HARD REQUIREMENT)
+  A "full app", "SaaS", "dashboard", "website", "platform", or any product with more than one
+  screen MUST be delivered as multiple real Next.js App Router route files — not one page that
+  simulates navigation. This is the single most common way generated apps fail the bar, so it is
+  enforced explicitly:
+
+  - BANNED: hash-based routing of any kind — \`window.location.hash\`, \`<a href="#/dashboard">\`,
+    \`useState("dashboard")\` + a big \`switch\`/ternary that swaps the whole screen, a hand-rolled
+    \`<Router>\`/\`HashRouter\`/\`BrowserRouter\`, or a single \`app/page.tsx\` that renders every
+    "page" conditionally. None of these count as multi-page and all are rejected.
+  - BANNED: cramming the whole product into \`app/page.tsx\`. \`app/page.tsx\` is ONLY the home
+    route. Each additional screen the user can navigate to is its OWN \`app/<segment>/page.tsx\` file.
+  - REQUIRED: a real \`app/layout.tsx\` holding the persistent shell (sidebar / top nav / bottom
+    nav) whenever the app has shared navigation, and a dedicated \`app/<segment>/page.tsx\` for
+    every distinct screen named or implied by the prompt.
+  - REQUIRED: navigation uses \`next/link\` (\`<Link href="/reports">\`) or \`useRouter().push()\`
+    from \`next/navigation\`. Clicking a nav item changes the URL and mounts a different route file.
+  - REQUIRED: nested/detail routes use real dynamic segments — \`app/projects/[id]/page.tsx\`,
+    \`app/users/[id]/page.tsx\` — not a modal-only or state-only "detail view".
+  - A minimum-viable multi-page app therefore emits, at least: \`app/layout.tsx\`, \`app/page.tsx\`,
+    and one \`app/<segment>/page.tsx\` per additional top-level screen, plus shared \`components/*\`.
+  - If the request is genuinely a single-screen tool (one calculator, one timer, one form), a
+    single \`app/page.tsx\` + \`components/*\` is correct — do NOT invent routes it doesn't need.
+    The ban is on FAKING multiple screens inside one file, not on legitimately small apps.`;
+
+/* ============================================================
+ * MOBILE-FIRST UX RULES — ADDITIVE ONLY.
+ * Native-app-feeling mobile behavior (bottom sheets, bottom nav, gestures,
+ * installable PWA affordance). Appended for every agent build; the rules
+ * degrade gracefully so desktop layouts are unaffected.
+ * ============================================================ */
+const MOBILE_FIRST_UX_RULES = dedent`
+  ## MOBILE-FIRST UX (BUILD FOR THUMBS FIRST, THEN SCALE UP)
+  Design every app so it feels like a native mobile app on a phone and a real desktop app on a
+  wide screen. Mobile is the default target, not an afterthought.
+
+  - Layout: design the small-viewport layout first with a single-column flow, then use responsive
+    utilities (\`sm: md: lg:\`) to expand to multi-column on larger screens. Never ship a desktop
+    grid that overflows or requires horizontal scrolling on a phone.
+  - Bottom navigation: for app-style products with 3–5 primary destinations, render a fixed
+    BOTTOM nav bar on mobile (\`fixed inset-x-0 bottom-0\`, icon + short label per item, safe-area
+    padding via \`pb-[env(safe-area-inset-bottom)]\`), and switch to a sidebar or top nav at
+    \`md:\` and up. The bottom nav items are real \`next/link\` routes, and the active route is
+    visually highlighted.
+  - Bottom sheets: on mobile, present secondary actions, filters, detail views, and forms as a
+    BOTTOM SHEET that slides up from the bottom edge (rounded top corners, drag-handle affordance,
+    tap-scrim-to-dismiss) rather than a centered desktop dialog. When COMPONENT LIBRARY is ON, use
+    the shadcn \`Sheet\` primitive with \`side="bottom"\`; otherwise build a lightweight local sheet
+    with a translate-y transition. Use a normal centered Dialog only on \`md:\` and up.
+  - Gesture & touch ergonomics: all primary tap targets are at least 44x44px, spaced so thumbs
+    don't mis-tap. Support swipe-to-dismiss on sheets/drawers where natural, and momentum-friendly
+    scrolling (\`overflow-y-auto overscroll-contain\`). Never gate a required action behind hover.
+  - Sticky chrome: keep the header/nav reachable — sticky top header on scroll where useful,
+    persistent bottom nav, and content padded so it is never hidden behind fixed chrome.
+  - Installable PWA affordance: for app-style products, include a lightweight, dismissible
+    "Install app" / "Add to Home Screen" prompt that appears on mobile (listen for the
+    \`beforeinstallprompt\` event, stash it, and show a small banner/button that calls
+    \`prompt()\`; on iOS Safari, where the event never fires, fall back to a one-line
+    "Add to Home Screen via the Share button" hint). Keep it unobtrusive, remember dismissal in
+    localStorage, and never block the UI with it. Skip it entirely for tiny single-widget tools.
+  - Respect \`prefers-reduced-motion\` for all sheet/drawer/gesture transitions.`;
+
+/* ============================================================
  * PHASE 1 AUDIT: SEMANTIC-TOKEN + ANTI-SLOP ENFORCEMENT — ADDITIVE ONLY.
  * Appended AFTER the active style direction block so it reinforces (never
  * overrides) it. Never modifies ABSOLUTE PROMPT OBEDIENCE, routing, or
@@ -452,6 +523,50 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   When the latest user prompt is long and detailed, treat every sentence as a literal, binding
   spec. Do not compress, summarize, paraphrase, reorder priorities, or reinterpret it into a
   more familiar template. Build each stated screen, entity, field, and interaction as written.`;
+
+/* ============================================================
+ * IMAGE-CLONE FIDELITY — ADDITIVE, IMAGE-ONLY.
+ * Injected only when the user attached a screenshot/mockup to clone. Raises the
+ * default one-line image hint into a strict pixel-fidelity + click-through
+ * contract. Appended after the anti-slop rules; never overrides prompt
+ * obedience or routing.
+ * ============================================================ */
+const IMAGE_CLONE_FIDELITY = dedent`
+  ## IMAGE CLONE FIDELITY (STRICT — THE ATTACHED IMAGE IS THE SPEC)
+  The user attached an image (a screenshot, mockup, or reference UI) to reproduce. Treat it as a
+  pixel-level, binding spec, not loose inspiration. The goal is a clone a designer would accept.
+
+  - Reproduce the EXACT layout the image shows: same overall structure, section order, column
+    counts, alignment, relative sizing, and spacing rhythm. Do not rearrange, add, or drop
+    sections the image doesn't have.
+  - Match the visual language precisely: color palette (background, surfaces, text, accent),
+    corner radii, border weights, shadow depth, density/padding, and the type hierarchy
+    (relative font sizes, weights, letter-spacing, and casing) shown in the image.
+  - Transcribe the VISIBLE TEXT verbatim — headings, labels, button text, nav items, table
+    headers, placeholder text, and numbers exactly as they appear. Do not invent new copy or
+    replace real labels with lorem ipsum. Only fill obviously-truncated/cropped content with
+    plausible domain-matching values.
+  - Recreate icons with the closest lucide-react equivalents in the same positions; recreate
+    charts/graphs with recharts (or local SVG) matching the shown type, orientation, and rough
+    data shape.
+  - When the design tokens implied by the image conflict with the active style preset, the IMAGE
+    WINS for visual fidelity — you are cloning this specific screen, not restyling it. (Semantic
+    token classes are still preferred as the implementation mechanism where they can express the
+    image's colors.)
+
+  ## STRICT CLICK-THROUGH (A CLONE MUST BE A WORKING APP, NOT A PICTURE)
+  A static look-alike does not pass. Every interactive element visible in the image must actually
+  work in the generated app:
+  - Every nav item, tab, sidebar link, and breadcrumb navigates to a real route (per the routing
+    contract) or switches the visible section it points to.
+  - Every button, menu, dropdown, toggle, checkbox, filter, search field, and form control has
+    real local behavior — it opens its target, mutates local state, filters/sorts its data, or
+    submits its form. Zero dead or decorative controls.
+  - Any list/table/card grid shown is populated with realistic domain data and its row/item
+    actions work. Any detail affordance ("view", "edit", chevrons) opens a real detail
+    view/route/sheet.
+  - Reproduce hover, focus, active, and selected states for interactive elements so the clone
+    feels alive, not frozen.`;
 
 /**
  * Human-readable names for each built-in style preset, used to name the
@@ -556,6 +671,7 @@ export function getMainCodingPrompt(
 
     if (hasImage) {
       p += "\n\n**IMAGE CONTEXT**: Enforce high visual fidelity with precise layout, spacing, colors, typography, shadows, and exact visible text.";
+      p += "\n\n" + IMAGE_CLONE_FIDELITY;
     }
     if (hasCodeFile) {
       p += "\n\n**CODE FILE CONTEXT**: Refactor the uploaded code into a clean working app while preserving the best parts and the user's requested product intent.";
@@ -574,6 +690,11 @@ export function getMainCodingPrompt(
     p += "\n\n" + (customDesign?.content ? getCustomDesignBlock(customDesign.content, customDesign.instructions) : getStyleDirectionBlock(styleId));
     p += "\n\n" + THREEJS_SUPPORT_RULE;
     p += "\n\n" + GSAP_SUPPORT_RULE;
+    // Reinforce real file-system routing (ban single-file/hash-routed SPAs) and
+    // mobile-first UX (bottom nav/sheets, gestures, installable PWA). Additive;
+    // never modifies obedience/routing/file-structure rules — they reinforce them.
+    p += "\n\n" + MULTI_ROUTE_ENFORCEMENT;
+    p += "\n\n" + MOBILE_FIRST_UX_RULES;
     // Phase 1 audit: semantic-token + anti-slop enforcement, appended AFTER the
     // style block so it reinforces the active preset. Additive; never modifies
     // obedience/routing/file-structure rules.
