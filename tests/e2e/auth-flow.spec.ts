@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test('homepage composer renders', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Build\.\s+Preview\.\s+Ship\./i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Build apps with an agent you can actually inspect\./i })).toBeVisible()
 })
 
 test('unauth create-chat would 401 (api test)', async ({ request }) => {
