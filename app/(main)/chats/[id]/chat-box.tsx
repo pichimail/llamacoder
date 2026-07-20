@@ -3,49 +3,6 @@
 import { PromptComposer, type ComposerAttachment, type ComposerMode } from "@/components/chat/prompt-composer";
 import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
 import { AiSuggestions } from "@/components/ui/ai-suggestions";
-import {
-  Checkpoint,
-  CheckpointIcon,
-  CheckpointTrigger,
-} from "@/components/ai-elements/checkpoint";
-import {
-  EnvironmentVariable,
-  EnvironmentVariableName,
-  EnvironmentVariableRequired,
-  EnvironmentVariables,
-  EnvironmentVariablesContent,
-  EnvironmentVariablesHeader,
-  EnvironmentVariablesTitle,
-  EnvironmentVariablesToggle,
-} from "@/components/ai-elements/environment-variables";
-import {
-  Queue,
-  QueueItem,
-  QueueItemContent,
-  QueueItemDescription,
-  QueueItemIndicator,
-  QueueList,
-  QueueSection,
-  QueueSectionContent,
-  QueueSectionLabel,
-  QueueSectionTrigger,
-} from "@/components/ai-elements/queue";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
-import { Shimmer } from "@/components/ai-elements/shimmer";
-import {
-  Terminal,
-  TerminalActions,
-  TerminalClearButton,
-  TerminalContent,
-  TerminalCopyButton,
-  TerminalHeader,
-  TerminalStatus,
-  TerminalTitle,
-} from "@/components/ai-elements/terminal";
 import { Button } from "@/components/ui/button";
 import { Tip, TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -53,104 +10,10 @@ import { MODELS } from "@/lib/constants";
 import { askModePrompt, planModePrompt } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
 import { useAvailableModels } from "@/lib/use-available-models";
-import {
-  Bookmark,
-  Brain,
-  CheckCircle2,
-  Expand,
-  KeyRound,
-  ListChecks,
-  RotateCcw,
-  ShieldCheck,
-  TerminalSquare,
-  Workflow,
-} from "lucide-react";
+import { Bookmark, Expand, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
-
-type QueueStatus = "pending" | "active" | "completed";
-
-const modeLabels: Record<ComposerMode, string> = {
-  agent: "Agent",
-  ask: "Ask",
-  plan: "Plan",
-};
-
-function StreamingText({ text, active }: { text: string; active?: boolean }) {
-  if (!active) return <span>{text}</span>;
-  return (
-    <span>
-      <Shimmer duration={1.15}>{text}</Shimmer>
-      <span className="ml-1 inline-block size-1.5 animate-pulse rounded-full bg-lime-300" />
-    </span>
-  );
-}
-
-function AgentPanel({
-  title,
-  icon,
-  children,
-  className,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-xl border border-lime-300/10 bg-[#0b0d09]/92 p-3 text-stone-200 shadow-[0_0_32px_rgba(0,0,0,0.25)]",
-        className,
-      )}
-    >
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-lime-100/75">
-        {icon}
-        {title}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function BuildQueue({
-  items,
-}: {
-  items: { id: string; title: string; description: string; status: QueueStatus }[];
-}) {
-  return (
-    <Queue className="border-lime-300/10 bg-transparent shadow-none">
-      <QueueSection>
-        <QueueSectionTrigger className="bg-white/[0.035] text-stone-300 hover:bg-white/[0.055]">
-          <QueueSectionLabel count={items.length} label="queued steps" icon={<Workflow className="size-4 text-lime-200" />} />
-        </QueueSectionTrigger>
-        <QueueSectionContent>
-          <QueueList className="mt-2">
-            {items.map((item) => (
-              <QueueItem key={item.id} className="hover:bg-lime-300/5">
-                <div className="flex items-start gap-3">
-                  <QueueItemIndicator
-                    completed={item.status === "completed"}
-                    className={cn(item.status === "active" && "border-amber-200 bg-amber-200/30")}
-                  />
-                  <div className="min-w-0">
-                    <QueueItemContent completed={item.status === "completed"} className="text-stone-300">
-                      {item.title}
-                    </QueueItemContent>
-                    <QueueItemDescription completed={item.status === "completed"} className="ml-0 text-stone-500">
-                      {item.description}
-                    </QueueItemDescription>
-                  </div>
-                </div>
-              </QueueItem>
-            ))}
-          </QueueList>
-        </QueueSectionContent>
-      </QueueSection>
-    </Queue>
-  );
-}
 
 export default function ChatBox({
   chat,
@@ -188,11 +51,8 @@ export default function ChatBox({
   const [model, setModel] = useState(chat.model);
   const [mode, setMode] = useState<ComposerMode>("agent");
   const [quality] = useState<"low" | "high">(chat.quality === "high" ? "high" : "low");
-  const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
-  const [terminalOutput, setTerminalOutput] = useState("agent ready\nqueue idle\npreview watcher attached");
   const [activeAbilities, setActiveAbilities] = useState<string[]>(["web"]);
-  const [lastAttachmentCount, setLastAttachmentCount] = useState(0);
   const [isPending, startTransition] = useTransition();
   const composerRef = useRef<HTMLDivElement>(null);
   const availableModels = useAvailableModels();
@@ -206,106 +66,7 @@ export default function ChatBox({
     [availableModels],
   );
 
-  const promptLooksBackend = /database|postgres|prisma|auth|api|backend|admin|dashboard|stripe|payment|login/i.test(prompt);
-  const promptLooksThreeD = /3d|three|webgl|canvas|shader|orbit|scene|gsap|parallax/i.test(prompt);
-  const promptLooksIntegration = /openai|anthropic|gemini|grok|openrouter|together|nvidia|api key|secret|env/i.test(prompt);
   const activeCheckpoint = versions.find((version) => version.id === currentVersionId) ?? versions[versions.length - 1];
-
-  const queueItems = useMemo(
-    () => [
-      {
-        id: "requirements",
-        title: "Understand request",
-        description: prompt ? "Prompt captured and ready for agent planning." : "Waiting for a product request.",
-        status: prompt ? "completed" : "active",
-      },
-      {
-        id: "plan",
-        title: "Create build plan",
-        description: mode === "ask" ? "Answer mode keeps edits small." : "Agent mode prepares files, preview, and checkpoints.",
-        status: isStreaming ? "completed" : prompt ? "active" : "pending",
-      },
-      {
-        id: "files",
-        title: "Write changed files only",
-        description: lastAttachmentCount ? `${lastAttachmentCount} attachment${lastAttachmentCount === 1 ? "" : "s"} sent with the last request.` : "No attachment context staged.",
-        status: isStreaming ? "active" : "pending",
-      },
-      {
-        id: "preview",
-        title: "Build preview",
-        description: "Compile, render, and surface recoverable errors.",
-        status: isStreaming ? "active" : "pending",
-      },
-    ] satisfies { id: string; title: string; description: string; status: QueueStatus }[],
-    [lastAttachmentCount, isStreaming, mode, prompt],
-  );
-
-  const terminalText = useMemo(() => {
-    const lines = [
-      terminalOutput,
-      `mode=${mode}`,
-      `model=${model}`,
-      `quality=${quality}`,
-      activeAbilities.length ? `abilities=${activeAbilities.join(",")}` : "abilities=web",
-      promptLooksBackend ? "detected backend/data requirements" : "backend detection idle",
-      promptLooksThreeD ? "detected 3D/motion requirements" : "motion detection idle",
-      isStreaming ? "stream: receiving file patches..." : "stream: idle",
-    ];
-    return lines.join("\n");
-  }, [activeAbilities, isStreaming, mode, model, promptLooksBackend, promptLooksThreeD, quality, terminalOutput]);
-
-  const reasoningSummary = useMemo(() => {
-    if (!prompt.trim()) {
-      return "Waiting for the next request. The agent will summarize requirements, choose the build path, then ask before secrets, integrations, destructive changes, publishing, or exports.";
-    }
-    return [
-      `Mode: ${modeLabels[mode]}.`,
-      promptLooksBackend ? "Backend/data work is likely needed." : "Frontend-first build path is likely enough.",
-      promptLooksThreeD ? "3D, GSAP, or advanced motion should be considered." : "Motion stays restrained unless requested.",
-      promptLooksIntegration ? "Integration or environment-variable confirmation may be required." : "No external provider confirmation detected yet.",
-      "Raw chain-of-thought stays private; this panel shows the user-facing reasoning summary.",
-    ].join(" ");
-  }, [mode, prompt, promptLooksBackend, promptLooksIntegration, promptLooksThreeD]);
-
-  const envVars = [
-    {
-      name: "DATABASE_URL",
-      purpose: "Postgres/Prisma persistence for backend or admin dashboards.",
-      required: promptLooksBackend,
-      configured: promptLooksBackend ? false : true,
-      value: promptLooksBackend ? "missing" : "not required",
-    },
-    {
-      name: "OPENROUTER_API_KEY",
-      purpose: "ChinnaLLM/OpenRouter fallback for generated AI features.",
-      required: promptLooksIntegration,
-      configured: false,
-      value: promptLooksIntegration ? "missing" : "optional",
-    },
-    {
-      name: "BLOB_READ_WRITE_TOKEN",
-      purpose: "Screenshot, image, and file attachments.",
-      required: lastAttachmentCount > 0,
-      configured: blobUploadConfigured === true,
-      value: blobUploadConfigured ? "configured" : "missing",
-    },
-  ];
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/blob-upload/config", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : { configured: false }))
-      .then((data) => {
-        if (!cancelled) setBlobUploadConfigured(Boolean(data.configured));
-      })
-      .catch(() => {
-        if (!cancelled) setBlobUploadConfigured(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!shouldFocusInput) return;
@@ -425,10 +186,8 @@ export default function ChatBox({
             throw error;
           });
 
-        setTerminalOutput((current) => `${current}\nmessage ${message.id} queued\nstream requested`);
         onNewStreamPromise(streamPromise, { reasoning: mode === "agent", messageId: message.id, model });
         setPrompt("");
-        setLastAttachmentCount(attachments.length);
       } catch (error) {
         onAbortController?.(null);
         toast({
@@ -473,119 +232,21 @@ export default function ChatBox({
   return (
     <TooltipProvider>
       <div ref={composerRef} className="relative w-full chat-composer">
-        <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-          <div className="grid gap-3 md:grid-cols-2">
-            <AgentPanel title="Queue + To-do" icon={<ListChecks className="size-4" />}>
-              <BuildQueue items={queueItems} />
-            </AgentPanel>
-
-            <AgentPanel title="Reasoning Summary" icon={<Brain className="size-4" />}>
-              <Reasoning isStreaming={isStreaming} defaultOpen>
-                <ReasoningTrigger className="text-stone-300">
-                  <Brain className="size-4 text-lime-200" />
-                  <StreamingText text={isStreaming ? "Reasoning through build steps..." : "Build reasoning summary"} active={isStreaming} />
-                </ReasoningTrigger>
-                <ReasoningContent className="mt-3 text-stone-400">
-                  {reasoningSummary}
-                </ReasoningContent>
-              </Reasoning>
-            </AgentPanel>
-
-            <AgentPanel title="Checkpoints" icon={<Bookmark className="size-4" />}>
-              <Checkpoint className="mb-2 text-stone-400">
-                <CheckpointIcon className="text-lime-200" />
-                <span className="px-2 text-xs">{activeCheckpoint?.label ?? "No checkpoint yet"}</span>
-              </Checkpoint>
-              <div className="flex flex-wrap gap-2">
-                {versions.slice(-4).map((version) => (
-                  <CheckpointTrigger
-                    key={version.id}
-                    variant={version.id === currentVersionId ? "secondary" : "outline"}
-                    size="sm"
-                    tooltip={`Restore ${version.label}`}
-                    onClick={() => onSwitchVersion?.(version.id)}
-                    disabled={!onSwitchVersion || disabled}
-                    className="h-8 border-lime-300/15 text-xs"
-                  >
-                    {version.label}
-                  </CheckpointTrigger>
-                ))}
-                {onUndo ? (
-                  <Button variant="outline" size="sm" onClick={onUndo} disabled={disabled} className="h-8 border-lime-300/15 text-xs">
-                    <RotateCcw className="size-3.5" />
-                    Undo
-                  </Button>
-                ) : null}
-              </div>
-            </AgentPanel>
-
-            <AgentPanel title="Confirmation" icon={<ShieldCheck className="size-4" />}>
-              <div className="space-y-2 text-sm text-stone-400">
-                <div className="flex items-start gap-2 rounded-lg border border-lime-300/10 bg-lime-300/5 p-2">
-                  <CheckCircle2 className="mt-0.5 size-4 text-lime-200" />
-                  <span>Normal file edits and preview builds can proceed automatically.</span>
-                </div>
-                <div className="flex items-start gap-2 rounded-lg border border-amber-300/15 bg-amber-300/5 p-2">
-                  <KeyRound className="mt-0.5 size-4 text-amber-200" />
-                  <span>Secrets, integrations, destructive actions, publishing, and exports require user confirmation.</span>
-                </div>
-              </div>
-            </AgentPanel>
+        {versions.length > 0 || onUndo ? (
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Bookmark className="size-3.5 shrink-0 text-lime-200" />
+              <span className="truncate">{activeCheckpoint?.label ?? "No checkpoint yet"}</span>
+              {versions.length > 1 ? <span className="shrink-0 text-muted-foreground/60">· {versions.length} versions</span> : null}
+            </div>
+            {onUndo ? (
+              <Button variant="ghost" size="sm" onClick={onUndo} disabled={disabled} className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
+                <RotateCcw className="size-3.5" />
+                Undo
+              </Button>
+            ) : null}
           </div>
-
-          <div className="grid gap-3">
-            <Terminal
-              output={terminalText}
-              isStreaming={isStreaming}
-              onClear={() => setTerminalOutput("terminal cleared\nagent ready")}
-              className="h-full min-h-[260px] border-lime-300/10 bg-[#050604]"
-            >
-              <TerminalHeader className="border-lime-300/10">
-                <TerminalTitle className="text-lime-100">
-                  <TerminalSquare className="size-4" />
-                  Agent terminal
-                </TerminalTitle>
-                <div className="flex items-center gap-1">
-                  <TerminalStatus>streaming</TerminalStatus>
-                  <TerminalActions>
-                    <TerminalCopyButton />
-                    <TerminalClearButton />
-                  </TerminalActions>
-                </div>
-              </TerminalHeader>
-              <TerminalContent className="max-h-[300px]" />
-            </Terminal>
-
-            <EnvironmentVariables className="border-lime-300/10 bg-[#0b0d09]/92 text-stone-200">
-              <EnvironmentVariablesHeader className="border-lime-300/10">
-                <EnvironmentVariablesTitle>Environment variables</EnvironmentVariablesTitle>
-                <EnvironmentVariablesToggle />
-              </EnvironmentVariablesHeader>
-              <EnvironmentVariablesContent className="divide-lime-300/10">
-                {envVars.map((item) => (
-                  <EnvironmentVariable key={item.name} name={item.name} value={item.value}>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <EnvironmentVariableName className="text-stone-200" />
-                        {item.required ? (
-                          <EnvironmentVariableRequired className={cn(item.configured ? "bg-lime-300/15 text-lime-100" : "bg-amber-300/15 text-amber-100")}>
-                            {item.configured ? "Configured" : "Required"}
-                          </EnvironmentVariableRequired>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-xs text-stone-500">{item.purpose}</p>
-                    </div>
-                    {item.required && !item.configured ? (
-                      <Button size="sm" variant="outline" className="h-8 border-lime-300/15 text-xs" asChild>
-                        <a href={`/settings?chat=${chat.id}#environment`}>Add</a>
-                      </Button>
-                    ) : null}
-                  </EnvironmentVariable>
-                ))}
-              </EnvironmentVariablesContent>
-            </EnvironmentVariables>
-          </div>
-        </div>
+        ) : null}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <AiSuggestions onSelect={(value) => setPrompt(value)} />
