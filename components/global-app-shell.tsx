@@ -21,6 +21,7 @@ import {
   Rocket,
   Settings,
   Shield,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -107,6 +108,7 @@ function GlobalSidebar({ collapsed, onToggle, onNavigate }: { collapsed?: boolea
       <nav className={cn("min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3", collapsed && "px-2.5")} aria-label="Primary navigation">
         <SidebarLink collapsed={collapsed} href="/" icon={Home} label="Home" active={pathname === "/"} onClick={onNavigate} />
         <SidebarLink collapsed={collapsed} href="/chats" icon={MessageSquare} label="Chats" active={pathname === "/chats" || (pathname.startsWith("/chats/") && collapsed)} onClick={onNavigate} />
+        <SidebarLink collapsed={collapsed} href="/studio" icon={Sparkles} label="Studio" active={pathname.startsWith("/studio")} onClick={onNavigate} />
         {isEnabled("gallery") ? (
           <SidebarLink collapsed={collapsed} href="/gallery" icon={Images} label="Gallery" active={pathname.startsWith("/gallery")} onClick={onNavigate} />
         ) : null}
