@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Eye, FolderKanban, KeyRound, Loader2, MoreHorizontal, Search, Users } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight, Eye, FolderKanban, KeyRound, Loader2, MoreHorizontal, ShieldCheck, Search, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import { toast } from "@/hooks/use-toast";
 
 type UserRow = {
   id: string; email: string | null; name: string | null; image: string | null;
-  joinedAt: string; isAdmin: boolean; planTier: string;
+  joinedAt: string; isAdmin: boolean; planTier: string; banned: boolean;
   creditBalance: number | null; byokCount: number; appsBuilt: number;
 };
 
@@ -38,6 +38,7 @@ type UserDetail = {
     id: string; email: string | null; name: string | null; image: string | null;
     createdAt: string; role: string; plan: string; creditBalance: number | null;
     aiCalls: number; aiCreditsUsed: number;
+    banned: boolean; bannedReason: string | null; bannedAt: string | null;
     credits: { planTier: string; totalGranted: number; totalUsed: number } | null;
     apiKeys: Array<{ id: string; provider: string; label: string | null; createdAt: string }>;
     projects: Array<{ id: string; name: string; chats: Array<{ id: string; title: string; createdAt: string }> }>;
@@ -63,6 +64,8 @@ export default function AdminUsersPage() {
   const [grantAmount, setGrantAmount] = useState("100");
   const [grantDialogOpen, setGrantDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banReason, setBanReason] = useState("");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -157,6 +160,39 @@ export default function AdminUsersPage() {
     });
   };
 
+  const banUser = () => {
+    const id = detailId;
+    if (!id) return;
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned: true, bannedReason: banReason.trim() || undefined }),
+      }).catch(() => null);
+      const data = await response?.json().catch(() => null);
+      setBanDialogOpen(false);
+      setBanReason("");
+      if (!response?.ok) { toast({ title: "Ban failed", description: data?.error, variant: "destructive" }); return; }
+      toast({ title: "User banned", description: "Their active sessions were revoked." });
+      openDetail(id);
+      void load();
+    });
+  };
+
+  const unbanUser = (id: string) => {
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned: false }),
+      }).catch(() => null);
+      if (!response?.ok) { toast({ title: "Unban failed", variant: "destructive" }); return; }
+      toast({ title: "User unbanned" });
+      openDetail(id);
+      void load();
+    });
+  };
+
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
   const userActions = (user: UserRow) => (
@@ -182,6 +218,20 @@ export default function AdminUsersPage() {
             <KeyRound className="size-4" />Credit ledger
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {user.banned ? (
+          <DropdownMenuItem onClick={() => unbanUser(user.id)} disabled={isPending}>
+            <ShieldCheck className="size-4" />Unban user
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => { openDetail(user.id); setBanDialogOpen(true); }}
+            disabled={isPending}
+          >
+            <Ban className="size-4" />Ban user
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -249,7 +299,10 @@ export default function AdminUsersPage() {
                           <AvatarFallback className="text-xs">{(user.name || user.email || "?").slice(0, 1).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}</p>
+                          <p className="truncate text-sm font-medium">
+                            {user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}
+                            {user.banned ? <Badge className="ml-1 rounded-full border-destructive/40 text-[9px] text-destructive" variant="outline">banned</Badge> : null}
+                          </p>
                           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                         </div>
                       </div>
@@ -292,6 +345,7 @@ export default function AdminUsersPage() {
                             <div className="min-w-0">
                               <p className="max-w-[180px] truncate text-sm font-medium">
                                 {user.name || "—"} {user.isAdmin ? <Badge variant="secondary" className="ml-1 rounded-full text-[9px]">admin</Badge> : null}
+                                {user.banned ? <Badge className="ml-1 rounded-full border-destructive/40 text-[9px] text-destructive" variant="outline">banned</Badge> : null}
                               </p>
                               <p className="max-w-[180px] truncate text-xs text-muted-foreground">{user.email}</p>
                             </div>
@@ -386,6 +440,24 @@ export default function AdminUsersPage() {
               </div>
 
               <div>
+                {detail.user.banned ? (
+                  <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                    <div className="min-w-0 text-xs">
+                      <p className="font-medium text-destructive">Banned{detail.user.bannedAt ? ` on ${new Date(detail.user.bannedAt).toLocaleDateString()}` : ""}</p>
+                      {detail.user.bannedReason ? <p className="mt-0.5 truncate text-muted-foreground">{detail.user.bannedReason}</p> : null}
+                    </div>
+                    <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-lg" onClick={() => unbanUser(detail.user.id)} disabled={isPending}>
+                      <ShieldCheck className="size-3.5" />Unban
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" className="h-10 w-full rounded-lg text-destructive hover:text-destructive" onClick={() => setBanDialogOpen(true)} disabled={isPending}>
+                    <Ban className="size-4" />Ban user…
+                  </Button>
+                )}
+              </div>
+
+              <div>
                 <p className="mb-2 text-sm font-medium">Recent apps</p>
                 {detail.user.projects.flatMap((project) => project.chats).length === 0 ? (
                   <p className="text-xs text-muted-foreground">No apps yet.</p>
@@ -456,6 +528,27 @@ export default function AdminUsersPage() {
             <Button variant="destructive" onClick={revokeByok} disabled={isPending}>
               {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
               Revoke keys
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ban confirmation */}
+      <Dialog open={banDialogOpen} onOpenChange={(open) => { if (!isPending) { setBanDialogOpen(open); if (!open) setBanReason(""); } }}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Ban this user?</DialogTitle>
+            <DialogDescription>Their active sessions are revoked immediately and they can no longer sign in, build, or access their account until unbanned.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="ban-reason">Reason (optional, visible to admins only)</Label>
+            <Input id="ban-reason" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="h-10 rounded-lg" placeholder="e.g. abuse of generation credits" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBanDialogOpen(false)} disabled={isPending}>Cancel</Button>
+            <Button variant="destructive" onClick={banUser} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              Ban user
             </Button>
           </DialogFooter>
         </DialogContent>

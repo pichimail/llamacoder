@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         take: pageSize,
         select: {
           id: true, email: true, name: true, image: true, createdAt: true,
-          role: true,
+          role: true, banned: true,
           credits: { select: { planTier: true, totalGranted: true, totalUsed: true } },
           apiKeys: { select: { id: true, provider: true } },
           projects: { select: { _count: { select: { chats: true } } } },
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       image: user.image,
       joinedAt: user.createdAt,
       isAdmin: user.role === "admin",
+      banned: user.banned,
       planTier: user.credits?.planTier ?? "free",
       creditBalance: user.credits ? Math.max(user.credits.totalGranted - user.credits.totalUsed, 0) : null,
       byokCount: user.apiKeys.length,

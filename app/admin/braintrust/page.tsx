@@ -1,141 +1,133 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Activity, 
-  BarChart3, 
-  Gauge, 
-  RefreshCw, 
-  Search,
-  ExternalLink
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Activity, BarChart3, ExternalLink, Gauge, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-// Mock data to match the admin UI theme and layout
-const initialLogs = [
-  { 
-    id: 1, 
-    model: "claude-3-5-sonnet", 
-    score: 0.94, 
-    provider: "Anthropic", 
-    time: "3m ago", 
-    quality: "Excellent",
-    status: "success",
-    outputPreview: "Built a responsive SaaS dashboard with charts and auth.",
-    chatId: "demo123"
-  },
-  { 
-    id: 2, 
-    model: "gpt-4o", 
-    score: 0.89, 
-    provider: "OpenAI", 
-    time: "12m ago", 
-    quality: "Good",
-    status: "success",
-    outputPreview: "Created a marketing landing with animations.",
-    chatId: "demo124"
-  },
-  { 
-    id: 3, 
-    model: "gemini-1.5-pro", 
-    score: 0.82, 
-    provider: "Google", 
-    time: "25m ago", 
-    quality: "Good",
-    status: "success",
-    outputPreview: "Admin console with tables and forms.",
-    chatId: null
-  },
-];
+type GenerationLogRow = {
+  id: string;
+  chatId: string | null;
+  model: string;
+  provider: string | null;
+  status: string;
+  outputPreview: string;
+  durationMs: number | null;
+  createdAt: string;
+};
+
+type LogDashboard = {
+  logs: GenerationLogRow[];
+  total: number;
+  byModel: Array<{ model: string; provider: string | null; count: number }>;
+  byStatus: Array<{ status: string; count: number }>;
+  braintrustConfigured: boolean;
+  braintrustProjectId: string | null;
+};
 
 export default function BraintrustAdminPage() {
-  const [logs, setLogs] = useState(initialLogs);
+  const [data, setData] = useState<LogDashboard | null>(null);
+  const [failed, setFailed] = useState(false);
   const [search, setSearch] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const filteredLogs = logs.filter(log => 
-    log.model.toLowerCase().includes(search.toLowerCase()) ||
-    log.provider.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const avgScore = (logs.reduce((sum, log) => sum + log.score, 0) / logs.length).toFixed(2);
-
-  const handleRefresh = () => {
+  const load = useCallback(async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      const newLog = {
-        id: Date.now(),
-        model: ["claude-3-5-sonnet", "gpt-4o", "gemini-1.5-pro"][Math.floor(Math.random() * 3)],
-        score: 0.75 + Math.random() * 0.22,
-        provider: ["Anthropic", "OpenAI", "Google"][Math.floor(Math.random() * 3)],
-        time: "just now",
-        quality: Math.random() > 0.3 ? "Excellent" : "Good",
-        status: "success",
-        outputPreview: "New dynamic artifact generated successfully.",
-        chatId: "live" + Date.now(),
-      };
-      setLogs([newLog, ...logs.slice(0, 8)]);
+    try {
+      const response = await fetch("/api/admin/braintrust/logs", { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      setData(await response.json());
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
       setIsRefreshing(false);
-    }, 500);
-  };
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredLogs = (data?.logs ?? []).filter(
+    (log) =>
+      log.model.toLowerCase().includes(search.toLowerCase()) ||
+      (log.provider ?? "").toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Braintrust Logs</h1>
-          <p className="text-muted-foreground">Quality scores, debugging and model comparisons</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Generation Logs</h1>
+          <p className="text-muted-foreground">Real generation events, status, and per-model call volume — live from the database.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="default">Connected</Badge>
-          <Button 
-            onClick={handleRefresh} 
-            variant="outline" 
-            size="sm" 
-            disabled={isRefreshing}
-            className="gap-2"
-          >
+          <Badge variant={data?.braintrustConfigured ? "default" : "outline"}>
+            {data?.braintrustConfigured ? "Braintrust connected" : "Braintrust not configured"}
+          </Badge>
+          <Button onClick={() => void load()} variant="outline" size="sm" disabled={isRefreshing} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Stats cards - matching the rest of the admin dashboard UI */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {failed ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Could not load generation logs. Check admin access and database connectivity.
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total logs</CardDescription>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Activity className="size-5" /> {logs.length}
-            </CardTitle>
+            <CardDescription>Total logged generations</CardDescription>
+            {data ? (
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Activity className="size-5" /> {data.total.toLocaleString()}
+              </CardTitle>
+            ) : (
+              <Skeleton className="h-8 w-16" />
+            )}
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Models compared</CardDescription>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <BarChart3 className="size-5" /> {new Set(logs.map(l => l.model)).size}
-            </CardTitle>
+            <CardDescription>Distinct models</CardDescription>
+            {data ? (
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <BarChart3 className="size-5" /> {data.byModel.length}
+              </CardTitle>
+            ) : (
+              <Skeleton className="h-8 w-16" />
+            )}
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Average score</CardDescription>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Gauge className="size-5" /> {avgScore}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Status</CardDescription>
-            <CardTitle className="text-2xl text-emerald-500">Connected</CardTitle>
+            <CardDescription>Success rate (recent)</CardDescription>
+            {data ? (
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Gauge className="size-5" />
+                {data.byStatus.reduce((sum, row) => sum + row.count, 0) > 0
+                  ? `${Math.round(
+                      ((data.byStatus.find((row) => row.status === "success")?.count ?? 0) /
+                        data.byStatus.reduce((sum, row) => sum + row.count, 0)) *
+                        100,
+                    )}%`
+                  : "—"}
+              </CardTitle>
+            ) : (
+              <Skeleton className="h-8 w-16" />
+            )}
           </CardHeader>
         </Card>
       </div>
@@ -144,17 +136,12 @@ export default function BraintrustAdminPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <CardTitle>Generation Events</CardTitle>
-              <CardDescription>Prompt debugging, scores and model performance</CardDescription>
+              <CardTitle>Generation events</CardTitle>
+              <CardDescription>Most recent logged generations across all users</CardDescription>
             </div>
             <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search model or provider..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search model or provider..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
           </div>
         </CardHeader>
@@ -166,36 +153,34 @@ export default function BraintrustAdminPage() {
                   <TableHead>Time</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Provider</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Quality</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Duration</TableHead>
                   <TableHead>Preview</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.length > 0 ? (
+                {data === null ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10">
+                      <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                          <Skeleton key={index} className="h-8 w-full" />
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLogs.length > 0 ? (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{log.time}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</TableCell>
                       <TableCell className="font-medium">{log.model}</TableCell>
-                      <TableCell className="text-muted-foreground">{log.provider}</TableCell>
+                      <TableCell className="text-muted-foreground">{log.provider ?? "—"}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 min-w-[120px]">
-                          <span className="font-mono text-xs w-9">{log.score.toFixed(2)}</span>
-                          <progress
-                            className="h-1.5 w-full flex-1 overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
-                            value={Math.round(log.score * 100)}
-                            max={100}
-                            aria-label={`Quality score ${Math.round(log.score * 100)} percent`}
-                          />
-                        </div>
+                        <Badge variant={log.status === "success" ? "default" : "outline"}>{log.status}</Badge>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={log.quality === "Excellent" ? "default" : "secondary"}>
-                          {log.quality}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[280px] text-xs text-muted-foreground line-clamp-1">{log.outputPreview}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{log.durationMs ? `${(log.durationMs / 1000).toFixed(1)}s` : "—"}</TableCell>
+                      <TableCell className="line-clamp-1 max-w-[280px] text-xs text-muted-foreground">{log.outputPreview || "—"}</TableCell>
                       <TableCell>
                         {log.chatId ? (
                           <Button asChild variant="ghost" size="sm">
@@ -203,7 +188,9 @@ export default function BraintrustAdminPage() {
                               Open <ExternalLink className="ml-1 size-3" />
                             </Link>
                           </Button>
-                        ) : "—"}
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

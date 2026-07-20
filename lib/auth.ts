@@ -48,6 +48,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
         (session.user as any).id = user.id;
         (session.user as any).role = isAdminEmail(email) ? "admin" : "user";
         (session.user as any).isAdmin = isAdminEmail(email);
+        (session.user as any).banned = (user as { banned?: boolean }).banned === true;
       }
       return session;
     },

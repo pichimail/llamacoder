@@ -10,6 +10,7 @@ import {
   BarChart3,
   CreditCard,
   FlaskConical,
+  HardDrive,
   Images,
   LayoutDashboard,
   Menu,
@@ -72,6 +73,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin/flags", label: "Feature Flags", icon: ToggleLeft },
       { href: "/admin/settings", label: "Settings", icon: Settings },
+      { href: "/admin/storage", label: "Storage", icon: HardDrive },
       { href: "/admin/analytics", label: "Analytics", icon: FlaskConical },
       { href: "/admin/braintrust", label: "Logs", icon: ScrollText },
     ],

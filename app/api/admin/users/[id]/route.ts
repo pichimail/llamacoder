@@ -4,6 +4,7 @@ import { requireAdmin, adminErrorResponse } from "@/lib/admin-guard";
 import { rateLimitOrThrow } from "@/lib/rate-limit";
 import { getPrisma } from "@/lib/prisma";
 import { ensureUserCredits } from "@/lib/chinnallm/credits";
+import { logAudit } from "@/lib/audit";
 
 /** Admin user detail + plan change + BYOK revoke (Phase 4). */
 
@@ -17,6 +18,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       where: { id },
       select: {
         id: true, email: true, name: true, image: true, createdAt: true, role: true, plan: true,
+        banned: true, bannedReason: true, bannedAt: true,
         credits: true,
         apiKeys: { select: { id: true, provider: true, label: true, createdAt: true } },
         projects: {
@@ -54,6 +56,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 const patchSchema = z.object({
   planTier: z.enum(["free", "pro", "enterprise"]).optional(),
   revokeByok: z.boolean().optional(),
+  banned: z.boolean().optional(),
+  bannedReason: z.string().max(500).optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -63,6 +67,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params;
     const parsed = patchSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    if (parsed.data.banned === true && id === admin.id) {
+      return NextResponse.json({ error: "You cannot ban your own account." }, { status: 400 });
+    }
     const prisma = getPrisma();
 
     if (parsed.data.planTier) {
@@ -72,6 +79,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (parsed.data.revokeByok) {
       await prisma.apiKeyStore.deleteMany({ where: { userId: id } });
+    }
+    if (typeof parsed.data.banned === "boolean") {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          banned: parsed.data.banned,
+          bannedReason: parsed.data.banned ? parsed.data.bannedReason || null : null,
+          bannedAt: parsed.data.banned ? new Date() : null,
+        },
+      });
+      if (parsed.data.banned) {
+        // Revoked sessions force the user to re-authenticate, at which point
+        // the banned flag on the User row is picked up and access is denied.
+        await prisma.session.deleteMany({ where: { userId: id } });
+      }
+      await logAudit({
+        userId: admin.id,
+        action: parsed.data.banned ? "ban-user" : "unban-user",
+        resource: "user",
+        resourceId: id,
+        metadata: parsed.data.bannedReason ? { reason: parsed.data.bannedReason } : undefined,
+      });
     }
     return NextResponse.json({ updated: true });
   } catch (error) {

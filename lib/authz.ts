@@ -44,6 +44,10 @@ export async function getCurrentUserOrNull(): Promise<CurrentUser | null> {
     const session = await auth();
     const rawUser = session?.user as any;
     if (!rawUser?.id) return null;
+    // A banned user is treated as logged out everywhere this gate is used —
+    // no separate DB round trip needed since the database session strategy
+    // already re-joins the User row (including `banned`) on every request.
+    if (rawUser.banned === true) return null;
     const email = rawUser.email ? String(rawUser.email) : null;
     return {
       id: String(rawUser.id),

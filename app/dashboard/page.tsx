@@ -100,7 +100,7 @@ export default async function DashboardPage() {
           <MetricCard icon={FolderKanban} label="Projects" value={projects.length} href="/chats" />
           <MetricCard icon={MessageSquare} label="Chats" value={totalChats} href="/chats" />
           <MetricCard icon={Users} label="Members" value={totalMembers} href="/chats" />
-          <MetricCard icon={CreditCard} label="Credits left" value={balance?.balance ?? 0} href="/credits" />
+          <MetricCard icon={CreditCard} label="Credits left" value={balance?.balance ?? 0} href="/credits" unavailable={balance === null} />
           <MetricCard icon={ArrowUpRight} label="Deployments" value={totalDeployments} href="/gallery" />
         </div>
 
@@ -184,15 +184,31 @@ export default async function DashboardPage() {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, href }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; href: string }) {
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  href,
+  unavailable,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  href: string;
+  unavailable?: boolean;
+}) {
   return (
     <Link href={href} className="glass-surface glass-interactive group block rounded-3xl p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-2 text-emerald-300 transition group-hover:bg-emerald-400/20"><Icon className="size-4" /></div>
         <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-emerald-300" />
       </div>
-      <p className="mt-4 text-3xl font-semibold tabular-nums">{value.toLocaleString()}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+      {unavailable ? (
+        <p className="mt-4 text-3xl font-semibold text-muted-foreground">—</p>
+      ) : (
+        <p className="mt-4 text-3xl font-semibold tabular-nums">{value.toLocaleString()}</p>
+      )}
+      <p className="mt-1 text-sm text-muted-foreground">{unavailable ? `${label} unavailable` : label}</p>
     </Link>
   );
 }
