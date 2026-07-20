@@ -4,8 +4,11 @@ import Link from "next/link";
 import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useGSAP } from "@gsap/react";
+import { gsap } from "gsap";
 import {
   ArrowRight,
+  ArrowUpRight,
   BrainCircuit,
   Bot,
   Box,
@@ -18,6 +21,7 @@ import {
   Github,
   Image as ImageIcon,
   KeyRound,
+  LayoutTemplate,
   Layers,
   Loader2,
   Lock,
@@ -29,6 +33,7 @@ import {
   Send,
   ServerCog,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   TerminalSquare,
   UploadCloud,
@@ -51,7 +56,7 @@ import { Input } from "@/components/ui/input";
 import { McpServerDialog } from "@/components/mcp/mcp-server-dialog";
 import { RichFooter } from "@/components/rich-footer";
 import { Textarea } from "@/components/ui/textarea";
-import { MODELS, type ModelConfig } from "@/lib/constants";
+import { MODELS, SUGGESTED_PROMPTS, type ModelConfig } from "@/lib/constants";
 import { DEFAULT_STYLE_ID, SANDBOX_STYLE_PRESETS, type SandboxStyleId } from "@/lib/sandbox-theme";
 import { requiresAI } from "@/lib/ai-detection";
 import { BYOK_PROVIDERS, type BYOKProviderId } from "@/lib/chinnallm/provider-catalog";
@@ -691,6 +696,36 @@ function PromptComposer({
   const selectedModel = MODELS.find((item) => item.value === model);
   const canSend = prompt.trim().length > 0 || attachments.length > 0;
   const selectedTypeLabel = appTypeHints.find((item) => item.id === selectedType)?.label ?? "Web app";
+  const prefersReducedMotion = useReducedMotion();
+  const composerScopeRef = useRef<HTMLDivElement>(null);
+
+  // Subtle, one-time entrance for the composer card + a barely-perceptible
+  // ambient sheen loop on the border — restrained on purpose ("ultra minimal
+  // futuristic"), not a decorative animation showcase. Skips entirely for
+  // prefers-reduced-motion.
+  useGSAP(
+    () => {
+      if (prefersReducedMotion) return;
+      const card = composerScopeRef.current?.querySelector("[data-composer-card]");
+      const sheen = composerScopeRef.current?.querySelector("[data-composer-sheen]");
+      if (!card) return;
+      gsap.fromTo(
+        card,
+        { opacity: 0, y: 14, scale: 0.985 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out" },
+      );
+      if (sheen) {
+        gsap.to(sheen, {
+          backgroundPosition: "200% 0",
+          duration: 6,
+          ease: "sine.inOut",
+          repeat: -1,
+          yoyo: true,
+        });
+      }
+    },
+    { scope: composerScopeRef },
+  );
 
   function appendPrompt(text: string) {
     const next = prompt.trim() ? `${prompt.trim()}\n\n${text}` : text;
@@ -704,33 +739,34 @@ function PromptComposer({
   }
 
   return (
-    <div className="relative mx-auto w-full max-w-5xl space-y-4" id="prompt-composer">
-      <div aria-hidden="true" className="absolute -inset-8 -z-10 rounded-[40px] bg-[radial-gradient(circle_at_16%_20%,rgba(190,242,100,0.18),transparent_38%),radial-gradient(circle_at_88%_45%,rgba(251,191,36,0.13),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:auto,auto,56px_56px,56px_56px] opacity-80 blur-[0.2px]" />
-      <div className="relative rounded-[28px] p-px shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
-        <div aria-hidden="true" className="absolute inset-0 rounded-[28px] bg-[linear-gradient(135deg,rgba(255,255,255,0.20),rgba(190,242,100,0.28),rgba(251,191,36,0.14),rgba(255,255,255,0.08))] opacity-75" />
-        <div className="relative overflow-hidden rounded-[27px] border border-white/10 bg-[#0a0b0d]/88 backdrop-blur-2xl">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),transparent)]" />
-        <Textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder="Build a 3D solar system viewer with Three.js and orbit controls..."
-          aria-label="Describe what to build"
-          className="relative min-h-[168px] resize-none border-0 bg-transparent p-5 text-base leading-7 text-stone-100 placeholder:text-stone-500 focus-visible:ring-0 sm:p-7 sm:text-lg"
+    <div ref={composerScopeRef} className="relative mx-auto w-full max-w-4xl space-y-4" id="prompt-composer">
+      <div data-composer-card className="relative rounded-[26px] p-px shadow-[0_20px_70px_rgba(0,0,0,0.55)]">
+        <div
+          data-composer-sheen
+          aria-hidden="true"
+          className="absolute inset-0 rounded-[26px] bg-[linear-gradient(100deg,rgba(255,255,255,0.10)_0%,rgba(190,242,100,0.24)_28%,rgba(255,255,255,0.06)_50%,rgba(190,242,100,0.24)_72%,rgba(255,255,255,0.10)_100%)] bg-[length:220%_100%] opacity-70"
         />
-        <div className="border-t border-white/12 bg-black/20 p-3 sm:p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="relative overflow-hidden rounded-[25px] border border-white/10 bg-[#0a0b0d]/92 backdrop-blur-2xl">
+          <Textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                onSend();
+              }
+            }}
+            placeholder="Describe what to build..."
+            aria-label="Describe what to build"
+            className="relative min-h-[132px] resize-none border-0 bg-transparent p-5 text-base leading-7 text-stone-100 placeholder:text-stone-500 focus-visible:ring-0 sm:p-6 sm:text-lg"
+          />
+          <div className="flex items-center justify-between gap-3 border-t border-white/10 p-3 sm:p-4">
+            <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-stone-300 transition hover:border-lime-300/45 hover:bg-lime-300/10 hover:text-lime-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-200/40"
+                    className="inline-flex size-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-stone-300 transition hover:border-lime-300/45 hover:bg-lime-300/10 hover:text-lime-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-200/40"
                     aria-label="Open prompt actions"
                   >
                     <Plus className="size-5" />
@@ -787,39 +823,78 @@ function PromptComposer({
               <button
                 type="button"
                 onClick={() => setModelPickerOpen(true)}
-                className="inline-flex h-11 min-w-0 max-w-[13rem] items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 transition hover:border-lime-300/40 hover:text-lime-100 sm:max-w-none"
+                className="inline-flex h-10 min-w-0 max-w-[10rem] items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.045] px-3 text-xs text-stone-200 transition hover:border-lime-300/40 hover:text-lime-100 sm:max-w-none sm:text-sm"
               >
-                <BrainCircuit className="size-4 text-lime-200" />
+                <BrainCircuit className="size-3.5 shrink-0 text-lime-200" />
                 <span className="truncate">{selectedModel?.label ?? model}</span>
               </button>
-              <select value={mode} onChange={(event) => setMode(event.target.value as Mode)} className="h-11 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 outline-none transition hover:border-lime-300/35 focus:border-lime-300/50">
-                <option value="agent">Agent</option>
-                <option value="plan">Plan</option>
-                <option value="ask">Ask</option>
-              </select>
-              <select value={styleId} onChange={(event) => setStyleId(event.target.value as SandboxStyleId)} className="h-11 max-w-[11rem] rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-200 outline-none transition hover:border-lime-300/35 focus:border-lime-300/50 sm:max-w-none">
-                {SANDBOX_STYLE_PRESETS.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
-              </select>
-              <button type="button" onClick={() => setBackendEnabled(!backendEnabled)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.045] px-3 text-sm text-stone-300 transition hover:border-lime-300/40 hover:text-lime-100">
-                <Code2 className="size-3.5" />
-                {backendEnabled ? "Backend on" : "Backend off"}
-              </button>
-              <button type="button" className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-stone-400 transition hover:border-amber-200/35 hover:text-amber-100" aria-label="Voice input">
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-10 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.045] px-3 text-xs text-stone-300 transition hover:border-lime-300/40 hover:text-lime-100 sm:text-sm"
+                    aria-label="Build options"
+                  >
+                    <SlidersHorizontal className="size-3.5" />
+                    <span className="hidden sm:inline">Options</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72 rounded-2xl border-white/12 bg-[#0c0d0b] p-2 text-stone-100 shadow-2xl shadow-black/60">
+                  <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">Mode</DropdownMenuLabel>
+                  <DropdownMenuGroup className="px-1 pb-1">
+                    <div className="flex gap-1.5">
+                      {(["agent", "plan", "ask"] as const).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setMode(value)}
+                          className={`flex-1 rounded-lg border px-2 py-1.5 text-xs capitalize transition ${mode === value ? "border-lime-300/50 bg-lime-300/10 text-lime-100" : "border-white/10 bg-white/[0.03] text-stone-400 hover:text-stone-200"}`}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-lime-200/75">Style</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    {SANDBOX_STYLE_PRESETS.map((style) => (
+                      <DropdownMenuItem
+                        key={style.id}
+                        className="gap-3 rounded-xl px-3 py-2 focus:bg-lime-300/10 focus:text-lime-100"
+                        onSelect={() => setStyleId(style.id)}
+                      >
+                        {style.id === styleId ? <span className="size-1.5 rounded-full bg-lime-300" /> : <span className="size-1.5" />}
+                        {style.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem className="gap-3 rounded-xl px-3 py-2.5 focus:bg-lime-300/10 focus:text-lime-100" onSelect={() => setBackendEnabled(!backendEnabled)}>
+                    <Code2 className="size-4" />
+                    Backend {backendEnabled ? "on" : "off"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <button type="button" className="hidden size-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.045] text-stone-400 transition hover:border-amber-200/35 hover:text-amber-100 sm:inline-flex" aria-label="Voice input">
                 <Mic className="size-4" />
               </button>
-              <span className="hidden text-xs text-stone-500 2xl:inline">
-                {selectedTypeLabel} · {activeStyle?.label ?? "Style"} · {attachments.length ? `${attachments.length} attached` : "No files"} · {mcpServers.length ? `${mcpServers.length} MCP` : "No MCP"}
-              </span>
             </div>
 
-            <Button disabled={!canSend || isSubmitting} onClick={onSend} className="h-12 rounded-2xl bg-lime-200 px-5 text-stone-950 shadow-[0_0_48px_rgba(190,242,100,0.22)] hover:bg-lime-100 md:min-w-32">
+            <Button disabled={!canSend || isSubmitting} onClick={onSend} className="h-11 shrink-0 rounded-full bg-lime-200 px-5 text-stone-950 shadow-[0_0_36px_rgba(190,242,100,0.2)] hover:bg-lime-100">
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              <span className="hidden sm:inline">Build now</span>
+              <span className="hidden sm:inline">Build</span>
             </Button>
           </div>
         </div>
-        </div>
       </div>
+      <p className="text-center text-xs text-stone-500">
+        {selectedTypeLabel} · {activeStyle?.label ?? "Style"}
+        {attachments.length ? ` · ${attachments.length} attached` : ""}
+        {mcpServers.length ? ` · ${mcpServers.length} MCP` : ""}
+      </p>
 
       <div className="relative flex flex-wrap justify-center gap-2 sm:gap-3">
         {appTypeHints.map((item) => (
@@ -858,11 +933,54 @@ function PromptComposer({
   );
 }
 
+function TemplateShowcase({
+  onSelect,
+  prefersReducedMotion,
+}: {
+  onSelect: (prompt: string) => void;
+  prefersReducedMotion: boolean | null;
+}) {
+  return (
+    <section className="mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8">
+      <div className="flex flex-col items-center text-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
+          <LayoutTemplate className="size-3.5" />
+          Templates
+        </div>
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-stone-50 sm:text-4xl">Start from a working shape, not a blank page.</h2>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-stone-400">Pick a template to load it into the composer above. Every one still goes through the same agent build, so you can keep iterating from there.</p>
+      </div>
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {SUGGESTED_PROMPTS.map((template, index) => (
+          <motion.button
+            key={template.title}
+            type="button"
+            onClick={() => onSelect(template.description)}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ delay: index * 0.05 }}
+            className="group flex h-full flex-col items-start rounded-2xl border border-lime-300/10 bg-[#0d0f0a] p-5 text-left transition hover:border-lime-300/30 hover:shadow-[0_0_44px_rgba(190,242,100,0.08)]"
+          >
+            <span className="text-lg font-semibold text-stone-50">{template.title}</span>
+            <span className="mt-2 text-sm leading-6 text-stone-400">{template.description}</span>
+            <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-lime-200/80 transition group-hover:text-lime-100">
+              Use this template
+              <ArrowUpRight className="size-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </span>
+          </motion.button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomePageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const context = use(Context);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -887,6 +1005,31 @@ export default function HomePageClient() {
   const [projectImportError, setProjectImportError] = useState<string | null>(null);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [0, -120]);
+
+  // Subtle, one-time hero entrance — eyebrow, headline, then subtext each
+  // fade/rise in with a short stagger. Skipped entirely for reduced motion.
+  useGSAP(
+    () => {
+      if (prefersReducedMotion) return;
+      const items = heroRef.current?.querySelectorAll("[data-hero-item]");
+      if (!items?.length) return;
+      gsap.fromTo(
+        items,
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out", stagger: 0.09 },
+      );
+    },
+    { scope: heroRef },
+  );
+
+  function selectTemplate(text: string) {
+    setPrompt(text);
+    requestAnimationFrame(() => {
+      const composer = document.getElementById("prompt-composer");
+      composer?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" });
+      composer?.querySelector("textarea")?.focus();
+    });
+  }
 
   useEffect(() => {
     const incomingPrompt = searchParams.get("prompt");
@@ -1225,18 +1368,18 @@ export default function HomePageClient() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,100,0.18),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(251,191,36,0.12),transparent_28%),linear-gradient(rgba(255,255,255,0.027)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.027)_1px,transparent_1px)] bg-[size:auto,auto,48px_48px,48px_48px]" />
           <div className="absolute inset-x-0 top-0 h-96 bg-[linear-gradient(180deg,rgba(190,242,100,0.08),transparent)]" />
         </motion.div>
-        <div className="mx-auto flex max-w-7xl flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
+        <div ref={heroRef} className="mx-auto flex max-w-7xl flex-col items-center text-center">
+          <div data-hero-item className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-medium text-lime-100">
             <Sparkles className="size-3.5" />
             Agentic builds with live code, preview, and checkpoints
           </div>
-          <h1 className="mt-8 max-w-5xl text-balance text-5xl font-semibold tracking-tight text-stone-50 sm:text-7xl lg:text-8xl">
+          <h1 data-hero-item className="mt-8 max-w-5xl text-balance text-5xl font-semibold tracking-tight text-stone-50 sm:text-7xl lg:text-8xl">
             Build apps with an agent you can actually inspect.
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-stone-400 sm:text-lg">
+          <p data-hero-item className="mt-6 max-w-2xl text-base leading-7 text-stone-400 sm:text-lg">
             Describe the product. Chinna-Coder plans the route structure, writes the files, streams the build state, and opens a live preview.
           </p>
-          <div className="mt-10 w-full">
+          <div data-hero-item className="mt-10 w-full">
             <PromptComposer
               prompt={prompt}
               setPrompt={setPrompt}
@@ -1263,6 +1406,8 @@ export default function HomePageClient() {
           </div>
         </div>
       </section>
+
+      <TemplateShowcase onSelect={selectTemplate} prefersReducedMotion={prefersReducedMotion} />
 
       <section className="mx-auto grid max-w-7xl gap-4 px-5 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
         {["Agent sees the queue", "You see the files", "Preview stays live"].map((item, index) => (
