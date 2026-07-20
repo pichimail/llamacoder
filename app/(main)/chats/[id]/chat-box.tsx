@@ -1,8 +1,7 @@
 "use client";
 
-import { ProductionInputBar as InputBar, type AttachedFile, type AttachedImage } from "@/components/agent-elements/production-input-bar";
+import { PromptComposer, type ComposerAttachment, type ComposerMode } from "@/components/chat/prompt-composer";
 import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
-import { AiModalSelector } from "@/components/ui/ai-modal-selector";
 import { AiResponseWriter } from "@/components/ui/ai-response-writer";
 import { AiSuggestions } from "@/components/ui/ai-suggestions";
 import {
@@ -10,14 +9,6 @@ import {
   CheckpointIcon,
   CheckpointTrigger,
 } from "@/components/ai-elements/checkpoint";
-import {
-  Context,
-  ContextContent,
-  ContextContentBody,
-  ContextContentFooter,
-  ContextContentHeader,
-  ContextTrigger,
-} from "@/components/ai-elements/context";
 import {
   EnvironmentVariable,
   EnvironmentVariableName,
@@ -45,7 +36,6 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
-import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
   Terminal,
@@ -66,32 +56,19 @@ import { cn } from "@/lib/utils";
 import { useAvailableModels } from "@/lib/use-available-models";
 import {
   Bookmark,
-  Boxes,
   Brain,
   CheckCircle2,
   Expand,
-  Gauge,
   KeyRound,
   ListChecks,
-  Paperclip,
   RotateCcw,
   ShieldCheck,
   TerminalSquare,
   Workflow,
-  Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createMessage } from "../../actions";
 import { type Chat } from "./page";
-
-type ComposerMode = "ask" | "plan" | "agent";
-type ComposerAttachment = {
-  id: string;
-  kind: "image" | "file";
-  filename: string;
-  url?: string;
-  size?: number;
-};
 
 type QueueStatus = "pending" | "active" | "completed";
 
@@ -212,13 +189,12 @@ export default function ChatBox({
   const [model, setModel] = useState(chat.model);
   const [mode, setMode] = useState<ComposerMode>("agent");
   const [quality] = useState<"low" | "high">(chat.quality === "high" ? "high" : "low");
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState("agent ready\nqueue idle\npreview watcher attached");
   const [activeAbilities, setActiveAbilities] = useState<string[]>(["web"]);
+  const [lastAttachmentCount, setLastAttachmentCount] = useState(0);
   const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const availableModels = useAvailableModels();
 
@@ -230,13 +206,6 @@ export default function ChatBox({
     })),
     [availableModels],
   );
-
-  const attachedImages: AttachedImage[] = attachments
-    .filter((item) => item.kind === "image" && item.url)
-    .map((item) => ({ id: item.id, filename: item.filename, url: item.url!, size: item.size }));
-  const attachedFiles: AttachedFile[] = attachments
-    .filter((item) => item.kind === "file")
-    .map((item) => ({ id: item.id, filename: item.filename, size: item.size }));
 
   const promptLooksBackend = /database|postgres|prisma|auth|api|backend|admin|dashboard|stripe|payment|login/i.test(prompt);
   const promptLooksThreeD = /3d|three|webgl|canvas|shader|orbit|scene|gsap|parallax/i.test(prompt);
@@ -260,7 +229,7 @@ export default function ChatBox({
       {
         id: "files",
         title: "Write changed files only",
-        description: attachments.length ? `${attachments.length} attachment${attachments.length === 1 ? "" : "s"} staged.` : "No attachment context staged.",
+        description: lastAttachmentCount ? `${lastAttachmentCount} attachment${lastAttachmentCount === 1 ? "" : "s"} sent with the last request.` : "No attachment context staged.",
         status: isStreaming ? "active" : "pending",
       },
       {
@@ -270,7 +239,7 @@ export default function ChatBox({
         status: isStreaming ? "active" : "pending",
       },
     ] satisfies { id: string; title: string; description: string; status: QueueStatus }[],
-    [attachments.length, isStreaming, mode, prompt],
+    [lastAttachmentCount, isStreaming, mode, prompt],
   );
 
   const terminalText = useMemo(() => {
@@ -318,7 +287,7 @@ export default function ChatBox({
     {
       name: "BLOB_READ_WRITE_TOKEN",
       purpose: "Screenshot, image, and file attachments.",
-      required: attachments.length > 0,
+      required: lastAttachmentCount > 0,
       configured: blobUploadConfigured === true,
       value: blobUploadConfigured ? "configured" : "missing",
     },
@@ -385,64 +354,7 @@ export default function ChatBox({
     window.location.reload();
   }
 
-  async function handleAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (blobUploadConfigured === false) {
-      toast({
-        title: "Attachments unavailable",
-        description: "Blob upload is not configured in this environment.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-      const response = await fetch("/api/blob-upload", { method: "POST", body: formData });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.url) throw new Error(data?.error || "Blob upload failed");
-      setAttachments((items) => [
-        ...items,
-        {
-          id: crypto.randomUUID(),
-          kind: file.type.startsWith("image/") ? "image" : "file",
-          filename: file.name || "attachment",
-          size: file.size,
-          url: data.url,
-        },
-      ]);
-      if (!prompt.trim()) setPrompt("Use the attached file as context and update the app.");
-      setTerminalOutput((current) => `${current}\nattached ${file.name || "file"}`);
-    } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Could not upload the file.",
-        variant: "destructive",
-      });
-    } finally {
-      event.currentTarget.value = "";
-    }
-  }
-
-  async function handlePaste(event: ClipboardEvent) {
-    const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith("image/"));
-    const file = imageItem?.getAsFile();
-    if (!file || blobUploadConfigured === false) return;
-    event.preventDefault();
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    await handleAttachmentUpload({
-      currentTarget: { value: "" },
-      target: { files: transfer.files },
-    } as unknown as ChangeEvent<HTMLInputElement>);
-  }
-
-  function removeAttachment(id: string) {
-    setAttachments((items) => items.filter((item) => item.id !== id));
-  }
-
-  function handleSend({ content }: { role: "user"; content: string }) {
+  function handleSend(content: string, attachments: ComposerAttachment[] = []) {
     if (disabled) return;
     const trimmed = content.trim();
     if (!trimmed && attachments.length === 0) return;
@@ -517,8 +429,7 @@ export default function ChatBox({
         setTerminalOutput((current) => `${current}\nmessage ${message.id} queued\nstream requested`);
         onNewStreamPromise(streamPromise, { reasoning: mode === "agent", messageId: message.id, model });
         setPrompt("");
-        setAttachments([]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        setLastAttachmentCount(attachments.length);
       } catch (error) {
         onAbortController?.(null);
         toast({
@@ -534,11 +445,11 @@ export default function ChatBox({
     return (
       <TooltipProvider>
         <div ref={composerRef} className="w-full">
-          <InputBar
+          <PromptComposer
             value={prompt}
             onChange={setPrompt}
             onSend={handleSend}
-            onStop={onStop ?? (() => undefined)}
+            onStop={onStop}
             status={isStreaming ? "streaming" : isPending ? "submitted" : "ready"}
             placeholder="Describe a change..."
             disabled={disabled}
@@ -563,15 +474,6 @@ export default function ChatBox({
   return (
     <TooltipProvider>
       <div ref={composerRef} className="relative w-full chat-composer">
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.json,.csv,.zip"
-          aria-label="Attach image or file"
-          onChange={handleAttachmentUpload}
-        />
-
         <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
           <div className="grid gap-3 md:grid-cols-2">
             <AgentPanel title="Queue + To-do" icon={<ListChecks className="size-4" />}>
@@ -705,97 +607,22 @@ export default function ChatBox({
             )}
           />
           <div className="relative rounded-[20px] border border-lime-300/10 bg-[#080a07]/95 p-1 shadow-2xl shadow-black/30">
-            <InputBar
+            <PromptComposer
               value={prompt}
               onChange={setPrompt}
               onSend={handleSend}
-              onStop={onStop ?? (() => undefined)}
+              onStop={onStop}
               status={isStreaming ? "streaming" : isPending ? "submitted" : "ready"}
               placeholder="Describe the next app build, fix, integration, or preview change..."
               disabled={disabled}
               autoFocus
-              onAttach={() => fileInputRef.current?.click()}
-              onPaste={handlePaste}
-              attachedImages={attachedImages}
-              attachedFiles={attachedFiles}
-              onRemoveImage={removeAttachment}
-              onRemoveFile={removeAttachment}
-              infoBar={{
-                title: `${modeLabels[mode]} workflow`,
-                description: isStreaming ? "Queue and terminal are live." : "Enter sends the exact request to the builder.",
-                position: "top",
-              }}
-              leftActions={
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <Paperclip className="size-3.5" />
-                    Attach
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAbilityModalOpen(true)}
-                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <Boxes className="size-3.5" />
-                    Abilities
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode((current) => (current === "agent" ? "plan" : current === "plan" ? "ask" : "agent"))}
-                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <Zap className="size-3.5" />
-                    {modeLabels[mode]}
-                  </button>
-                </div>
-              }
-              rightActions={
-                <div className="flex items-center gap-1">
-                  <SpeechInput
-                    onTranscriptionChange={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
-                    disabled={disabled}
-                    className="size-7 rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
-                    aria-label="Dictate chat prompt"
-                  />
-                  <AiModalSelector
-                    options={modelOptions.map((item) => item.label)}
-                    onSelect={handleModelChange}
-                    trigger={modelOptions.find((item) => item.value === model)?.label ?? "Model"}
-                  />
-                  <Context
-                    usedTokens={Math.floor(prompt.length / 4) + 240}
-                    maxTokens={model.includes("claude") ? 200000 : 128000}
-                    modelId={model}
-                  >
-                    <ContextTrigger asChild>
-                      <button
-                        type="button"
-                        className="hidden size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground sm:flex"
-                        aria-label="Model context"
-                      >
-                        <Gauge className="size-3.5" />
-                      </button>
-                    </ContextTrigger>
-                    <ContextContent>
-                      <ContextContentHeader>
-                        <span className="text-sm font-medium">Context · {model.split("/").pop()}</span>
-                      </ContextContentHeader>
-                      <ContextContentBody>
-                        <div className="text-xs text-muted-foreground">
-                          ~{Math.floor(prompt.length / 4)} prompt tokens. Attachments and previous files are included by the builder context.
-                        </div>
-                      </ContextContentBody>
-                      <ContextContentFooter>
-                        <span className="text-[10px] text-muted-foreground">Visible estimate only.</span>
-                      </ContextContentFooter>
-                    </ContextContent>
-                  </Context>
-                </div>
-              }
+              mode={mode}
+              onModeChange={() => setMode((current) => (current === "agent" ? "plan" : current === "plan" ? "ask" : "agent"))}
+              onOpenAbilities={() => setAbilityModalOpen(true)}
+              model={model}
+              modelOptions={modelOptions}
+              onModelChange={handleModelChange}
+              onDictate={(text) => setPrompt((current) => `${current}${current.trim() ? " " : ""}${text}`)}
             />
           </div>
         </div>
