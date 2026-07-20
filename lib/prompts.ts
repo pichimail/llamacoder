@@ -182,6 +182,34 @@ Landing-page quality bar:
 - Keep mobile first-class with no horizontal overflow, overlapping text, or hover-only required actions.
 - Include local interaction behavior for forms, tabs, toggles, nav, carousels, or demos where useful.
 - Still compile first. Every import must resolve and every effect must clean up timers, animation contexts, canvas renderers, and event listeners.
+
+## SECTION COMPLETENESS CONTRACT (NON-NEGOTIABLE)
+Before finishing, re-read the user's prompt sentence by sentence and confirm every named requirement
+exists as a real, populated section or page in the output. If the prompt names concrete sections or
+features — "pricing", "product imagery", "docs links", "testimonials", "FAQ", "case studies",
+"integrations", "contact" — you MUST build ALL of them with real content. Never stop after the hero
+or after one or two sections and call it done; a build that only satisfies the first clause of a
+multi-part prompt has NOT met the bar even if it compiles cleanly. Unless the prompt is for a
+narrow single-purpose page (waitlist-only, coming-soon-only), build each of the sections the prompt
+implies as its own visually distinct block with intentional spacing rhythm — do not compress a
+multi-section request into one short scrolling page with a single code snippet and a footer.
+
+## HERO VISUAL BAR (NON-NEGOTIABLE, ANTI-SLOP)
+A hero made of only a centered heading, a subheading, and a button is not acceptable as the entire
+first viewport of a premium landing page — that reads as generic AI output, not a shipped product.
+The hero MUST include a real visual anchor in addition to copy, chosen to fit the product:
+- A product mockup: a browser-chrome or device-frame component showing a believable in-app
+  screenshot, built from real local markup/components (never an external image URL).
+- A layered graphic composition: an illustration, abstract shapes, a dashboard/data-visualization
+  preview, or a small interactive demo widget.
+- A code/terminal panel ONLY for developer-facing products, and only paired with at least one other
+  visual element (a diagram, live counter, or mockup) — never a lone code block as the entire hero.
+Do not default to a plain background with two-tone gradient heading text as the whole hero
+treatment. BANNED as a default: bg-clip-text gradient headline text using stock blue/purple/indigo
+combinations (a top generic-AI tell) — use the active style preset's accent tokens, and prefer
+confident solid typography over gradient-text tricks unless the selected design mode specifically
+calls for a gradient treatment. Give the hero real visual weight through layered surfaces,
+considered imagery, or a populated interactive element, not typography alone.
 `;
 
 const premiumProductAppPrompt = dedent`
@@ -501,6 +529,10 @@ const ANTI_SLOP_TOKEN_RULES = dedent`
   - No double-layered / nested panels (a card inside a card inside a card with competing borders
     and shadows). One surface layer per region.
   - No glow blobs, radial "aurora" gradient orbs, or neon halos behind hero/section content.
+  - No stock bg-clip-text gradient headline text (blue/purple/indigo two-tone gradients on the main
+    heading) as a default treatment — a top generic-AI tell. Use the active style preset's accent
+    tokens and confident solid typography instead, unless the selected design mode specifically
+    calls for a gradient-text treatment.
   - No glassmorphism / backdrop-blur translucent surfaces UNLESS the active STYLE DIRECTION block
     above is the Glassmorphism preset. Outside that preset, keep surfaces solid.
   - No dark-on-dark or low-contrast text. Body text must clear WCAG AA against its surface.
