@@ -15,7 +15,8 @@ import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { ChatCompletionStreamClient } from "@/lib/chat-completion-stream-client";
 import dynamic from "next/dynamic";
 import ChatBox from "./chat-box";
-import { ChatPanel } from "./chat-panel";
+import { LeftComposerPanel } from "@/components/builder/left-composer-panel";
+import { MobileBuilderSwitcher } from "@/components/builder/mobile-builder-switcher";
 import { CanvasMode } from "./canvas-mode";
 import CodeViewer, { downloadFilesAsZip, type BuilderStatus } from "./code-viewer";
 import type { Chat, Message, SidebarChat } from "./page";
@@ -48,7 +49,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ChatsAppSidebar } from "@/components/chats/app-sidebar";
 import { useHomeSidebarData } from "@/components/home/use-home-sidebar-data";
@@ -991,6 +991,37 @@ Fix requirements:
     }
   }, [activeMessage]);
 
+  // Manual "Continue" action offered once the automatic continuation loop
+  // exhausts MAX_CONTINUATION_ROUNDS (continuationStatus === "exhausted").
+  // Identical to the automatic continuation fetch in the finalContent handler
+  // above, just re-triggered on demand from the BuildWorkflowPanel UI.
+  const handleContinueGeneration = useCallback(() => {
+    if (!currentGenerationRef.current) return;
+    continuationRoundRef.current = 0;
+    setContinuationStatus("continuing");
+    setBuilderStatus("generating");
+    const { messageId: contMessageId, model: contModel } = currentGenerationRef.current;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const continuationPromise = fetch("/api/get-next-completion-stream-promise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messageId: contMessageId,
+        model: contModel,
+        isContinuation: true,
+        continuationContext: accumulatedGenerationTextRef.current.slice(-CONTINUATION_TAIL_CHARS),
+      }),
+    }).then(async (res) => {
+      if (!res.ok) throw new Error((await res.text()) || "Failed to continue generation");
+      if (!res.body) throw new Error("No body on continuation response");
+      return res.body;
+    });
+    streamPromiseRef.current = continuationPromise;
+    setStreamPromise(continuationPromise);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const activeElement = document.activeElement as HTMLElement | null;
@@ -1617,12 +1648,6 @@ Fix requirements:
             </div>
 
             <div className="flex items-center justify-end gap-1.5">
-              {/* Mobile compact controls */}
-              <div className="flex items-center rounded-lg border border-border/70 bg-transparent p-0.5 md:hidden" aria-label="Mobile panels">
-                <MobilePanelButton panel="chat" current={mobilePanel} label="Chat" icon={<MessageSquare className="size-3.5" />} onClick={() => switchMobilePanel("chat")} />
-                <MobilePanelButton panel="code" current={mobilePanel} label="Code" icon={<Code2 className="size-3.5" />} onClick={() => switchMobilePanel("code")} />
-                <MobilePanelButton panel="preview" current={mobilePanel} label="Preview" icon={<Eye className="size-3.5" />} onClick={() => switchMobilePanel("preview")} />
-              </div>
               <button type="button" onClick={() => setMobileOptionsOpen(true)} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:hidden" aria-label="Open mobile options"><MoreHorizontal className="size-4" /></button>
 
               {/* Desktop: clean non-crowded toolbar with dynamic visibility */}
@@ -1771,113 +1796,83 @@ Fix requirements:
           </header>
           )}
 
+          {!immersiveFullscreen && (
+            <MobileBuilderSwitcher current={mobilePanel} onChange={switchMobilePanel} className="md:hidden" />
+          )}
+
           <ResizablePanelGroup id="chat-builder-split" orientation="horizontal" className="min-h-0 flex-1 overflow-hidden">
             {!effectiveChatCollapsed ? (
               <>
                 <ResizablePanel id="chat-panel" defaultSize="30%" minSize="20%" maxSize="45%" className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-w-0 flex-col overflow-hidden bg-transparent md:flex md:border-r md:border-border/70`}>
-                  <section className="flex h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Chat panel">
-                    {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
-                    {/* Dynamic stack + auto commands banner for Git imports */}
-                    {(() => {
-                      const currentFiles = artifactFiles.length ? artifactFiles : (activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : []);
-                      const stk = currentFiles.length > 0 ? getStackFromFiles(currentFiles as any) : null;
-                      if (!stk) return null;
-                      return (
-                        <div className="flex items-center gap-2 border-b border-border/50 bg-muted/10 px-4 py-1 text-[11px]">
-                          <span className="text-emerald-400">Stack:</span> <span className="font-medium">{stk.stack}</span>
-                          {stk.framework && <span className="text-muted-foreground">({stk.framework})</span>}
-                          <span className="mx-1 text-muted-foreground/50">•</span>
-                          <span className="font-mono text-amber-400 truncate max-w-[280px]" title={stk.devCommand}>{stk.devCommand}</span>
-                          <button onClick={() => handleDynamicGitImport()} className="ml-auto text-[10px] underline text-muted-foreground hover:text-foreground">Re-import / change repo</button>
-                        </div>
-                      );
-                    })()}
-                    {chat.backendMode ? (
-                      <BackendSetupPanel
-                        envKeys={backendSetupKeys}
-                        onConfigure={() => { setRequiredEnvKeys(backendSetupKeys); setEnvModalOpen(true); }}
-                      />
-                    ) : null}
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                      <ChatPanel
-                        chat={chat}
-                        messages={chat.messages}
-                        activeMessage={activeMessage}
-                        onMessageClick={(message) => {
-                          if (message !== activeMessage) {
-                            setActiveMessage(message);
-                            setActiveTab("code");
-                            setBuilderMode("code");
-                            setMobilePanel("code");
-                          }
-                        }}
-                        streamText={streamText}
-                        reasoningText={reasoningText}
-                        isReasoningStreaming={isReasoningStreaming}
-                        isStreaming={!!streamPromise}
-                        showPlanMode={isPlanConversation || (!!streamPromise && !hasCodeInStream && streamText.length > 0)}
-                        checkpoints={assistantVersions}
-                        onRestoreCheckpoint={handleSwitchVersion}
-                      />
-                    </div>
-                    {continuationStatus === "exhausted" && !streamPromise && (
-                      <div className="shrink-0 px-3 pt-3">
-                        <Alert variant="destructive" className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2">
-                            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                            <div>
-                              <AlertTitle className="text-sm">Generation was interrupted</AlertTitle>
-                              <AlertDescription className="text-xs">
-                                This build needed more room than usual to finish. Your progress was saved — click Continue to pick up exactly where it left off.
-                              </AlertDescription>
+                  <LeftComposerPanel
+                    chat={chat}
+                    messages={chat.messages}
+                    activeMessage={activeMessage}
+                    onMessageClick={(message) => {
+                      if (message !== activeMessage) {
+                        setActiveMessage(message);
+                        setActiveTab("code");
+                        setBuilderMode("code");
+                        setMobilePanel("code");
+                      }
+                    }}
+                    streamText={streamText}
+                    reasoningText={reasoningText}
+                    isReasoningStreaming={isReasoningStreaming}
+                    isStreaming={!!streamPromise}
+                    showPlanMode={isPlanConversation || (!!streamPromise && !hasCodeInStream && streamText.length > 0)}
+                    builderStatus={builderStatus}
+                    autoFixStatus={autoFixStatus}
+                    autoFixAttempt={autoFixAttempt}
+                    maxAutoFixAttempts={MAX_AUTO_FIX_ATTEMPTS}
+                    continuationStatus={continuationStatus}
+                    onContinueGeneration={handleContinueGeneration}
+                    checkpoints={assistantVersions}
+                    currentVersionId={activeMessage?.id}
+                    onSwitchVersion={handleSwitchVersion}
+                    onNewStreamPromise={handleNewStreamPromise}
+                    onAbortController={(c) => { abortControllerRef.current = c; }}
+                    onStop={stopStreaming}
+                    onUndo={handleUndo}
+                    shouldFocusInput={shouldFocusInput}
+                    onInputFocused={() => setShouldFocusInput(false)}
+                    onFocusComposer={() => setShouldFocusInput(true)}
+                    headerExtra={
+                      <>
+                        {activeMessage && activeVersion && <div className="hs-version-strip flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs"><span className="inline-flex items-center rounded px-2 py-0.5 font-mono text-emerald-600 dark:text-emerald-400">{activeVersion.label}</span><span className="font-medium text-foreground">Version {activeVersion.version}</span><span className="text-muted-foreground">• {activeFileCount} file{activeFileCount === 1 ? "" : "s"}</span></div>}
+                        {/* Dynamic stack + auto commands banner for Git imports */}
+                        {(() => {
+                          const currentFiles = artifactFiles.length ? artifactFiles : (activeMessage ? getMessageFiles(activeMessage).map(normalizeFile) : []);
+                          const stk = currentFiles.length > 0 ? getStackFromFiles(currentFiles as any) : null;
+                          if (!stk) return null;
+                          return (
+                            <div className="flex items-center gap-2 border-b border-border/50 bg-muted/10 px-4 py-1 text-[11px]">
+                              <span className="text-emerald-400">Stack:</span> <span className="font-medium">{stk.stack}</span>
+                              {stk.framework && <span className="text-muted-foreground">({stk.framework})</span>}
+                              <span className="mx-1 text-muted-foreground/50">•</span>
+                              <span className="font-mono text-amber-400 truncate max-w-[280px]" title={stk.devCommand}>{stk.devCommand}</span>
+                              <button onClick={() => handleDynamicGitImport()} className="ml-auto text-[10px] underline text-muted-foreground hover:text-foreground">Re-import / change repo</button>
                             </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="shrink-0"
-                            onClick={() => {
-                              if (!currentGenerationRef.current) return;
-                              continuationRoundRef.current = 0;
-                              setContinuationStatus("continuing");
-                              setBuilderStatus("generating");
-                              const { messageId: contMessageId, model: contModel } = currentGenerationRef.current;
-                              const controller = new AbortController();
-                              abortControllerRef.current = controller;
-                              const continuationPromise = fetch("/api/get-next-completion-stream-promise", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                signal: controller.signal,
-                                body: JSON.stringify({
-                                  messageId: contMessageId,
-                                  model: contModel,
-                                  isContinuation: true,
-                                  continuationContext: accumulatedGenerationTextRef.current.slice(-CONTINUATION_TAIL_CHARS),
-                                }),
-                              }).then(async (res) => {
-                                if (!res.ok) throw new Error((await res.text()) || "Failed to continue generation");
-                                if (!res.body) throw new Error("No body on continuation response");
-                                return res.body;
-                              });
-                              streamPromiseRef.current = continuationPromise;
-                              setStreamPromise(continuationPromise);
-                            }}
-                          >
-                            Continue
-                          </Button>
-                        </Alert>
-                      </div>
-                    )}
-                    {builderMode === "design" ? (
-                      <div
-                        key="design-controls"
-                        ref={setDesignControlsSlot}
-                        className="hs-composer-swap min-h-0 flex-1 overflow-y-auto border-t border-border/70"
-                      />
-                    ) : (
-                      <div key="chat-composer" className="hs-composer-swap relative shrink-0 p-3"><ChatBox chat={chat} onNewStreamPromise={handleNewStreamPromise} onAbortController={(c) => { abortControllerRef.current = c; }} isStreaming={!!streamPromise} onStop={stopStreaming} onUndo={handleUndo} versions={assistantVersions} currentVersionId={activeMessage?.id} onSwitchVersion={handleSwitchVersion} shouldFocusInput={shouldFocusInput} onInputFocused={() => setShouldFocusInput(false)} /></div>
-                    )}
-                  </section>
+                          );
+                        })()}
+                        {chat.backendMode ? (
+                          <BackendSetupPanel
+                            envKeys={backendSetupKeys}
+                            onConfigure={() => { setRequiredEnvKeys(backendSetupKeys); setEnvModalOpen(true); }}
+                          />
+                        ) : null}
+                      </>
+                    }
+                    composerSlotOverride={
+                      builderMode === "design" ? (
+                        <div
+                          key="design-controls"
+                          ref={setDesignControlsSlot}
+                          className="hs-composer-swap min-h-0 max-h-[45vh] overflow-y-auto border-t border-border/70"
+                        />
+                      ) : undefined
+                    }
+                  />
                 </ResizablePanel>
                 <ResizableHandle withHandle className="hidden md:flex" />
               </>
@@ -2145,11 +2140,6 @@ function BackendSetupPanel({ envKeys, onConfigure }: { envKeys: string[]; onConf
 function BuilderModeButton({ mode, current, label, icon, onClick, compact }: { mode: BuilderMode; current: BuilderMode; label: string; icon: ReactNode; onClick: () => void; compact?: boolean }) {
   const active = current === mode;
   return <button type="button" aria-label={label} onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.2),rgba(168,85,247,0.16),rgba(251,191,36,0.1))] text-zinc-50 shadow-[0_0_18px_rgba(244,114,182,0.16)]" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"} ${compact ? "w-full" : ""}`} title={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span></button>;
-}
-
-function MobilePanelButton({ panel, current, label, icon, onClick }: { panel: MobilePanel; current: MobilePanel; label: string; icon: ReactNode; onClick: () => void }) {
-  const active = current === panel;
-  return <button type="button" onClick={onClick} className={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${active ? "border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(244,114,182,0.18),rgba(168,85,247,0.15),rgba(251,191,36,0.08))] text-zinc-50" : "border-transparent text-muted-foreground hover:border-violet-400/20 hover:bg-zinc-900 hover:text-zinc-100"}`} aria-label={label}><span aria-hidden="true" className={active ? "text-amber-300" : "text-violet-300"}>{icon}</span><span className="sr-only">{label}</span></button>;
 }
 
 function ProjectMenuItem({ icon, label, onClick, disabled, danger }: { icon: ReactNode; label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {

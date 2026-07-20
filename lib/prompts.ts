@@ -375,6 +375,27 @@ const GSAP_SUPPORT_RULE = dedent`
   For 3D requests, combine GSAP with Three.js only for camera/object choreography or scroll-linked scene transitions; keep the main scene in @react-three/fiber and use useFrame for continuous animation.`;
 
 /* ============================================================
+ * NO-DEAD-CONTROLS RULE — ADDITIVE ONLY, EVERY BUILD (not just image clones).
+ * IMAGE_CLONE_FIDELITY already enforces "every visible interactive element
+ * must work" for screenshot-clone requests; this generalizes the same bar to
+ * every generated app regardless of whether an image was attached. Appended
+ * after the support rules so it reinforces (never overrides) existing rules.
+ * ============================================================ */
+const NO_DEAD_CONTROLS_RULE = dedent`
+  ## EVERY VISIBLE CLICKABLE ELEMENT MUST WORK OR BE REMOVED
+  A generated app is judged as a working product, not a static mockup. Before finishing, mentally
+  click every visible interactive element and confirm it does something real:
+  - Every button, link, tab, menu item, toggle, checkbox, filter, and form control must have real
+    local behavior — navigate a real route, mutate real state, open a real dialog/sheet, submit a
+    form, or otherwise change what's on screen. Never leave an \`onClick\` empty or missing.
+  - Every nav item and breadcrumb goes to a real route or in-page section; never a dead \`href="#"\`.
+  - Any list/table/card grid shown must be populated with realistic data, and its row/item actions
+    (view, edit, delete, expand) must work against that data (local state is fine).
+  - If a feature is out of scope for this build, remove the control entirely rather than shipping
+    a decorative one that does nothing when clicked. A smaller, fully-working app beats a larger
+    one with dead controls.`;
+
+/* ============================================================
  * MULTI-ROUTE ENFORCEMENT — ADDITIVE ONLY.
  * Closes the specific failure mode where a "full app / SaaS" request is
  * satisfied with ONE giant file that fakes multiple pages via hash routing,
@@ -695,6 +716,7 @@ export function getMainCodingPrompt(
     // never modifies obedience/routing/file-structure rules — they reinforce them.
     p += "\n\n" + MULTI_ROUTE_ENFORCEMENT;
     p += "\n\n" + MOBILE_FIRST_UX_RULES;
+    p += "\n\n" + NO_DEAD_CONTROLS_RULE;
     // Phase 1 audit: semantic-token + anti-slop enforcement, appended AFTER the
     // style block so it reinforces the active preset. Additive; never modifies
     // obedience/routing/file-structure rules.
