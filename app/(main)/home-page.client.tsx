@@ -916,7 +916,18 @@ export default function HomePageClient() {
       const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
       if (!session?.user) return;
       sessionStorage.removeItem("pendingBuild");
-      await createBuild(JSON.parse(raw));
+      setIsSubmitting(true);
+      try {
+        await createBuild(JSON.parse(raw));
+      } catch (error) {
+        toast({
+          title: "Could not resume your build after sign-in",
+          description: error instanceof Error ? error.message : "Please re-enter your prompt and try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     })().catch(() => sessionStorage.removeItem("pendingBuild"));
   }, []);
 
@@ -927,7 +938,15 @@ export default function HomePageClient() {
       const session = await fetch("/api/auth/session", { cache: "no-store" }).then((response) => response.json().catch(() => null)).catch(() => null);
       if (!session?.user) return;
       sessionStorage.removeItem("pendingGithubImport");
-      await importGithubRepo(JSON.parse(raw));
+      try {
+        await importGithubRepo(JSON.parse(raw));
+      } catch (error) {
+        toast({
+          title: "Could not resume your GitHub import after sign-in",
+          description: error instanceof Error ? error.message : "Please paste the repository URL again.",
+          variant: "destructive",
+        });
+      }
     })().catch(() => sessionStorage.removeItem("pendingGithubImport"));
   }, []);
 
@@ -974,7 +993,7 @@ export default function HomePageClient() {
         screenshotUrl,
         attachments: data.attachments,
         aiCapabilities: aiDetection.capabilities,
-        aiIntegration: data.aiIntegration,
+        aiIntegration: data.aiIntegration ? (data.aiIntegration.provider === "chinnallm" ? "chinnallm" : "byok") : null,
         backendMode: data.backendMode,
         mcpServers: data.mcpServers,
       }),
