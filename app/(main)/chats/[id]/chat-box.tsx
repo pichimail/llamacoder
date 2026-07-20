@@ -2,7 +2,6 @@
 
 import { PromptComposer, type ComposerAttachment, type ComposerMode } from "@/components/chat/prompt-composer";
 import { AiModalAbilitySelector } from "@/components/ui/ai-modal-ability-selector";
-import { AiResponseWriter } from "@/components/ui/ai-response-writer";
 import { AiSuggestions } from "@/components/ui/ai-suggestions";
 import {
   Checkpoint,
@@ -591,12 +590,6 @@ export default function ChatBox({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <AiSuggestions onSelect={(value) => setPrompt(value)} />
         </div>
-
-        {isStreaming ? (
-          <div className="mb-3">
-            <AiResponseWriter isActive={isStreaming} />
-          </div>
-        ) : null}
 
         <div className="group/composer relative">
           <div

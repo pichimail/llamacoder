@@ -12,6 +12,8 @@ import {
   Attachments,
 } from "@/components/ai-elements/attachments";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import { DotFlow } from "@/components/ui/dot-flow";
 import {
   PromptInput,
   PromptInputActionAddAttachments,
@@ -68,6 +70,56 @@ async function uploadDataUrl(filename: string, mediaType: string, url: string) {
   return data.url as string;
 }
 
+const BUILD_WORDS = [
+  "Scaffolding",
+  "Architecting",
+  "Composing",
+  "Wiring routes",
+  "Styling",
+  "Refining",
+  "Polishing",
+  "Validating",
+  "Optimizing",
+  "Assembling",
+];
+
+/** Shimmer streaming indicator shown at the top of the composer while a build
+ * is generating. Rotates through single build words so the composer itself
+ * reflects live agent activity (matches the reasoning/plan panels above it). */
+function StreamingStatusBar({
+  active,
+  label,
+}: {
+  active: boolean;
+  label?: string;
+}) {
+  const [word, setWord] = useState(BUILD_WORDS[0]);
+
+  useEffect(() => {
+    if (!active || label) return;
+    let index = 0;
+    const interval = setInterval(() => {
+      index = (index + 1) % BUILD_WORDS.length;
+      setWord(BUILD_WORDS[index]);
+    }, 900);
+    return () => clearInterval(interval);
+  }, [active, label]);
+
+  if (!active) return null;
+
+  return (
+    <div className="flex items-center gap-2 border-b border-border/60 px-3.5 py-2 text-xs">
+      <DotFlow size={4} className="text-primary" label="Generating" />
+      <Shimmer as="span" className="font-medium tracking-tight" duration={1.4}>
+        {label || word}
+      </Shimmer>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+        building artifact
+      </span>
+    </div>
+  );
+}
+
 /** Syncs the external `value` prop into the PromptInput controller's text state. */
 function ControlledValueSync({ value }: { value: string }) {
   const controller = usePromptInputController();
@@ -113,6 +165,7 @@ export function PromptComposer({
   onModelChange,
   onDictate,
   leftActions,
+  statusLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -131,6 +184,9 @@ export function PromptComposer({
   onModelChange?: (value: string) => void;
   onDictate?: (text: string) => void;
   leftActions?: React.ReactNode;
+  /** Optional fixed label for the streaming indicator; when omitted the
+   * indicator rotates through build words while status is busy. */
+  statusLabel?: string;
 }) {
   const [blobUploadConfigured, setBlobUploadConfigured] = useState<boolean | null>(null);
 
@@ -199,6 +255,7 @@ export function PromptComposer({
         )}
       >
         <PromptInputBody>
+          <StreamingStatusBar active={isBusy} label={statusLabel} />
           <AttachmentPreviewRow />
           <PromptInputTextarea
             placeholder={placeholder}

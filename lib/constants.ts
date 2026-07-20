@@ -16,10 +16,20 @@ export type ModelConfig = {
   maxOutputTokens?: number;
 };
 
-/** Conservative default output ceiling used for any model without an explicit
- * override below. Generation code should never hardcode a token number itself;
- * always resolve it through getMaxOutputTokensForModel(). */
-export const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
+/** Default output ceiling used for any model without an explicit override
+ * below. Generation code should never hardcode a token number itself; always
+ * resolve it through getMaxOutputTokensForModel(). Every model currently listed
+ * supports at least this many completion tokens, so raising it from the old
+ * 16000 floor gives large multi-file builds more room in a single pass and
+ * leans on the continuation loop only for genuinely huge outputs. Free/limited
+ * routes stay explicitly capped below via their own maxOutputTokens. */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 24000;
+
+/** Higher ceiling for the primary, known-capable builder models (GLM 5.x,
+ * Claude, Qwen coder, etc.) that comfortably stream 32k completion tokens.
+ * Applied via explicit per-model maxOutputTokens so raising it can never
+ * overshoot a smaller model's real capacity. */
+export const LARGE_BUILD_MAX_OUTPUT_TOKENS = 32000;
 
 export const WORKING_FALLBACK_MODEL = "zai-org/GLM-5.1";
 
@@ -53,6 +63,7 @@ export const MODELS: ModelConfig[] = [
     status: "ready",
     recommended: true,
     description: "Working builder model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "GLM 5.1",
@@ -62,6 +73,7 @@ export const MODELS: ModelConfig[] = [
     status: "ready",
     recommended: true,
     description: "Primary fallback model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "GLM 5.2",
@@ -71,6 +83,7 @@ export const MODELS: ModelConfig[] = [
     status: "ready",
     recommended: true,
     description: "Newest GLM builder model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "OpenRouter Auto",
@@ -124,6 +137,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "OpenRouter coding model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Claude Sonnet 4.6",
@@ -132,6 +146,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "OpenRouter balanced coding and reasoning model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Claude Sonnet 4.5",
@@ -140,6 +155,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "OpenRouter coding model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Claude Opus 4.8",
@@ -148,6 +164,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "OpenRouter heavy reasoning model",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Claude Opus 4.8 Fast",
@@ -156,6 +173,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "Lower-latency Opus route for large edits",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "DeepSeek V4 Pro",
@@ -197,6 +215,7 @@ export const MODELS: ModelConfig[] = [
     status: "experimental",
     recommended: true,
     description: "OpenRouter UI and app-building coder",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Qwen 3 Coder Flash",
@@ -270,6 +289,7 @@ export const MODELS: ModelConfig[] = [
     provider: "openrouter",
     status: "experimental",
     description: "Z.ai GLM route via OpenRouter",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "OpenRouter GLM 5.1",
@@ -307,6 +327,7 @@ export const MODELS: ModelConfig[] = [
     nativeModel: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     provider: "together",
     status: "experimental",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "Qwen 3 Coder Next",
@@ -314,6 +335,7 @@ export const MODELS: ModelConfig[] = [
     nativeModel: "Qwen/Qwen3-Coder-Next-FP8",
     provider: "together",
     status: "experimental",
+    maxOutputTokens: LARGE_BUILD_MAX_OUTPUT_TOKENS,
   },
   {
     label: "DeepSeek V3",
