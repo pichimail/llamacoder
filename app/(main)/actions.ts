@@ -1,6 +1,6 @@
 "use server";
 
-import { requireChatAccess } from "@/lib/access-control";
+import { requireChatAccess } from "@/lib/authz";
 
 export async function createMessage(
   chatId: string,

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Metadata } from "next";
 import PageClientWrapper from "./page-client-wrapper";
-import { getScopedChatListWhere, requireChatAccess } from "@/lib/access-control";
+import { getScopedChatListWhere, requireChatAccess } from "@/lib/authz";
 
 type Props = {
   params: Promise<{ id: string }>;
