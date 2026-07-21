@@ -29,9 +29,15 @@ import {
   GENERATION_BUDGET_MS,
   MAX_CONTINUATION_ROUNDS,
   getMessageFiles,
-  isPlanModeConversation,
   type RawGeneratedFile,
 } from "./chat-helpers";
+
+type TriggerAutoFixFn = (args: {
+  error: string;
+  files?: RawGeneratedFile[];
+  fallback?: boolean;
+  force?: boolean;
+}) => Promise<void>;
 
 type UseChatStreamArgs = {
   chat: Chat;
@@ -42,13 +48,9 @@ type UseChatStreamArgs = {
   autoFixEnabled: boolean;
   isPlanConversation: boolean;
   syncWorkspaceFiles: (files: RawGeneratedFile[]) => Promise<void>;
-  triggerAutoFix: (args: {
-    error: string;
-    files?: RawGeneratedFile[];
-    fallback?: boolean;
-    force?: boolean;
-  }) => Promise<void>;
-  presentBuildError: (error: string) => void;
+  /** Latest auto-fix callbacks via refs — breaks circular hook dependency */
+  triggerAutoFixRef: MutableRefObject<TriggerAutoFixFn | null>;
+  presentBuildErrorRef: MutableRefObject<((error: string) => void) | null>;
   showEnvModalIfNeeded: (files: { path: string; code: string; language: string }[]) => void;
   clearAutoFixLedger: () => void;
   markAutoFixIdleOnStop: () => void;
@@ -65,9 +67,6 @@ type UseChatStreamArgs = {
   hasAutoSwitchedPreviewRef: MutableRefObject<boolean>;
   searchParams: URLSearchParams;
   setSearchParams: Dispatch<SetStateAction<URLSearchParams>>;
-  /** AI/MCP chooser gates — if true, URL-driven generation is paused */
-  aiChooserPending: boolean;
-  mcpChooserPending: boolean;
   chatAiIntegration: string | null | undefined;
   onMaybeShowAiChooser: () => boolean;
   onMaybeShowMcpChooser: () => boolean;
@@ -82,8 +81,8 @@ export function useChatStream({
   autoFixEnabled,
   isPlanConversation,
   syncWorkspaceFiles,
-  triggerAutoFix,
-  presentBuildError,
+  triggerAutoFixRef,
+  presentBuildErrorRef,
   showEnvModalIfNeeded,
   clearAutoFixLedger,
   markAutoFixIdleOnStop,
@@ -98,8 +97,6 @@ export function useChatStream({
   hasAutoSwitchedPreviewRef,
   searchParams,
   setSearchParams,
-  aiChooserPending,
-  mcpChooserPending,
   chatAiIntegration,
   onMaybeShowAiChooser,
   onMaybeShowMcpChooser,
@@ -222,7 +219,6 @@ export function useChatStream({
     setStreamPromise(continuationPromise);
   }, [setBuilderStatus]);
 
-  // URL-driven generation start (?generate=messageId)
   useEffect(() => {
     const messageId = searchParams.get("generate");
     if (!messageId || streamPromiseRef.current || streamTextRef.current) return;
@@ -304,7 +300,6 @@ export function useChatStream({
     setSearchParams,
   ]);
 
-  // Core stream reader
   useEffect(() => {
     async function readStream() {
       if (!streamPromise || isHandlingStreamRef.current) return;
@@ -506,10 +501,14 @@ export function useChatStream({
               setStreamPromise(undefined);
               setStreamReasoningEnabled(false);
               if (!autoFixEnabled) {
-                presentBuildError(validationError);
+                presentBuildErrorRef.current?.(validationError);
                 return;
               }
-              await triggerAutoFix({ error: validationError, files: mergedFiles, fallback: true });
+              await triggerAutoFixRef.current?.({
+                error: validationError,
+                files: mergedFiles,
+                fallback: true,
+              });
               return;
             }
             const message = await createMessage(
@@ -554,8 +553,6 @@ export function useChatStream({
     streamPromise,
     autoFixEnabled,
     syncWorkspaceFiles,
-    triggerAutoFix,
-    presentBuildError,
     isPlanConversation,
     activeMessage,
     setActiveMessage,
@@ -569,6 +566,8 @@ export function useChatStream({
     showEnvModalIfNeeded,
     resetAutoFixAttemptCounters,
     hasAutoSwitchedPreviewRef,
+    triggerAutoFixRef,
+    presentBuildErrorRef,
   ]);
 
   return {
