@@ -296,7 +296,8 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
       update: { value: encrypted },
       create: { projectId: project.id, key, value: encrypted },
     });
-    await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } }); 
+    await logAudit({ userId: accessUser.id, action: "save-env", resource: "project", resourceId: project.id, metadata: { key } });
+    return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
   if (action === "save-seo") {
@@ -328,7 +329,6 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     }
     if (upserts.length) await Promise.all(upserts);
     await logAudit({ userId: accessUser.id, action: "save-seo", resource: "project", resourceId: project.id });
-    return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
     return NextResponse.json({ ok: true, workspace: await serializeWorkspace(chatId) });
   }
 
