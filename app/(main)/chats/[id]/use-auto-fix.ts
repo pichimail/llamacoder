@@ -225,7 +225,7 @@ Fix requirements:
           autoFixingToastRef.current.dismiss();
           autoFixingToastRef.current = null;
         }
-        const compilerFault = /Path must be a string\\. Received null|postcss-compiler|vendors-sandbox/i.test(normalized);
+        const compilerFault = /Path must be a string\. Received null|postcss-compiler|vendors-sandbox/i.test(normalized);
         toast({
           title: compilerFault ? "Preview compiler failed" : "Preview build is still starting",
           description: compilerFault
