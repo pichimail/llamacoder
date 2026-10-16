@@ -14,6 +14,13 @@ export const MAX_AUTO_FIX_ATTEMPTS = 5;
 export const FIX_CONTEXT_FILE_LIMIT = 18;
 export const FIX_CONTEXT_CHAR_BUDGET = 70000;
 export const SANDBOX_BUNDLER_TIMEOUT_RE = /Sandbox bundler did not respond in time/i;
+/**
+ * Sandpack-internal PostCSS/path-resolver crashes are not caused by model
+ * generated component code. Sending the same error back for auto-fix creates
+ * successive broken versions instead of repairing the preview infrastructure.
+ */
+export const SANDBOX_PLATFORM_ERROR_RE =
+  /Path must be a string\. Received null|(?:vendors-sandbox|postcss-compiler|postcss).*?(?:isAbsolute|path must be a string)|(?:Sandpack|sandbox) (?:runtime|compiler|bundler) (?:failed|crashed)/i;
 
 /** Max automatic "continue where you left off" rounds when a response is cut
  * off at the provider's token limit. Distinct from the general autofix loop. */
@@ -68,7 +75,7 @@ export function autoFixFingerprint(error: string) {
 }
 
 export function isNonFixablePreviewError(error: string) {
-  return SANDBOX_BUNDLER_TIMEOUT_RE.test(error);
+  return SANDBOX_BUNDLER_TIMEOUT_RE.test(error) || SANDBOX_PLATFORM_ERROR_RE.test(error);
 }
 
 export function isPlanModeConversation(messages: Message[]) {
