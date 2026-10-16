@@ -225,10 +225,12 @@ Fix requirements:
           autoFixingToastRef.current.dismiss();
           autoFixingToastRef.current = null;
         }
+        const compilerFault = /Path must be a string\\. Received null|postcss-compiler|vendors-sandbox/i.test(normalized);
         toast({
-          title: "Preview build is still starting",
-          description:
-            "The sandbox timed out before reporting a result. Refresh the preview or review the current files; no model fix was started.",
+          title: compilerFault ? "Preview compiler failed" : "Preview build is still starting",
+          description: compilerFault
+            ? "This is a Sandpack preview-platform error, not a generated-code error. Automatic model retries were stopped. Refresh the preview or inspect the sandbox runtime."
+            : "The sandbox timed out before reporting a result. Refresh the preview or review the current files; no model fix was started.",
           variant: "destructive",
         });
         return;
